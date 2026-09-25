@@ -1,0 +1,177 @@
+"""Ignatius at Home: turn an uploaded PDF or Word document into a guided audio retreat."""
+
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from . import auth, config, pipeline, prompts, tts
+from .auth import User, current_user
+from .extract import ExtractError, extract
+from .storage import LocalStore, StorageError, store
+
+logging.basicConfig(level=logging.INFO)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    await store.setup()
+    yield
+
+
+app = FastAPI(title="Ignatius at Home API", version="0.2.0", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=config.ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
+)
+
+
+# Every error comes back as {"error": {"status": ..., "message": ...}}.
+@app.exception_handler(StarletteHTTPException)
+async def http_error(_: Request, exc: StarletteHTTPException):
+    return JSONResponse({"error": {"status": exc.status_code, "message": exc.detail}}, status_code=exc.status_code)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(_: Request, exc: RequestValidationError):
+    first = exc.errors()[0]
+    field = ".".join(str(p) for p in first["loc"][1:]) or "request"
+    return JSONResponse({"error": {"status": 422, "message": f"Invalid {field}: {first['msg']}"}}, status_code=422)
+
+
+@app.exception_handler(StorageError)
+async def storage_error(_: Request, exc: StorageError):
+    return JSONResponse({"error": {"status": 503, "message": str(exc)}}, status_code=503)
+
+
+def check_prompt(text: str | None, default: str, name: str) -> str:
+    """A blank prompt means the default; custom prompts are length-limited."""
+    text = (text or "").strip()
+    if len(text) > prompts.MAX_PROMPT_CHARS:
+        raise HTTPException(400, f"The {name} prompt is longer than {prompts.MAX_PROMPT_CHARS} characters.")
+    return text or default
+
+
+async def my_retreat(retreat_id: str, user: User = Depends(current_user)) -> dict:
+    retreat = await pipeline.get(retreat_id)
+    # Someone else's retreat gets the same answer as a missing one.
+    if not retreat or retreat["user_id"] != user.id:
+        raise HTTPException(404, "Retreat not found.")
+    return retreat
+
+
+@app.get("/")
+def root():
+    return {"name": "Ignatius at Home API", "docs": "/docs", "health": "/api/health"}
+
+
+@app.get("/api/health")
+def health():
+    return {
+        "ok": True,
+        "llm": config.LLM_MODE,
+        "model": config.LLM_MODEL if config.LLM_MODE != "stub" else None,
+        "tiers": list(tts.tiers()),
+        "sign_in": auth.enabled(),
+    }
+
+
+@app.get("/api/options")
+def options():
+    """Everything the frontend needs before sign-in: menus, default prompts, and
+    the public Supabase settings for the sign-in form."""
+    return {
+        "tiers": tts.tiers(),
+        "prompts": prompts.defaults(),
+        "limits": {"max_upload_mb": config.MAX_UPLOAD_MB, "max_pages": config.MAX_PAGES},
+        "auth": {"url": config.SUPABASE_URL, "publishable_key": config.SUPABASE_PUBLISHABLE_KEY}
+        if auth.enabled()
+        else None,
+    }
+
+
+@app.get("/api/me")
+def me(user: User = Depends(current_user)):
+    return {"id": user.id, "email": user.email}
+
+
+@app.get("/api/retreats")
+async def list_retreats(user: User = Depends(current_user)):
+    return {"retreats": await store.list_for(user.id)}
+
+
+@app.post("/api/retreats", status_code=202)
+async def create_retreat(
+    file: UploadFile = File(...), plan_prompt: str = Form(""), user: User = Depends(current_user)
+):
+    plan_prompt = check_prompt(plan_prompt, prompts.PLAN_INSTRUCTIONS, "planning")
+    data = await file.read(config.MAX_UPLOAD_MB * 1024 * 1024 + 1)
+    if len(data) > config.MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(413, f"File is larger than {config.MAX_UPLOAD_MB} MB.")
+    if not data:
+        raise HTTPException(400, "The uploaded file is empty.")
+    try:
+        source = extract(file.filename or "upload", data)
+    except ExtractError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    retreat = await pipeline.create_retreat(user.id, file.filename or "upload", source, plan_prompt)
+    return await pipeline.public_view(retreat)
+
+
+@app.get("/api/retreats/{retreat_id}")
+async def read_retreat(retreat: dict = Depends(my_retreat)):
+    return await pipeline.public_view(retreat)
+
+
+@app.delete("/api/retreats/{retreat_id}")
+async def delete_retreat(retreat: dict = Depends(my_retreat)):
+    if retreat["id"] in pipeline.active:
+        raise HTTPException(409, "Wait for the current job to finish before deleting this retreat.")
+    await store.delete(retreat)
+    return {"deleted": retreat["id"]}
+
+
+class BuildRequest(BaseModel):
+    tier: str = "free"
+    voice: str = "en-US-AndrewMultilingualNeural"
+    heart_prompt: str | None = None
+    deep_prompt: str | None = None
+
+
+@app.post("/api/retreats/{retreat_id}/days/{day}/build", status_code=202)
+async def build_day(day: int, body: BuildRequest, retreat: dict = Depends(my_retreat)):
+    if retreat["status"] != "ready":
+        raise HTTPException(409, "The retreat plan isn't ready yet.")
+    state = retreat["days"].get(str(day))
+    if state is None:
+        raise HTTPException(404, f"This retreat has no day {day}.")
+    if state["status"] == "building":
+        raise HTTPException(409, f"Day {day} is already being built.")
+    heart = check_prompt(body.heart_prompt, prompts.HEART_PRESETS["companion"], "heart")
+    deep = check_prompt(body.deep_prompt, prompts.DEEP_INSTRUCTIONS, "deep dive")
+    try:
+        await pipeline.start_day_build(retreat, day, body.tier, body.voice, heart, deep)
+    except tts.TTSError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return await pipeline.public_view(retreat)
+
+
+if isinstance(store, LocalStore):
+    # Local development only. With Supabase, files are served by signed Storage URLs.
+    @app.get("/api/files/{path:path}")
+    def read_file(path: str):
+        try:
+            target = store.local_path(path)
+        except StorageError:
+            raise HTTPException(404, "File not found.")
+        if not target.is_file():
+            raise HTTPException(404, "File not found.")
+        media = "audio/mpeg" if target.suffix == ".mp3" else "image/jpeg"
+        return FileResponse(target, media_type=media)
