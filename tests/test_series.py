@@ -92,3 +92,9 @@ def test_claude_gets_the_series_as_a_cached_system_block():
     assert system[0]["cache_control"] == {"type": "ephemeral"} and system[0]["text"].startswith(series.INSTRUCTIONS)
     assert system[1]["text"] == "Write the reflection."
     assert llm._system("Plain.", "") == "Plain."
+
+
+def test_background_joins_the_cached_series_block():
+    blocks = llm._with_background(llm._system("Write.", "<series>…</series>"))
+    assert blocks[0]["text"].startswith("Background for this work") and blocks[0]["cache_control"]
+    assert llm._with_background("Plain.").endswith("Plain.")

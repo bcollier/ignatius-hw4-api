@@ -68,3 +68,28 @@ def test_title_that_is_only_the_day_number():
 
     text = guide_text(GUIDE_DEFAULTS["opening"], {"day": 5, "title": "Day 5", "grace": ""})
     assert text.startswith("Day 5. Settle yourself")
+
+
+def test_free_voice_pieces_are_retried(monkeypatch):
+    import asyncio
+
+    from app import tts
+
+    calls = {"n": 0}
+
+    class Flaky:
+        def __init__(self, *a, **k):
+            pass
+
+        async def stream(self):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise ConnectionError("dropped")
+            yield {"type": "audio", "data": b"mp3"}
+
+    async def no_sleep(_):
+        return None
+
+    monkeypatch.setattr(tts.edge_tts, "Communicate", Flaky)
+    monkeypatch.setattr(tts.asyncio, "sleep", no_sleep)
+    assert asyncio.run(tts._edge_piece("hello", "v")) == b"mp3" and calls["n"] == 3

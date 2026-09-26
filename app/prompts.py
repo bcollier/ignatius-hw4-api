@@ -1,6 +1,46 @@
 """Prompts for planning a retreat and writing each day's scripts."""
 
+import contextvars
 import re
+
+# Sent ahead of every prompt to every model (see llm._call and jetstream.complete),
+# so each step understands the tradition it's writing for.
+BACKGROUND = """Background for this work (for your understanding; don't recite it to the listener):
+
+This app, Ignatius at Home, turns material a person has chosen (a retreat handout, scripture passages, readings, images) into a guided audio retreat they pray at home, usually one day at a time, often week after week over months.
+
+The Spiritual Exercises. Ignatius of Loyola (1491 to 1556), founder of the Jesuits, wrote the Spiritual Exercises as a manual for the person who gives them, not a book to be read straight through; Pope Paul III approved them in 1548. They are a structured path of prayer, traditionally arranged in four "weeks" that are stages rather than calendar weeks: the first on God's love, sin and mercy; the second on the life of Christ and following him; the third on his passion; the fourth on the resurrection and love in action. They open with the Principle and Foundation, on what we are made for and the freedom (Ignatius calls it indifference) to choose what leads there. Features that matter for this app:
+- Each prayer period begins by asking for a specific grace, "what I want and desire," named plainly.
+- Imaginative contemplation: entering a Gospel scene with the senses, as if present. Application of the senses gathers a scene through each sense.
+- The colloquy: speaking to God or to Christ "as one friend speaks to another," usually at the end of a period, closing with the Our Father.
+- Repetition: returning to the points where one felt more consolation or desolation, rather than always moving on to new material.
+- Consolation and desolation: the inner movements of the heart toward or away from God (peace, desire, tears, or dryness, restlessness). Noticing them is the heart of discernment; the director helps the person notice, not tell them what to feel.
+- The Examen: a short daily review of the day with gratitude, noticing where God was present.
+- The one who gives the Exercises should not push the retreatant but "let the Creator deal directly with the creature" (Annotation 15). Guidance should invite, not instruct or moralize.
+
+A retreat. A retreat is a period set apart for prayer. The full Exercises can be made over about thirty days in silence, or, following Ignatius' nineteenth annotation, "in daily life": at home over many months, with a set time of prayer each day and regular meetings with a spiritual director. Programs of this kind often run through the school year week by week, with a handout of scripture and readings for each week. That is the listener here: an adult praying for perhaps half an hour a day, in the middle of work and family life.
+
+Lectio divina. "Divine reading" is the monastic practice of slow, prayerful reading of scripture, central to the Rule of Saint Benedict. The Carthusian Guigo II (twelfth century) named its steps in The Ladder of Monks: lectio (reading), meditatio (meditation), oratio (prayer), contemplatio (contemplation). Pope Benedict XVI's Verbum Domini (2010, paragraph 87) describes them as: what does the text say in itself; what does it say to us; what do we say to the Lord in response; and taking up God's way of seeing, with actio (action) following.
+
+How a day in this app is prayed. The day opens by asking for the grace, then a short silence. The passage is read four times, loosely following lectio divina: the first reading simply to hear it (lectio); then the reflection for the heart, and the second reading, listening for what the text says to me (meditatio); then the deep dive on its theology, history and interpretation, and the third reading, listening for what God may offer or ask; then a silence framed by a bell (contemplatio); then the last reading, answered in one's own words as a colloquy (oratio), and a closing. The reflection is heard between the first and second readings; the deep dive between the second and third. Everything is heard aloud, once, in order, so each part should prepare for the next and never assume the listener can look back at a page.
+"""
+
+
+# What the person has written about themselves ("user info.md"), set for the length
+# of a job so every model call made for them includes it (llm._call, jetstream.complete).
+PERSON: contextvars.ContextVar[str] = contextvars.ContextVar("person", default="")
+
+
+def person_block(about: str) -> str:
+    if not about.strip():
+        return ""
+    return (
+        "About the person praying, in their own words (from their saved notes; it may be a summary). Let it shape "
+        "your choice of examples, images and tone, and what you notice or ask about. Don't quote it back, don't "
+        "mention that you have notes about them, and don't assume more than it says.\n<about_the_person>\n"
+        + about.strip() + "\n</about_the_person>"
+    )
+
 
 HOUSE_STYLE = """House style for anything that will be read aloud:
 - Plain prose paragraphs. No headings, lists, bold, emoji or markdown.
@@ -22,7 +62,7 @@ PLAN_FIXED = """Plan at most {max_days} days.
 
 For each day, passage_text is the text the listener will hear read aloud. Copy it word for word from the source, including the translation's wording. Remove only page numbers, running headers and footers, line-break hyphens, and verse numbers. If a day has no scripture (a consideration, a review day), use the source's own words for that day. Scanned pages are included as images; transcribe from them exactly.
 
-grace is the grace to ask for that day, in one sentence, taken from the source when it names one. focus is one or two sentences telling the writers what the day is about. image_index is the index of the supplied image that best fits the day, or -1 for none. In images, describe each supplied image briefly for the writers; this text is never shown to the listener."""
+grace is the grace to ask for that day, in one sentence, taken from the source when it names one. focus is one or two sentences telling the writers what the day is about. image_indexes lists every supplied image that belongs with the day, best first (the listener sees them while praying), or is empty; image_index is the first of them, or -1 for none. An image may serve several days. In images, describe each supplied image briefly for the writers; this text is never shown to the listener."""
 
 PLAN_SCHEMA = {
     "type": "object",
@@ -51,8 +91,9 @@ PLAN_SCHEMA = {
                     "grace": {"type": "string"},
                     "focus": {"type": "string"},
                     "image_index": {"type": "integer"},
+                    "image_indexes": {"type": "array", "items": {"type": "integer"}},
                 },
-                "required": ["day", "title", "source_ref", "passage_text", "grace", "focus", "image_index"],
+                "required": ["day", "title", "source_ref", "passage_text", "grace", "focus", "image_index", "image_indexes"],
                 "additionalProperties": False,
             },
         },
@@ -176,7 +217,26 @@ SEARCH_QUERIES = (
 SEARCH_OFF = "You cannot search the web. Make only claims you are confident are well established, and say when a point is debated."
 
 
-def day_context(retreat_title: str, day: dict, image_description: str | None) -> str:
+GUIDE_TAILOR = """You write the short spoken guidance for one day of a prayer retreat: the lines a guide says before each reading and around the silence. The listener hears them in this order, between the parts shown below: opening, then the first reading, the reflection for the heart, the second reading, the deep dive, the third reading, the silence, the last reading, and the closing.
+
+For each line you're given the text the retreat uses by default. Keep its purpose, its place and roughly its length, and adapt it to this day so the parts hold together: point back to an image, word or question from the reflection or the deep dive where it helps the listener pray the next reading (for example, the line before the second reading can recall what the reflection invited them to notice). Don't summarize the reflection or the deep dive. Keep the opening's request for the grace word for word. Each line is read aloud once, by the same calm voice.
+
+""" + HOUSE_STYLE + """
+
+Reply with only a JSON object whose keys are the line names given, each with its text."""
+
+
+def tailor_input(context: str, heart: str, deep: str, lines: dict) -> str:
+    parts = [context]
+    if heart:
+        parts.append(f"<heart_reflection>\n{heart}\n</heart_reflection>")
+    if deep:
+        parts.append(f"<deep_dive>\n{deep}\n</deep_dive>")
+    parts.append("<default_lines>\n" + "\n".join(f"{name}: {text}" for name, text in lines.items()) + "\n</default_lines>")
+    return "\n\n".join(parts)
+
+
+def day_context(retreat_title: str, day: dict, image_description: str | None, heart: str | None = None) -> str:
     """The user message for the heart and deep prompts. The image description helps the
     writers connect the day's picture to the text; the listener sees the image itself."""
     lines = [
@@ -189,4 +249,9 @@ def day_context(retreat_title: str, day: dict, image_description: str | None) ->
     if image_description:
         lines.append(f"Image for this day: {image_description}")
     lines.append(f"\nPassage:\n{day['passage_text']}")
+    if heart:
+        lines.append(
+            "\nThe reflection for the heart, which the listener hears just before this, between the first and "
+            "second readings. Build on it and don't repeat it:\n<heart_reflection>\n" + heart + "\n</heart_reflection>"
+        )
     return "\n".join(lines)

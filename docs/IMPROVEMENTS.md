@@ -131,9 +131,27 @@ The app remembers what has been played, per day, so a missed or interrupted day 
 - **Series in the PDF:** the whole-retreat PDF cover says "Week N of the series …" and lists the earlier weeks' titles.
 - **Empty and loading states:** a skeleton card while planning (title placeholder, seven grey chips) instead of the status sentence; a friendly empty Library ("No retreats yet. Upload a handout or a few passages to make your first week.").
 
+### 10. Added during the run (all required)
+
+These came in while the run was under way and are part of the definition of done.
+
+1. **Parts that know about each other.** A day's parts are written in listening order: the reflection first; the deep dive sees the reflection and builds on it; the spoken guidance is then tailored to both (e.g. the line before the second reading points back to what the reflection invited the listener to notice). Default or customized guidance stays the basis; tailoring can be switched off in Advanced; any failure falls back to the plain text. Re-recording keeps tailored guidance.
+2. **Background for every model.** Every prompt to every model (planning, reflection, deep dive, tailoring, search questions, conversation) starts with a briefing on the Spiritual Exercises, retreats in daily life (Annotation 19), lectio divina (Guigo II; Verbum Domini 87) and how a day in this app is prayed.
+3. **About page.** What the Exercises are, what a retreat is, what lectio divina is, how a day here is prayed, with checked links to IgnatianSpirituality.com, CCEL, Verbum Domini, Saint John's Abbey, Creighton and Wikipedia; a plain statement that the writing and voices are AI.
+4. **Architecture document featured** at the top of both READMEs (done on `main`).
+5. **Talk it over: a live spoken conversation** about the retreat. Never called "spiritual direction" in the app; the companion is modeled on how spiritual directors accompany someone: mostly questions and gentle probing, little advice, helping the person notice where God is at work and engage with the retreat; says it's an AI if asked; crisis guidance (988). Context: the retreat's days, which were listened to or prayed, the words and notes saved after praying.
+   - Providers, chosen in Advanced with a voice: **OpenAI GPT-Live** (`gpt-live-1`, WebRTC, the SDP offer relayed by the server so the key stays there, server-side hangup at the limit) and **xAI Grok voice** (WebSocket with an ephemeral token minted by the server, PCM16 audio in the browser). OpenRouter can't carry live voice, so these need `OPENAI_API_KEY` and `XAI_API_KEY`.
+   - Free users: 60 seconds a day (enforced by the server's daily allowance and, for OpenAI, a server hangup); premium: up to 30 minutes a call.
+   - **Memory:** every conversation's transcript is saved to Supabase (the user's storage folder) and the companion is given the recent ones, with older ones condensed into a memory summary, so it remembers past conversations. The person can clear this memory. Transcripts are also in `llm_calls`.
+6. **About me ("user info.md").** Upload a text, Markdown, Word or PDF file about yourself, or type it; it's saved as `user info.md` and informs every model call made for you: planning, writing, tailoring and the conversation. Over 6,000 characters, a model condenses it and the page warns that a summary is being used. A separate box for what you want from the conversation companion.
+7. **A reasonably aware companion.** The conversation companion also knows how many days have passed since the last conversation, which days were listened to or prayed since then, and the person's local date, time and part of the day (morning, evening, night), sent by the browser.
+8. **Costs only while making.** Cost estimates and totals appear when a retreat (or a day) is being made, on larger screens; never while praying, and never on a phone.
+9. **Robustness found by testing:** free-voice requests are retried with backoff (a real build lost two guidance clips to dropped connections).
+10. **Keep building until everything above and in sections 1–9 is done**, testing continuously with free builds (Jetstream models, Microsoft voices) on the Mac mini, not only at the end.
+
 ## Out of scope for this run
 
-Accounts and payments, a native app, offline audio, a shared or public gallery, changing the pipeline or prompts, changing the research services, redesigning the PDF, replacing the Microsoft or ElevenLabs voices.
+Payments, a native app, offline audio, a shared or public gallery, changing the pipeline or prompts, changing the research services, redesigning the PDF, replacing the Microsoft or ElevenLabs voices.
 
 ## How to work
 
