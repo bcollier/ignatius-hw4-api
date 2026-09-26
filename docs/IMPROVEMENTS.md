@@ -163,7 +163,8 @@ These came in while the run was under way and are part of the definition of done
 1. **Text on the prayer screen.** "On screen while praying": Image and text (default), Image only, or Text only, from an "Aa" button on the player or Prayer settings. The text is whatever is being spoken (the reading, reflection, deep dive or guidance), and during the silence the reading stays up. The word being spoken is highlighted and kept in view. New recordings save exact word timings (Microsoft WordBoundary events; ElevenLabs' with-timestamps endpoint, same price). Older recordings, including the examples, estimate the position from the audio's progress.
 2. **Each day knows the rest of the retreat.** The heart and deep writers get the earlier days' reflections and deep dives (newest first, within a budget) and the coming days' readings only. They're told not to re-explain what was already covered, to connect to earlier days where it helps, and not to preview what's coming.
 3. **What it cost.** On a computer, a finished retreat has a collapsed "What it cost to make" section. "Try again" keeps the day's writing cost instead of resetting it.
-4. **Conversation voices you can hear.** Samples of all 28 xAI voices and OpenAI's Marin and Cedar, a "▶ Hear this voice" button in the settings, the voice's gender in the picker, and a player grid on the About page.
+4. **Research notes, always there.** No setting to turn on: on a computer, each day has a "Research notes" link and the retreat page a "Research notes for this retreat" link at its foot. The research service picker now shows for Claude models too, since they get the free results first.
+5. **Conversation voices you can hear.** Samples of all 28 xAI voices and OpenAI's Marin and Cedar, a "▶ Hear this voice" button in the settings, the voice's gender in the picker, and a player grid on the About page.
 
 ## To do (Ben, not code)
 

@@ -807,7 +807,7 @@ flowchart TD
 
 ## 8e. Research done for this retreat
 
-A page for seeing how each day was made, meant for a computer (hidden on phones), turned on with **Show a "Research" page for each retreat** under Advanced. It adds a **Research** button to the retreat and a "Research for this day" item to each day's More menu.
+A page for seeing how each day was made, meant for a computer (hidden on phones) and always available: a **Research notes** link in each day's row of small links opens that day, and **Research notes for this retreat** sits at the foot of the retreat page. It works for any retreat at any time; nothing has to be decided when the retreat is made.
 
 For each day it shows the passage and notes the planner took from the document (theme, grace, image description); how the deep dive was researched (the service or services, "results from Brave Search, Exa, Tavily…", services skipped and why); the searches; every result with its title, link, snippet and the service that found it, with the cited ones marked; and the deep dive's source list.
 

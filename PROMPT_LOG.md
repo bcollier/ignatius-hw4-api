@@ -572,6 +572,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Recorded a sample of all 28 xAI voices and OpenAI's Marin and Cedar (the only two of OpenAI's live voices it offers outside live conversation). Added a "▶ Hear this voice" button and each voice's gender to the picker, a player grid on the About page, and a table of samples in the web README.
 
+### 91. 2026-09-26, 20:30 UTC
+
+> i don't like how this show research option is handled, users should be able to show reserach anytime, not just decide once when building the retreat. put in a way for users typically on web to show the research on a page, either in settings turned on or on a tucked away show reserach notes link that goes to the details. *(with a screenshot of the Advanced models section)*
+
+**What was done:** Removed the checkbox. On a computer, each day now has a "Research notes" link next to the printable script, and the retreat page has "Research notes for this retreat" at its foot; both are hidden on phones. The research service picker now shows for Claude models too, since they get the free results first.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
