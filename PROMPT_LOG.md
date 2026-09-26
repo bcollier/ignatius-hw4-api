@@ -832,6 +832,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Verse numbers are now taken out of every passage when a plan is made. They're recognized by counting up (19, 20, 21…) whatever word follows them, so a number that belongs to the text stays. The compact-plan path had copied them straight from the PDF. Only the "2-PrepDays" retreat was affected (Day 4, Romans 8, and Day 5, Psalm 33); both readings were cleaned and recorded again.
 
+### 133. 2026-09-26, 23:28 UTC
+
+> Those four colored circles aren't doing anything *(with a screenshot of the day page)*
+
+**What was done:** The circles had already been removed, and the reference already cleaned ("Romans 8:18–25"); the phone was showing an older copy of the page (GitHub Pages lets browsers keep it for up to ten minutes). The app now checks for a newer version when it opens and whenever the tab comes back into view, and reloads itself if there is one, but never in the middle of a prayer or a conversation.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
