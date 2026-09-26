@@ -226,6 +226,7 @@ async def _deep_jetstream(
     limited to URLs that were actually returned."""
     model = pricing.api_model(meter.model)
     results: list[dict] = []
+    research = None
     try:
         if provider and config.WEB_SEARCH:
             llm_log.tag(purpose="search_queries")
@@ -247,7 +248,7 @@ async def _deep_jetstream(
     if results:
         urls = {r["url"] for r in results}
         sources = [line for line in sources if any(u in line for u in urls)]  # drop anything not from the results
-    return script, sources, bool(results)
+    return script, sources, (research.provider or False) if results else False  # the service that answered
 
 
 def _split_script(text: str) -> tuple[str, list[str]]:

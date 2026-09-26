@@ -36,3 +36,5 @@ services:
         sync: false
       - key: BRAVE_ANSWERS_API_KEY
         sync: false
+      - key: FIRECRAWL_API_KEY
+        sync: false

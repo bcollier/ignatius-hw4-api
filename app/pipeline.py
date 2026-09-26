@@ -232,8 +232,9 @@ async def _build_day(
             return await record("tracks", "deep", k["script"], voices["deep"], sources=k.get("sources", []), web_search=k.get("web_search"))
         state["tracks"]["deep"]["status"] = "writing"
         script, sources, searched = await llm.write_deep(context, deep_prompt, words_for("deep"), meter, search_provider)
-        await record("tracks", "deep", script, voices["deep"], sources=sources, web_search=searched,
-                     research=search.PROVIDERS.get(search_provider) if searched and pricing.is_jetstream(meter.model) else None)
+        # For Jetstream models `searched` names the research service that answered.
+        await record("tracks", "deep", script, voices["deep"], sources=sources, web_search=bool(searched),
+                     research=search.PROVIDERS.get(searched) if isinstance(searched, str) else None)
 
     reading = re.sub(r"\n{3,}", "\n\n", day["passage_text"]).strip()
     jobs = {("tracks", "reading"): record("tracks", "reading", reading, voices["reading"]),

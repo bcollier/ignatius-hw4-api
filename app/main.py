@@ -111,7 +111,8 @@ async def options():
             "usd_per_1k_chars": config.ELEVENLABS_USD_PER_1K_CHARS,
             "balance": await pricing.elevenlabs_balance(),
         },
-        "search_providers": search.available(),
+        "search_providers": search.configured(),
+        "search_status": search.status(),
         "default_search_provider": search.default_provider(),
         "free_mode": {
             "enabled": config.FREE_MODE,
@@ -281,7 +282,7 @@ async def build_day(
     provider = body.search_provider or search.default_provider()  # None when no service has a key
     if provider == "none":
         provider = None
-    elif provider is not None and provider not in search.available():
+    elif provider is not None and provider not in search.configured():
         raise HTTPException(400, f"Unknown or unavailable search service: {provider}")
     llm_log.tag(email=user.email or ("guest" if user.anonymous else None))  # inherited by the build job
     try:

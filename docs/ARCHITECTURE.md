@@ -52,7 +52,7 @@ flowchart LR
     subgraph AI["Model and voice services"]
         OR["OpenRouter<br/>Anthropic-compatible API"]
         JS["Jetstream2 inference<br/>(Open WebUI proxy, OpenAI-compatible)<br/>free mode"]
-        TV["Research services<br/>Tavily · Exa · Brave Search · Brave Answers<br/>free mode"]
+        TV["Research services<br/>Brave Search · Exa · Tavily · Firecrawl · Brave Answers<br/>free mode"]
         CLAUDE["Claude<br/>(Opus 5 by default)<br/>+ web search"]
         EDGE["Microsoft neural voices<br/>(edge-tts, free)"]
         ELEVEN["ElevenLabs<br/>(premium voices)"]
@@ -84,7 +84,7 @@ flowchart LR
 | File storage | Supabase Storage | Extracted images and every MP3, in a private bucket. |
 | Claude | Anthropic, reached through OpenRouter | Plans the retreat, writes the reflection and deep dive, searches the web for the deep dive (full mode). |
 | Open models | Jetstream2 inference service (Llama 4 Scout, Muse Glimmer) | The same writing jobs for free-mode users. |
-| Research services | Tavily, Exa, Brave Search, Brave Answers | Web research for free-mode deep dives, run by the server; the user picks one. |
+| Research services | Brave Search, Exa, Tavily, Firecrawl, Brave Answers | Web research for free-mode deep dives, run by the server; the user picks one, others are fallbacks. |
 | Voices | Microsoft (free), ElevenLabs (premium) | Turn scripts into MP3. |
 
 ---
@@ -164,7 +164,7 @@ erDiagram
         uuid retreat_id FK
         int day
         text purpose "plan | heart | deep | search_queries | research"
-        text provider "openrouter | anthropic | jetstream | brave_answers"
+        text provider "openrouter | anthropic | jetstream | brave | exa | tavily | firecrawl | brave_answers"
         text model
         jsonb request "system + messages, images as placeholders"
         text response_text
@@ -552,7 +552,28 @@ Both services produce constant-bitrate MP3, so pieces can be joined byte for byt
 | Tavily | `POST api.tavily.com/search` (Bearer key), basic depth, 4 results | title, URL, content snippet |
 | Exa | `POST api.exa.ai/search` (`x-api-key`), type auto, 4 results with highlights | title, URL, highlights; Exa's reported cost is added to the day's cost |
 | Brave Search | `GET api.search.brave.com/res/v1/web/search` (`X-Subscription-Token`), 4 results with extra snippets | title, URL, description and extra snippets |
-| Brave Answers | `POST api.search.brave.com/res/v1/chat/completions` (its own key), model `brave`, streamed, citations on | the written answer (under its first cited URL) and each citation's snippet; also logged in `llm_calls` as provider `brave_answers` |
+| Firecrawl | `POST api.firecrawl.dev/v2/search` (Bearer key), 4 results | title, URL, description; credits used are logged |
+| Brave Answers | `POST api.search.brave.com/res/v1/chat/completions` (its own key), model `brave`, streamed, citations on | the written answer (under its first cited URL) and each citation's snippet |
+
+**Keeping research from breaking a build.** Research is optional, so it's written to fail softly:
+
+```mermaid
+flowchart TD
+    Q["Three queries"] --> P{"Chosen service<br/>paused?"}
+    P -- no --> RUN["Run each query<br/>(20 s timeout)"]
+    P -- yes --> NEXT
+    RUN --> R{Response}
+    R -- "results" --> OK["Keep results · reset failure count"]
+    R -- "402, Tavily 432/433,<br/>or 'quota/credit' in a 403/429" --> CR["Pause until the 1st of next month"] --> NEXT
+    R -- "429" --> RL["Pause 1 minute"] --> NEXT
+    R -- "401/403" --> KEY["Pause 1 hour"] --> NEXT
+    R -- "timeout, 5xx, bad response" --> F["Count a failure<br/>(3 in a row: pause 10 minutes)"]
+    NEXT["Next configured service"] --> P
+    OK --> DONE["Write the deep dive from the results"]
+    F --> DONE2["No results from any service:<br/>write without search"]
+```
+
+Pauses are saved to `system/search_status.json` in storage, so a restart (or Render waking from sleep) doesn't retry a service that's out of credits. The page's research menu shows a paused service with its reason and date. Every call, successful or not, adds a row to `llm_calls` with provider set to the service, purpose `research`, the query, the results it returned, credits or cost where reported, and any error.
 
 ```mermaid
 sequenceDiagram
@@ -862,7 +883,7 @@ Serves files from `DATA_DIR` when Supabase isn't configured. In production, file
 | Supabase Storage | `GET/POST /storage/v1/bucket` | Startup: create the bucket if missing |
 | OpenRouter | `POST /api/v1/messages` (Anthropic Messages format, streamed) | Planning, reflection, deep dive |
 | OpenRouter | `GET /api/v1/models` | Prices, cached 6 hours |
-| Tavily / Exa / Brave Search / Brave Answers | See section 7 | Free-mode deep dives: three queries with the chosen service |
+| Brave Search / Exa / Tavily / Firecrawl / Brave Answers | See section 7 | Free-mode deep dives: three queries with the chosen service, falling back to the others |
 | Jetstream2 | `POST /api/chat/completions` (OpenAI format, `Authorization: Bearer <token>`) | Free-mode planning and writing; images are offered for planning and dropped if refused |
 | Microsoft (edge-tts) | WebSocket speech synthesis | Free voices |
 | ElevenLabs | `POST /v1/text-to-speech/{voice}` | Premium voices |
@@ -986,6 +1007,7 @@ flowchart LR
 | `EXA_API_KEY` | | Exa research |
 | `BRAVE_SEARCH_API_KEY` | | Brave Search research |
 | `BRAVE_ANSWERS_API_KEY` | | Brave Answers research (a separate Brave plan and key) |
+| `FIRECRAWL_API_KEY` | | Firecrawl research |
 | `SEARCH_PROVIDER` | `brave` | Default research service |
 | `ALLOWED_ORIGINS` | localhost ports | CORS origins |
 | `DATA_DIR` | `/tmp/ignatius` | Local storage when Supabase is off |
