@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from .. import config, demos, examples, llm_log, pipeline, prompts, script_pdf
+from .. import config, demos, examples, google_docs, llm_log, pipeline, prompts, script_pdf
 from ..access import my_retreat, readable_retreat, save_retreat, view_of
 from ..auth import User, current_user
 from ..checks import BuildRequest, check_date, check_model, check_prompt, check_series, check_title, resolve_build
@@ -60,6 +60,7 @@ async def _add_cover_urls(summaries: list[dict]) -> None:
 async def create_retreat(
     file: UploadFile | None = File(None),
     example: str = Form(""),
+    google_doc: str = Form(""),
     plan_prompt: str = Form(""),
     model: str = Form(""),
     series_ids: str = Form("", alias="series"),
@@ -71,13 +72,14 @@ async def create_retreat(
     fields as a day build), every day is made right after planning: one request, and
     the retreat comes back ready to pray. Without it, only the plan is made.
     Instead of a file, `example` names one of the example documents (/api/examples),
-    ("be-still", or "be-still.txt" for its plain-text version)."""
+    ("be-still", or "be-still.txt" for its plain-text version), or `google_doc` is the
+    link to a Google Doc shared as "Anyone with the link can view"."""
     # Everything is checked before the upload is read, so a bad option fails fast.
     plan_prompt = check_prompt(plan_prompt, prompts.PLAN_INSTRUCTIONS, "planning")
     model = check_model(model, user)
     build_options = _build_options(options, user)
     start = check_date(start_date)
-    filename, data = await _source_bytes(file, example)
+    filename, data = await _source_bytes(file, example, google_doc)
     try:
         source = extract(filename, data)
     except ExtractError as exc:
@@ -101,8 +103,13 @@ def _build_options(raw: str, user: User) -> dict | None:
     return resolve_build(body, user)
 
 
-async def _source_bytes(file: UploadFile | None, example: str) -> tuple[str, bytes]:
-    """The document to plan from: an example on the server, or the uploaded file."""
+async def _source_bytes(file: UploadFile | None, example: str, google_doc: str = "") -> tuple[str, bytes]:
+    """The document to plan from: an example on the server, a shared Google Doc, or the uploaded file."""
+    if google_doc.strip():
+        try:
+            return await google_docs.fetch(google_doc)
+        except google_docs.GoogleDocError as exc:
+            raise HTTPException(400, str(exc)) from exc
     if example:
         kind = "txt" if example.endswith(".txt") else "pdf"
         path = examples.file_for(example.removesuffix(".txt"), kind)
@@ -110,7 +117,7 @@ async def _source_bytes(file: UploadFile | None, example: str) -> tuple[str, byt
             raise HTTPException(404, "No such example.")
         filename, data = path.name, path.read_bytes()
     elif file is None:
-        raise HTTPException(400, "Choose a file to upload, or an example.")
+        raise HTTPException(400, "Choose a file to upload, a Google Doc, or an example.")
     else:
         filename, data = file.filename or "upload", await read_upload(file)
     if too_big(len(data)):
