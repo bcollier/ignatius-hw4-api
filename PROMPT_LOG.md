@@ -518,6 +518,18 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Explained that accounts live in Supabase Auth's own `auth.users` table (the `auth` schema, or Authentication → Users), which the Table Editor hides by default, and added that note under both ER diagrams. The screenshot run also found that the API's CORS settings didn't allow `PATCH`, so changing a start date failed from the live site; fixed.
 
+### 82. 2026-09-26, 19:20 UTC
+
+> right now the sign in email comes from supabase, is there a way to customize this so users know it is for the retreat app *(with a screenshot of the default "Confirm your email address" email)*
+
+**What was done:** Wrote branded subjects and bodies for the Confirm signup, Magic Link and Change Email Address templates, and explained that the sender name and "powered by Supabase" footer need custom SMTP.
+
+### 83. 2026-09-26, 19:25 UTC
+
+> *(screenshot of Supabase's Emails page: "Set up custom SMTP to edit templates")*
+
+**What was done:** Corrected the earlier answer: Supabase now requires custom SMTP before templates can be edited. Gave step-by-step setup with Resend on the collier.phd domain (host smtp.resend.com, port 465, user resend, API key as password), a Gmail app-password alternative, and raising the email rate limit.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
