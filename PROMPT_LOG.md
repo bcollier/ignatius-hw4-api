@@ -768,6 +768,40 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** The prompts told every writer to bring in the painting and describe it so someone with closed eyes could see it. They now say the opposite: the listener can see the painting, so don't describe it; mention it at most once, in a few words, and only to point back to the text. The heart reflection (both voices) now has a clear center: one true, personal thing God wants this person to know in their heart through this passage, said plainly once. Tested on the prodigal son day with Claude Opus 5.5: one brief mention of the painting, and a center ("You do not have to finish the apology to be held").
 
+### 123. 2026-09-26, 22:10 UTC
+
+> Do free
+
+**What was done:** The free Blessed example is being brought up to the new prompts: its reflections for the heart and its spoken guidance are rewritten and re-recorded with `tools/rewrite_parts.py`, which keeps each day's deep dive as it was.
+
+### 124. 2026-09-26, 22:15 UTC
+
+> Do the full visual redesign push to main
+
+**What was done:** Built the "modern book of hours" redesign into the web app. Type is Cormorant Garamond and EB Garamond on warm paper with deep ink; rubrics (red small capitals) mark labels and the grace; gold leaf marks what's prayed. Colors are read from each day's painting in the browser (`js/look.js`) and color the Today card, the day page, the retreat covers and the prayer screen, with "today's colors" shown as four dots. The home screen leads with a Today card (the painting, a greeting for the hour, the grace, a gold Pray button); My retreats is a shelf of covers with the painting in an arched window and a gold square per prayed day. A day is a two-page spread on a computer (painting and caption on the left; running head, title, grace, fleuron and a drop-capped passage on the right). The prayer screen has beads on a thread, a gold play button, a candle that burns down through a silence to the bell, and after a day is prayed its first letter is gilded in an illuminated frame beside the week's initials. Paintings drift slowly everywhere. Icons are SVG line drawings instead of symbol characters; Talk it over is restyled to match. Everything is still for reduced motion, focus rings are visible, and the beads and icon buttons have labels. Screenshots in the README were retaken.
+
+### 125. 2026-09-26, 22:20 UTC
+
+> Add a progress bar to the build like have a certain number of sections and progress it every step so I can see progress
+
+(With phone screenshots of a retreat being planned: the painting banner bled past the edges and felt heavy, the title was the raw file name "2-PrepDays.PU2 - rev 1.pdf", and the header wrapped onto three lines.)
+
+**What was done:** The progress card has a segmented bar: one segment for planning, then one per day, each day filling in eight steps (reading recorded, heart written and recorded, deep dive researched, written and recorded, guidance written and recorded). Under it a small-caps line says "Step 13 of 17 · Day 2 · researching and writing the deep dive · 79%". Done segments are gold, the current one has a slow shimmer (none with reduced motion), a failed day is red, and it updates on every poll; the library's "being made" card shows a compact version. While planning, the page says "Your new retreat" with the file name as a small line, and shows no painting banner until the plan and an image exist. The phone header is one line, and the "Signed in as" line moved to About me.
+
+### 126. 2026-09-26, 22:35 UTC
+
+> If a day is an exercise just say so and say go do the exercise today and have a mark as complete button
+
+**What was done:** Server: the planner marks activity days (worksheets, review or repetition days) as kind "exercise" and copies the handout's instruction word for word; the build writes and records nothing for them. App: an exercise day shows "Today's exercise", its title, the instruction, "Go and do this exercise today, then mark it complete." and a Mark as complete button (then "Completed · date" with a Mark as not complete link), with no Pray button, length or parts. On the home screen the Today card says "Today's exercise" with Mark as complete instead of Pray this day. A completed exercise counts as a prayed day (gold) in the day strip and on the covers, the prayer screen never opens for one, and the build bar counts it done once it's ready.
+
+### 127. 2026-09-26, 22:40 UTC
+
+> Make sure we are logging errors
+
+(With a screenshot of a retreat whose planning failed.)
+
+**What was done:** A reply from the free model that was cut off is now logged as an error with its token and character counts. Planning failures say why and are written to the server log. Long handouts on the free model are planned compactly: the model marks the first and last words of each passage and the app copies the passage from the document, so the plan no longer runs out of room. The "2-PrepDays" handout was planned again and succeeded with all seven days.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
