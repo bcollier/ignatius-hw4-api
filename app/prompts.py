@@ -1,5 +1,7 @@
 """Prompts for planning a retreat and writing each day's scripts."""
 
+import re
+
 HOUSE_STYLE = """House style for anything that will be read aloud:
 - Plain prose paragraphs. No headings, lists, bold, emoji or markdown.
 - No em dashes or en dashes; use commas, periods, colons or semicolons.
@@ -91,8 +93,71 @@ Length: about {words} words. Reply with the script inside <script></script> tags
 MAX_PROMPT_CHARS = 8000
 
 
+# Spoken guidance around the readings, in the order the lectio sequence uses it.
+# Placeholders: {day}, {title}, {grace}. These are read aloud as written (no model).
+GUIDE_DEFAULTS = {
+    "opening": (
+        "Day {day}. {title}. Settle yourself, and become aware that God is present with you now. "
+        "{grace} Stay with that desire for a few moments."
+    ),
+    "first": (
+        "We will hear today's reading four times. On this first reading, simply listen. "
+        "Notice any word or phrase that catches your attention."
+    ),
+    "second": (
+        "Now the reading a second time. Listen for how these words touch your own life. "
+        "Notice what stirs in you: a memory, a desire, consolation or desolation."
+    ),
+    "third": "The third reading. Listen for what God may be offering you, or asking of you, in these words.",
+    "silence": (
+        "Now rest in silence with the word or phrase that stayed with you. "
+        "Let it pray in you. A bell will mark the end of the silence."
+    ),
+    "last": (
+        "The last reading. Let the words rest in you, then speak to God in your own words, "
+        "as one friend speaks to another."
+    ),
+    "closing": "Thank God for this time of prayer, and close with the Our Father. Amen.",
+}
+GUIDE_LABELS = {
+    "opening": "Opening: asking for the grace",
+    "first": "Before the first reading",
+    "second": "Before the second reading",
+    "third": "Before the third reading",
+    "silence": "Before the silence",
+    "last": "Before the last reading",
+    "closing": "Closing",
+}
+MAX_GUIDE_CHARS = 1000
+
+
+def grace_request(grace: str) -> str:
+    """The day's grace as a sentence to say aloud, whether or not it already
+    starts with "Ask for"."""
+    grace = grace.strip().rstrip(".")
+    if not grace:
+        return ""
+    if grace.lower().startswith(("ask ", "i ask", "to ask")):
+        return grace + "."
+    return f"Ask for this grace: {grace[0].lower() + grace[1:]}."
+
+
+def guide_text(template: str, day: dict) -> str:
+    text = template
+    title = re.sub(r"^\s*day\s+\d+\s*[:.\-]\s*", "", day["title"], flags=re.I)  # "Day 1: Isaiah 43" -> "Isaiah 43"
+    for key, value in {"{day}": str(day["day"]), "{title}": title, "{grace}": grace_request(day.get("grace", ""))}.items():
+        text = text.replace(key, value)
+    return " ".join(text.split())
+
+
 def defaults() -> dict:
-    return {"plan": PLAN_INSTRUCTIONS, "heart": HEART_PRESETS, "deep": DEEP_INSTRUCTIONS}
+    return {
+        "plan": PLAN_INSTRUCTIONS,
+        "heart": HEART_PRESETS,
+        "deep": DEEP_INSTRUCTIONS,
+        "guide": GUIDE_DEFAULTS,
+        "guide_labels": GUIDE_LABELS,
+    }
 
 
 SEARCH_ON = "Use web search to check specific claims (dates, word meanings, quotations, attributions) before you make them. Prefer scholarly and church sources."

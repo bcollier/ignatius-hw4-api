@@ -138,11 +138,21 @@ async def delete_retreat(retreat: dict = Depends(my_retreat)):
     return {"deleted": retreat["id"]}
 
 
+DEFAULT_VOICE = "en-US-AndrewMultilingualNeural"
+
+
 class BuildRequest(BaseModel):
-    tier: str = "free"
-    voice: str = "en-US-AndrewMultilingualNeural"
+    # A voice id for each section: guide, reading, heart, deep. Missing sections
+    # use `voice`. Voice ids from /api/options; the tier follows from the id.
+    voices: dict[str, str] = {}
+    voice: str = DEFAULT_VOICE
     heart_prompt: str | None = None
     deep_prompt: str | None = None
+    # Spoken guidance by name (opening, first, second, third, silence, last, closing);
+    # missing names use the defaults. An empty string leaves that clip out.
+    guide: dict[str, str] = {}
+    # Re-record with new voices but keep the written reflection and deep dive.
+    keep_scripts: bool = False
 
 
 @app.post("/api/retreats/{retreat_id}/days/{day}/build", status_code=202)
@@ -156,8 +166,16 @@ async def build_day(day: int, body: BuildRequest, retreat: dict = Depends(my_ret
         raise HTTPException(409, f"Day {day} is already being built.")
     heart = check_prompt(body.heart_prompt, prompts.HEART_PRESETS["companion"], "heart")
     deep = check_prompt(body.deep_prompt, prompts.DEEP_INSTRUCTIONS, "deep dive")
+    voices = {section: body.voices.get(section) or body.voice for section in pipeline.SECTIONS}
+    guide = {}
+    for name, default in prompts.GUIDE_DEFAULTS.items():
+        text = body.guide.get(name, default).strip()
+        if len(text) > prompts.MAX_GUIDE_CHARS:
+            raise HTTPException(400, f"The '{name}' guidance is longer than {prompts.MAX_GUIDE_CHARS} characters.")
+        if text:
+            guide[name] = text
     try:
-        await pipeline.start_day_build(retreat, day, body.tier, body.voice, heart, deep)
+        await pipeline.start_day_build(retreat, day, voices, heart, deep, guide, body.keep_scripts)
     except tts.TTSError as exc:
         raise HTTPException(400, str(exc)) from exc
     return await pipeline.public_view(retreat)

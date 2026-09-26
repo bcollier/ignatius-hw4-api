@@ -42,7 +42,9 @@ When Supabase is configured, the endpoints marked 🔒 need `Authorization: Bear
 | `POST /api/retreats` 🔒 | multipart: `file` (.pdf or .docx, up to 15 MB and 40 pages), optional `plan_prompt` | **202** with the retreat, `status: "planning"`. 400 for unreadable or empty files, 413 if too large |
 | `GET /api/retreats/{id}` 🔒 | none | The retreat: `status` (`planning`, `ready`, `failed`), `source` stats, `images` (with signed `url`), `plan` (title, summary, mode, days with passage, grace, image), and `days` (build state per day, tracks with `status`, `script`, `url`, `sources`) |
 | `DELETE /api/retreats/{id}` 🔒 | none | `{deleted: id}`; removes the row and its files. 409 while a job is running |
-| `POST /api/retreats/{id}/days/{n}/build` 🔒 | JSON: `tier` (`free` or `premium`), `voice` (an id from `/api/options`), optional `heart_prompt`, `deep_prompt` | **202** with the retreat, that day `status: "building"`. 400 for an unknown voice, 404 for a missing day, 409 if the plan isn't ready or the day is already building |
+| `POST /api/retreats/{id}/days/{n}/build` 🔒 | JSON: `voices` (a voice id from `/api/options` for each of `guide`, `reading`, `heart`, `deep`; free and premium can be mixed), optional `heart_prompt`, `deep_prompt`, `guide` (spoken guidance text by name; empty skips a clip), `keep_scripts` (re-record with new voices without rewriting) | **202** with the retreat, that day `status: "building"`. 400 for an unknown voice or overlong text, 404 for a missing day, 409 if the plan isn't ready or the day is already building |
+
+Each built day has three `tracks` (reading, heart, deep) and a set of short `guide` clips: the opening, which asks for the day's grace, instructions before each of the four readings and the silence, and a closing. Every clip records its `voice` and its length in `seconds`, so the player can show the total time of the prayer.
 
 Track statuses move `waiting` → `writing` (Claude) → `speaking` (text to speech) → `ready`, or `failed` with an `error`. A job interrupted by a server restart is marked `failed` with a message to try again.
 

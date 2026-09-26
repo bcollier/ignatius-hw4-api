@@ -74,11 +74,17 @@ async def public_view(retreat: dict) -> dict:
     """The retreat as the API returns it, with file paths turned into URLs."""
     view = {k: v for k, v in retreat.items() if k != "user_id"}
     paths = [img["path"] for img in retreat["images"]]
-    paths += [t["path"] for d in retreat["days"].values() for t in d["tracks"].values() if t.get("status") == "ready"]
+    for d in retreat["days"].values():
+        for group in ("tracks", "guide"):
+            paths += [t["path"] for t in d.get(group, {}).values() if t.get("status") == "ready"]
     urls = await store.urls(paths) if paths else {}
     view["images"] = [{**img, "url": urls.get(img["path"])} for img in retreat["images"]]
+
+    def with_urls(clips: dict) -> dict:
+        return {k: {**t, "url": urls.get(t.get("path"))} for k, t in clips.items()}
+
     view["days"] = {
-        n: {**d, "tracks": {k: {**t, "url": urls.get(t.get("path"))} for k, t in d["tracks"].items()}}
+        n: {**d, "tracks": with_urls(d["tracks"]), "guide": with_urls(d.get("guide", {}))}
         for n, d in retreat["days"].items()
     }
     return view
@@ -152,65 +158,86 @@ def fit(text: str, max_chars: int) -> tuple[str, bool]:
     return (cut[: end + 1] if end > max_chars // 2 else cut).strip(), True
 
 
-async def start_day_build(retreat: dict, day_no: int, tier: str, voice: str, heart_prompt: str, deep_prompt: str) -> dict:
-    tts.validate(tier, voice)
+SECTIONS = ("guide", "reading", "heart", "deep")  # each can have its own voice
+
+
+async def start_day_build(
+    retreat: dict, day_no: int, voices: dict, heart_prompt: str, deep_prompt: str, guide: dict, keep_scripts: bool
+) -> dict:
+    for section in SECTIONS:
+        tts.tier_of(voices[section])  # raises TTSError for an unknown voice
     state = retreat["days"][str(day_no)]
+    old = {k: t for k, t in state.get("tracks", {}).items() if t.get("script")}
+    if keep_scripts and not all(name in old for name in ("heart", "deep")):
+        keep_scripts = False  # nothing to keep yet; write them
     state.update(
         status="building",
         error=None,
-        tier=tier,
-        voice=voice,
+        voices=voices,
         tracks={name: {"status": "waiting"} for name in TRACKS},
+        guide={name: {"status": "waiting"} for name in guide},
     )
     await save(retreat)
-    spawn(retreat, _build_day(retreat, day_no, heart_prompt, deep_prompt))
+    spawn(retreat, _build_day(retreat, day_no, heart_prompt, deep_prompt, guide, old if keep_scripts else {}))
     return state
 
 
-async def _build_day(retreat: dict, day_no: int, heart_prompt: str, deep_prompt: str) -> None:
+async def _build_day(retreat: dict, day_no: int, heart_prompt: str, deep_prompt: str, guide: dict, kept: dict) -> None:
     state = retreat["days"][str(day_no)]
     day = retreat["plan"]["days"][day_no - 1]
-    tier, voice = state["tier"], state["voice"]
-    max_chars = tts.tiers()[tier]["max_chars"]
-    words = int(max_chars / 6 * 0.85)  # English averages about six characters per word with spaces
+    voices = state["voices"]
     image = retreat["images"][day["image_index"]]["description"] if day["image_index"] >= 0 else None
     context = prompts.day_context(retreat["plan"]["title"], day, image)
 
-    async def speak(name: str, script: str, **extra) -> None:
-        track = state["tracks"][name]
-        script, trimmed = fit(script, max_chars)
-        track.update(status="speaking", script=script, characters=len(script), trimmed=trimmed, **extra)
+    def words_for(section: str) -> int:
+        return int(tts.max_chars(voices[section]) / 6 * 0.85)  # about six characters per word with spaces
+
+    async def record(group: str, name: str, script: str, voice: str, **extra) -> None:
+        clip = state[group][name]
+        script, trimmed = fit(script, tts.max_chars(voice))
+        clip.update(status="speaking", script=script, characters=len(script), trimmed=trimmed, voice=voice, **extra)
         await save(retreat)
         with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp) / "track.mp3"
-            await tts.synthesize(script, tier, voice, out)
+            out = Path(tmp) / "clip.mp3"
+            seconds = await tts.synthesize(script, voice, out)
             path = f"{retreat['user_id']}/{retreat['id']}/day{day_no}_{name}.mp3"
             await store.put_file(path, out.read_bytes(), "audio/mpeg")
-        track.update(status="ready", path=path)
+        clip.update(status="ready", path=path, seconds=seconds)
         await save(retreat)
 
     async def heart() -> None:
+        if "heart" in kept:
+            return await record("tracks", "heart", kept["heart"]["script"], voices["heart"])
         state["tracks"]["heart"]["status"] = "writing"
-        await speak("heart", await llm.write_heart(context, heart_prompt, words))
+        await record("tracks", "heart", await llm.write_heart(context, heart_prompt, words_for("heart")), voices["heart"])
 
     async def deep() -> None:
+        if "deep" in kept:
+            k = kept["deep"]
+            return await record("tracks", "deep", k["script"], voices["deep"], sources=k.get("sources", []), web_search=k.get("web_search"))
         state["tracks"]["deep"]["status"] = "writing"
-        script, sources, searched = await llm.write_deep(context, deep_prompt, words)
-        await speak("deep", script, sources=sources, web_search=searched)
+        script, sources, searched = await llm.write_deep(context, deep_prompt, words_for("deep"))
+        await record("tracks", "deep", script, voices["deep"], sources=sources, web_search=searched)
 
-    reading = re.sub(r"\n{3,}", "\n\n", f"Day {day_no}. {day['title']}.\n\n{day['passage_text']}")
+    reading = re.sub(r"\n{3,}", "\n\n", day["passage_text"]).strip()
+    jobs = {("tracks", "reading"): record("tracks", "reading", reading, voices["reading"]),
+            ("tracks", "heart"): heart(),
+            ("tracks", "deep"): deep()}
+    for name, template in guide.items():
+        jobs[("guide", name)] = record("guide", name, prompts.guide_text(template, day), voices["guide"])
+
     async with _jobs:
-        results = await asyncio.gather(speak("reading", reading), heart(), deep(), return_exceptions=True)
+        results = await asyncio.gather(*jobs.values(), return_exceptions=True)
 
     errors = []
-    for name, result in zip(TRACKS, results):
+    for (group, name), result in zip(jobs, results):
         if isinstance(result, Exception):
             known = isinstance(result, (llm.LLMError, tts.TTSError, StorageError))
             if not known:
                 log.error("day build failed", exc_info=result)
             message = str(result) if known else "Unexpected error."
-            state["tracks"][name].update(status="failed", error=message)
+            state[group][name].update(status="failed", error=message)
             errors.append(f"{name}: {message}")
     state["status"] = "failed" if errors else "ready"
-    state["error"] = "; ".join(errors) or None
+    state["error"] = "; ".join(dict.fromkeys(errors)) or None
     await save(retreat)

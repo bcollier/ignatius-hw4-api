@@ -28,3 +28,20 @@ def test_scanned_page_is_rendered_for_ocr():
     scan.new_page().insert_image(scan[0].rect, stream=png)
     result = extract("scan.pdf", scan.tobytes())
     assert result.text == "" and len(result.scanned_pages) == 1
+
+
+def test_grace_is_spoken_once_whatever_its_form():
+    from app.prompts import GUIDE_DEFAULTS, guide_text
+
+    day = {"day": 2, "title": "Come to Me", "grace": "Ask for the grace to come to him just as I am."}
+    opening = guide_text(GUIDE_DEFAULTS["opening"], day)
+    assert opening.count("Ask for") == 1 and "{" not in opening
+    day["grace"] = "To know God's closeness"
+    assert "Ask for this grace: to know God's closeness." in guide_text(GUIDE_DEFAULTS["opening"], day)
+
+
+def test_day_number_is_not_repeated_in_the_opening():
+    from app.prompts import GUIDE_DEFAULTS, guide_text
+
+    day = {"day": 1, "title": "Day 1: Isaiah 43:1-4", "grace": ""}
+    assert guide_text(GUIDE_DEFAULTS["opening"], day).startswith("Day 1. Isaiah 43:1-4. Settle")

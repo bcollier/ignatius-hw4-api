@@ -13,9 +13,10 @@ SAMPLES = Path(__file__).parent.parent / "samples"
 
 @pytest.fixture
 def client(monkeypatch):
-    async def fake_synthesize(text, tier, voice, out_path):
-        tts.validate(tier, voice)
+    async def fake_synthesize(text, voice, out_path):
+        tts.tier_of(voice)
         out_path.write_bytes(b"ID3fake-mp3")
+        return 12.5
 
     monkeypatch.setattr(tts, "synthesize", fake_synthesize)
     with TestClient(main.app) as c:
@@ -73,15 +74,29 @@ def test_pdf_to_plan_to_audio(client):
     assert client.get(retreat["images"][0]["url"]).headers["content-type"] == "image/jpeg"
     assert retreat["id"] in [r["id"] for r in client.get("/api/retreats").json()["retreats"]]
 
-    r = client.post(f"{url}/days/1/build", json={"tier": "free", "voice": "en-US-AvaMultilingualNeural"})
+    voices = {"guide": "en-US-AvaMultilingualNeural", "reading": "en-US-AndrewMultilingualNeural",
+              "heart": "en-US-EmmaMultilingualNeural", "deep": "en-US-ChristopherNeural"}
+    r = client.post(f"{url}/days/1/build", json={"voices": voices, "guide": {"closing": ""}})
     assert r.status_code == 202
     retreat = wait_for(client, url, lambda b: b["days"]["1"]["status"] != "building")
     day = retreat["days"]["1"]
     assert day["status"] == "ready", day
     for track in ("reading", "heart", "deep"):
-        assert day["tracks"][track]["status"] == "ready"
+        assert day["tracks"][track]["status"] == "ready" and day["tracks"][track]["seconds"] == 12.5
+        assert day["tracks"][track]["voice"] == voices[track]
         audio = client.get(day["tracks"][track]["url"])
         assert audio.status_code == 200 and audio.headers["content-type"] == "audio/mpeg"
+    # Spoken guidance: every default clip except the one left empty, in the guide voice.
+    assert set(day["guide"]) == {"opening", "first", "second", "third", "silence", "last"}
+    assert all(c["status"] == "ready" and c["voice"] == voices["guide"] and c["url"] for c in day["guide"].values())
+    assert day["guide"]["opening"]["script"].startswith("Day 1.")
+
+    # Re-recording with a new voice keeps the written scripts.
+    heart_script = day["tracks"]["heart"]["script"]
+    r = client.post(f"{url}/days/1/build", json={"voice": "en-US-AriaNeural", "keep_scripts": True})
+    assert r.status_code == 202
+    day = wait_for(client, url, lambda b: b["days"]["1"]["status"] != "building")["days"]["1"]
+    assert day["tracks"]["heart"]["script"] == heart_script and day["tracks"]["heart"]["voice"] == "en-US-AriaNeural"
 
 
 def test_docx_with_days_keeps_them(client):
@@ -95,7 +110,7 @@ def test_build_rejects_unknown_voice_and_day(client):
     retreat = upload(client, "loose-passages-web.pdf").json()
     url = f"/api/retreats/{retreat['id']}"
     wait_for(client, url, lambda b: b["status"] != "planning")
-    r = client.post(f"{url}/days/1/build", json={"tier": "free", "voice": "nobody"})
+    r = client.post(f"{url}/days/1/build", json={"voice": "nobody"})
     assert r.status_code == 400
     r = client.post(f"{url}/days/99/build", json={})
     assert r.status_code == 404

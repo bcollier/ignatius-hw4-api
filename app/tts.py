@@ -32,6 +32,9 @@ PREMIUM_VOICES = {
 ELEVENLABS_CHUNK = 2500
 EDGE_CHUNK = 400
 EDGE_PARALLEL = 6
+# Shared by every recording in the process, so a day with many sections doesn't
+# open dozens of connections to the free service at once.
+_edge_slots = asyncio.Semaphore(EDGE_PARALLEL)
 
 
 class TTSError(RuntimeError):
@@ -49,12 +52,20 @@ def tiers() -> dict:
     return available
 
 
-def validate(tier: str, voice: str) -> None:
-    available = tiers()
-    if tier not in available:
-        raise TTSError(f"Voice tier '{tier}' isn't available on this server.")
-    if voice not in available[tier]["voices"]:
-        raise TTSError(f"Unknown voice for the {tier} tier.")
+def tier_of(voice: str) -> str:
+    """Which tier a voice belongs to. Voice ids are unique across tiers."""
+    for tier, info in tiers().items():
+        if voice in info["voices"]:
+            return tier
+    raise TTSError(f"Unknown or unavailable voice: {voice}")
+
+
+def max_chars(voice: str) -> int:
+    return tiers()[tier_of(voice)]["max_chars"]
+
+
+# Both services return constant-bitrate MP3, so length follows from file size.
+BYTES_PER_SECOND = {"free": 48_000 / 8, "premium": 128_000 / 8}
 
 
 def chunk_text(text: str, limit: int) -> list[str]:
@@ -76,12 +87,14 @@ def chunk_text(text: str, limit: int) -> list[str]:
     return pieces
 
 
-async def synthesize(text: str, tier: str, voice: str, out_path: Path) -> None:
-    validate(tier, voice)
+async def synthesize(text: str, voice: str, out_path: Path) -> float:
+    """Record text with the voice; returns the length in seconds."""
+    tier = tier_of(voice)
     if tier == "free":
         await _edge(text, voice, out_path)
     else:
         await _elevenlabs(text, voice, out_path)
+    return round(out_path.stat().st_size / BYTES_PER_SECOND[tier], 1)
 
 
 async def _edge_piece(text: str, voice: str) -> bytes:
@@ -95,10 +108,8 @@ async def _edge_piece(text: str, voice: str) -> bytes:
 async def _edge(text: str, voice: str, out_path: Path) -> None:
     # The free service speaks at a bit faster than real time, so a long track is
     # split into pieces that are recorded in parallel and joined (same MP3 format).
-    limit = asyncio.Semaphore(EDGE_PARALLEL)
-
     async def piece(part: str) -> bytes:
-        async with limit:
+        async with _edge_slots:
             return await _edge_piece(part, voice)
 
     try:
