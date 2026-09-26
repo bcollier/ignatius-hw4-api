@@ -391,6 +391,15 @@ async def start_day_build(
     return retreat["days"][str(day_no)]
 
 
+def _carry_cost(meter: pricing.Meter, state: dict) -> None:
+    """Start a retry's meter from what the day already spent, so its cost stays whole."""
+    before = (state.get("cost") or {}).get("llm") or {}
+    meter.input_tokens += before.get("input_tokens", 0)
+    meter.output_tokens += before.get("output_tokens", 0)
+    meter.searches += before.get("web_searches", 0)
+    meter.usd += before.get("usd", 0.0)
+
+
 def can_retry(state: dict) -> bool:
     """A failed day whose failed parts all have their scripts can be finished by
     recording just those parts again, with no new writing."""
@@ -416,6 +425,7 @@ async def retry_failed(retreat: dict, day_no: int) -> dict:
     state.update(status="building", error=None)
     await save(retreat)
     meter = pricing.Meter(params["model"], await pricing.prices())
+    _carry_cost(meter, state)  # the writing was paid for in the first attempt
     spawn(retreat, _build_day(retreat, day_no, params["heart_prompt"], params["deep_prompt"], params["guide"], kept, meter,
                               params.get("search_provider")))
     return state
@@ -461,14 +471,19 @@ async def _build_day(
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "clip.mp3"
             seconds = await tts.synthesize(script, voice, out)
+            timings = tts.words_path(out)
+            # [[seconds, character index], ...] so the page can follow along word by word
+            words = json.loads(timings.read_text()) if timings.exists() else None
             path = f"{retreat['user_id']}/{retreat['id']}/day{day_no}_{name}.mp3"
             await store.put_file(path, out.read_bytes(), "audio/mpeg")
-        clip.update(status="ready", path=path, seconds=seconds)
+        clip.update(status="ready", path=path, seconds=seconds, words=words)
         await save(retreat)
 
     llm_log.tag(user_id=retreat["user_id"], retreat_id=retreat["id"], day=day_no)
     await profile.use_for_job(retreat["user_id"])  # "user info.md" informs every call
     series_text = await series_context(retreat, meter.model)
+    # The rest of this retreat: earlier days as heard, coming days as readings only.
+    so_far = prompts.retreat_so_far(retreat["plan"], retreat["days"], day_no)
     recordings: dict[tuple[str, str], asyncio.Task] = {}
     errors: dict[tuple[str, str], Exception] = {}
 
@@ -489,7 +504,7 @@ async def _build_day(
                 heart_script = done["script"]
             else:
                 state["tracks"]["heart"]["status"] = "writing"
-                heart_script = await llm.write_heart(prompts.day_context(title, day, image), heart_prompt,
+                heart_script = await llm.write_heart(prompts.day_context(title, day, image, so_far=so_far), heart_prompt,
                                                      words_for("heart"), meter, series_text)
             start_recording("tracks", "heart", heart_script, voices["heart"])
         except Exception as exc:
@@ -507,7 +522,7 @@ async def _build_day(
                                 research_path=done.get("research_path"))
             else:
                 state["tracks"]["deep"]["status"] = "writing"
-                context = prompts.day_context(title, day, image, heart=heart_script)
+                context = prompts.day_context(title, day, image, heart=heart_script, so_far=so_far)
                 deep_script, sources, searched = await llm.write_deep(context, deep_prompt, words_for("deep"), meter,
                                                                       search_provider, series_text)
                 research_path = await _save_research(retreat, day_no, day, meter, sources)

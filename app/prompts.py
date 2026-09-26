@@ -243,7 +243,47 @@ def tailor_input(context: str, heart: str, deep: str, lines: dict) -> str:
     return "\n\n".join(parts)
 
 
-def day_context(retreat_title: str, day: dict, image_description: str | None, heart: str | None = None) -> str:
+RETREAT_SO_FAR_NOTE = (
+    "This day is one day of a larger retreat, prayed one day at a time. Inside <retreat_so_far> is what the "
+    "listener has already heard on earlier days (most recent first). Don't explain again what was explained "
+    "there. Build on it, and where it helps, connect to it briefly (\"yesterday we heard...\"). Inside "
+    "<coming_days> are the readings for the days still ahead, readings only: you may point lightly toward one "
+    "when it truly connects, but don't preview or explain them. Today's passage stays the center."
+)
+SO_FAR_CHARS = 24000
+
+
+def retreat_so_far(plan: dict, days: dict, day_no: int, max_chars: int = SO_FAR_CHARS) -> str:
+    """Earlier days' reflections and deep dives (newest first, whole while they fit,
+    then titles only) and the coming days' readings, for the heart and deep writers."""
+    plan_days = sorted(plan.get("days", []), key=lambda d: d["day"])
+    total = len(plan_days)
+    earlier, budget = [], max_chars
+    for d in reversed([d for d in plan_days if d["day"] < day_no]):
+        tracks = (days.get(str(d["day"])) or {}).get("tracks", {})
+        head = f"Day {d['day']}: {d['title']} ({d.get('source_ref', '')})"
+        parts = [f"{label}:\n{tracks[k]['script']}" for k, label in (("heart", "For the heart"), ("deep", "Deep dive"))
+                 if tracks.get(k, {}).get("script")]
+        body = "\n\n".join(parts)
+        if body and len(body) <= budget:
+            earlier.append(f"{head}\n{body}")
+            budget -= len(body)
+        else:
+            earlier.append(head + (" (not yet written)" if not body else ""))
+    coming = [f"Day {d['day']}: {d['title']} ({d.get('source_ref', '')})\n{d.get('passage_text', '')}"
+              for d in plan_days if d["day"] > day_no]
+    if not earlier and not coming:
+        return ""
+    out = [RETREAT_SO_FAR_NOTE, f"Today is Day {day_no} of {total}."]
+    if earlier:
+        out.append("<retreat_so_far>\n" + "\n\n---\n\n".join(earlier) + "\n</retreat_so_far>")
+    if coming:
+        out.append("<coming_days>\n" + "\n\n".join(coming) + "\n</coming_days>")
+    return "\n\n".join(out)
+
+
+def day_context(retreat_title: str, day: dict, image_description: str | None, heart: str | None = None,
+                so_far: str = "") -> str:
     """The user message for the heart and deep prompts. The image description helps the
     writers connect the day's picture to the text; the listener sees the image itself."""
     lines = [
@@ -255,7 +295,9 @@ def day_context(retreat_title: str, day: dict, image_description: str | None, he
     ]
     if image_description:
         lines.append(f"Image for this day: {image_description}")
-    lines.append(f"\nPassage:\n{day['passage_text']}")
+    if so_far:
+        lines.append("\n" + so_far + "\n")
+    lines.append(f"\nToday's passage:\n{day['passage_text']}")
     if heart:
         lines.append(
             "\nThe reflection for the heart, which the listener hears just before this, between the first and "

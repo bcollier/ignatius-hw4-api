@@ -158,6 +158,13 @@ These came in while the run was under way and are part of the definition of done
 18. **ElevenLabs reliability and Try again.** At most 2 ElevenLabs requests at once with 429 retries (the plan limits simultaneous requests; this, not credits, caused the premium example's failed clips), and **Try again** on a failed day (`POST /days/{n}/retry`, `tools/retry_days.py`) re-records only the failed clips from saved scripts.
 19. **Keep building until everything above and in sections 1–9 is done**, testing continuously with free builds (Jetstream models, Microsoft voices) on the Mac mini, not only at the end.
 
+### 11. Added after the run
+
+1. **Text on the prayer screen.** "On screen while praying": Image and text (default), Image only, or Text only, from an "Aa" button on the player or Prayer settings. The text is whatever is being spoken (the reading, reflection, deep dive or guidance), and during the silence the reading stays up. The word being spoken is highlighted and kept in view. New recordings save exact word timings (Microsoft WordBoundary events; ElevenLabs' with-timestamps endpoint, same price). Older recordings, including the examples, estimate the position from the audio's progress.
+2. **Each day knows the rest of the retreat.** The heart and deep writers get the earlier days' reflections and deep dives (newest first, within a budget) and the coming days' readings only. They're told not to re-explain what was already covered, to connect to earlier days where it helps, and not to preview what's coming.
+3. **What it cost.** On a computer, a finished retreat has a collapsed "What it cost to make" section. "Try again" keeps the day's writing cost instead of resetting it.
+4. **Conversation voices you can hear.** Samples of all 28 xAI voices and OpenAI's Marin and Cedar, a "▶ Hear this voice" button in the settings, the voice's gender in the picker, and a player grid on the About page.
+
 ## To do (Ben, not code)
 
 - [ ] **Branded sign-in emails.** Supabase only allows editing email templates with custom SMTP. Set up Resend on `collier.phd` (Domains → add the DNS records → verify; API key with sending access), then in Supabase **Authentication → Emails → SMTP Settings**: sender `retreats@collier.phd`, name `Ignatius at Home`, host `smtp.resend.com`, port `465`, user `resend`, password = the API key. Then paste the branded Confirm signup, Magic Link and Change Email Address templates (in [email-templates.md](email-templates.md)) and raise **Authentication → Rate Limits → emails per hour** to about 30. A Gmail app password works instead if DNS is a hassle. Until then, sign-in emails come from "Supabase Auth" and Supabase's built-in sender allows only a few emails an hour.

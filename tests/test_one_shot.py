@@ -246,3 +246,4 @@ def test_try_again_records_only_what_failed(client, monkeypatch):
     assert day["status"] == "ready" and 0 < len(calls) < written
     assert len(calls) == sum(1 for g in ("tracks", "guide") for k in day[g] if k not in ready_before)
     assert client.post(f"/api/retreats/{rid}/days/{n}/retry").status_code == 409  # nothing left to retry
+    assert day["cost"]["llm"]["input_tokens"] == body["days"][n]["cost"]["llm"]["input_tokens"]  # writing cost kept

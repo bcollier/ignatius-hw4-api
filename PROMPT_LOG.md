@@ -548,6 +548,30 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Explained that Supabase's built-in sender allows only a couple of sign-in emails an hour (fixed by the SMTP to-do). The sign-in page now says so plainly and points to "Try it without an account".
 
+### 87. 2026-09-26, 20:00 UTC
+
+> somehow the text should still be available to be shown on screen, right now it is only the image, maybe have options to do image, scripture, or scripture + image? if possible there should be an animation that hovers over each word in the reading as it is being spoken etc. if not we can skip the animatino
+
+**What was done:** Added Image and text, Image only and Text only views on the prayer screen, with the spoken word highlighted and kept in view. New recordings save exact word timings from both voice services; older ones estimate the position.
+
+### 88. 2026-09-26, 20:05 UTC
+
+> how do i see the cost to produce the retreat? what was the total cost breakdown for the example?
+
+**What was done:** Gave the premium example's breakdown: about $0.47 planning, $6.71 writing (the deep dives with web search were $5.57 of it) and 46,245 ElevenLabs characters (about $13.87 at list price), about $21 in all. The free example cost $0.15 (Exa searches). Added a "What it cost to make" section to finished retreats on a computer, and fixed "Try again" resetting a day's writing cost.
+
+### 89. 2026-09-26, 20:10 UTC
+
+> the deep dive  and heart reflection prompt doesn't say anythign about how this could be part of a larger retreat. that should somehow be in the text since we are passing past days text and they don't ahve to explain something they just explained yesterday. they can comment on how this relates to something yesterday, or even upcoming readings (give them just the readings for the future days, not the analysis)
+
+**What was done:** The heart and deep writers now get the earlier days' reflections and deep dives (newest first) and the coming days' readings only, with instructions not to re-explain, to connect back where it helps, and not to preview what's ahead.
+
+### 90. 2026-09-26, 20:15 UTC
+
+> give details for the conversation voices as to what they sounds like *(with screenshots of the OpenAI and Grok voice pickers)*
+
+**What was done:** Recorded a sample of all 28 xAI voices and OpenAI's Marin and Cedar (the only two of OpenAI's live voices it offers outside live conversation). Added a "▶ Hear this voice" button and each voice's gender to the picker, a player grid on the About page, and a table of samples in the web README.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

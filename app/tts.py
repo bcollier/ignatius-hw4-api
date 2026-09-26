@@ -1,6 +1,8 @@
 """Text to speech with two tiers: free Microsoft Edge voices and premium ElevenLabs."""
 
 import asyncio
+import base64
+import json
 import re
 from pathlib import Path
 
@@ -92,8 +94,49 @@ def chunk_text(text: str, limit: int) -> list[str]:
     return pieces
 
 
+def words_path(out_path: Path) -> Path:
+    """Where synthesize leaves the word timings for a recording, if the service gave them."""
+    return out_path.with_suffix(".words.json")
+
+
+def align(text: str, spoken: list[tuple[float, str]]) -> list[list]:
+    """[[seconds, character index in text], ...] for each spoken word found in text,
+    in order, so the page can highlight the word being read."""
+    out, cursor = [], 0
+    for t, word in spoken:
+        word = word.strip()
+        if not word:
+            continue
+        i = text.find(word, cursor)
+        if i < 0 or i - cursor > 80:  # not where we expected it: skip rather than jump ahead
+            continue
+        out.append([round(t, 2), i])
+        cursor = i + len(word)
+    return out
+
+
+def words_from_alignment(alignment: dict, offset: float) -> list[tuple[float, str]]:
+    """ElevenLabs character timings to (start time, word) pairs."""
+    chars = alignment.get("characters") or []
+    starts = alignment.get("character_start_times_seconds") or []
+    words, current, start = [], "", 0.0
+    for ch, t in zip(chars, starts):
+        if ch.isspace():
+            if current:
+                words.append((start, current))
+            current = ""
+        else:
+            if not current:
+                start = offset + t
+            current += ch
+    if current:
+        words.append((start, current))
+    return words
+
+
 async def synthesize(text: str, voice: str, out_path: Path) -> float:
-    """Record text with the voice; returns the length in seconds."""
+    """Record text with the voice; returns the length in seconds. Word timings, when
+    the service gives them, are written next to the recording (words_path)."""
     tier = tier_of(voice)
     if tier == "free":
         await _edge(text, voice, out_path)
@@ -105,17 +148,19 @@ async def synthesize(text: str, voice: str, out_path: Path) -> float:
 EDGE_ATTEMPTS = 4
 
 
-async def _edge_piece(text: str, voice: str) -> bytes:
+async def _edge_piece(text: str, voice: str) -> tuple[bytes, list[tuple[float, str]]]:
     """One piece from the free service, retried with a growing pause: the service
     sometimes drops a connection or returns nothing, especially under load."""
     for attempt in range(EDGE_ATTEMPTS):
         try:
-            audio = bytearray()
-            async for chunk in edge_tts.Communicate(text, voice, rate="-5%").stream():
+            audio, words = bytearray(), []
+            async for chunk in edge_tts.Communicate(text, voice, rate="-5%", boundary="WordBoundary").stream():
                 if chunk["type"] == "audio":
                     audio += chunk["data"]
+                elif chunk["type"] == "WordBoundary":
+                    words.append((chunk["offset"] / 10_000_000, chunk["text"]))  # offsets are in 100 ns units
             if audio:
-                return bytes(audio)
+                return bytes(audio), words
             raise RuntimeError("no audio returned")
         except Exception:
             if attempt == EDGE_ATTEMPTS - 1:
@@ -135,13 +180,26 @@ async def _edge(text: str, voice: str, out_path: Path) -> None:
         parts = await asyncio.gather(*(piece(p) for p in chunk_text(text, EDGE_CHUNK)))
     except Exception as exc:  # edge-tts raises several network and protocol errors
         raise TTSError("The free voice service didn't respond. Try again, or use the premium tier.") from exc
-    out_path.write_bytes(b"".join(parts))
+    out_path.write_bytes(b"".join(audio for audio, _ in parts))
+    spoken, offset = [], 0.0
+    for audio, words in parts:
+        spoken += [(offset + t, w) for t, w in words]
+        offset += len(audio) / BYTES_PER_SECOND["free"]
+    _write_words(text, spoken, out_path)
+
+
+def _write_words(text: str, spoken: list[tuple[float, str]], out_path: Path) -> None:
+    words = align(text, spoken)
+    if words:
+        words_path(out_path).write_text(json.dumps(words))
 
 
 async def _elevenlabs(text: str, voice: str, out_path: Path) -> None:
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice}"
+    # The with-timestamps endpoint costs the same and also gives each character's time.
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice}/with-timestamps"
     headers = {"xi-api-key": config.ELEVENLABS_API_KEY}
     audio = bytearray()
+    spoken: list[tuple[float, str]] = []
     async with httpx.AsyncClient(timeout=120) as http:
         previous = ""
         for piece in chunk_text(text, ELEVENLABS_CHUNK):
@@ -169,6 +227,13 @@ async def _elevenlabs(text: str, voice: str, out_path: Path) -> None:
                 raise TTSError("ElevenLabs is out of credits. Use the free tier or add credits.")
             if response.status_code >= 400:
                 raise TTSError(f"ElevenLabs returned an error ({response.status_code}).")
-            audio += response.content  # constant-bitrate MP3 pieces can be joined directly
+            try:
+                data = response.json()
+                clip = base64.b64decode(data["audio_base64"])
+            except (ValueError, KeyError) as exc:
+                raise TTSError("ElevenLabs returned an unexpected response.") from exc
+            spoken += words_from_alignment(data.get("alignment") or {}, len(audio) / BYTES_PER_SECOND["premium"])
+            audio += clip  # constant-bitrate MP3 pieces can be joined directly
             previous = piece
     out_path.write_bytes(bytes(audio))
+    _write_words(text, spoken, out_path)

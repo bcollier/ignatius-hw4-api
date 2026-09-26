@@ -86,10 +86,39 @@ def test_free_voice_pieces_are_retried(monkeypatch):
             if calls["n"] < 3:
                 raise ConnectionError("dropped")
             yield {"type": "audio", "data": b"mp3"}
+            yield {"type": "WordBoundary", "offset": 5_000_000, "text": "hello"}
 
     async def no_sleep(_):
         return None
 
     monkeypatch.setattr(tts.edge_tts, "Communicate", Flaky)
     monkeypatch.setattr(tts.asyncio, "sleep", no_sleep)
-    assert asyncio.run(tts._edge_piece("hello", "v")) == b"mp3" and calls["n"] == 3
+    assert asyncio.run(tts._edge_piece("hello", "v")) == (b"mp3", [(0.5, "hello")]) and calls["n"] == 3
+
+
+def test_word_timings_align_to_the_script():
+    from app import tts
+
+    text = 'Jesus said to her, "Mary." She turned.'
+    spoken = [(0.1, "Jesus"), (0.4, "said"), (0.6, "to"), (0.7, "her"), (1.0, "Mary"), (1.6, "She"), (1.8, "turned")]
+    words = tts.align(text, spoken)
+    assert [i for _, i in words] == [0, 6, 11, 14, 20, 27, 31]
+    assert tts.align("one two", [(0, "zzz"), (0.5, "two")]) == [[0.5, 4]]  # an unmatched word is skipped
+    alignment = {"characters": list("Hi there"), "character_start_times_seconds": [0, .1, .2, .3, .4, .5, .6, .7]}
+    assert tts.words_from_alignment(alignment, 10.0) == [(10.0, "Hi"), (10.3, "there")]
+
+
+def test_writers_know_the_rest_of_the_retreat():
+    from app import prompts
+
+    plan = {"days": [{"day": n, "title": f"T{n}", "source_ref": f"Ref {n}", "passage_text": f"passage {n}"} for n in (1, 2, 3, 4)]}
+    days = {"1": {"tracks": {"heart": {"script": "HEART ONE"}, "deep": {"script": "DEEP ONE"}}},
+            "2": {"tracks": {"heart": {"script": "HEART TWO " * 50}, "deep": {"script": "DEEP TWO"}}},
+            "4": {"tracks": {"heart": {"script": "FUTURE ANALYSIS"}}}}
+    text = prompts.retreat_so_far(plan, days, 3)
+    assert "Today is Day 3 of 4" in text and "Don't explain again" in text
+    assert text.index("Day 2: T2") < text.index("Day 1: T1")  # most recent first
+    assert "DEEP ONE" in text and "passage 4" in text and "FUTURE ANALYSIS" not in text  # coming days: readings only
+    tight = prompts.retreat_so_far(plan, days, 3, max_chars=100)
+    assert "HEART TWO" not in tight and "HEART ONE" in tight  # too long: title only, older short day still fits
+    assert prompts.retreat_so_far({"days": plan["days"][:1]}, {}, 1) == ""
