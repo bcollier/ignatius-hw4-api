@@ -13,9 +13,9 @@ Observed on the live layout with a real seven-day retreat, one day built.
 3. **No sense of where you are.** All days look the same. Nothing says which day is today, which days you've prayed, or what to do next. For a nine-month retreat prayed week by week this is the main thing the app should know.
 4. **The returning user is treated like a new one.** After sign-in, the first thing is a small "My retreats" list and then a large upload form. The 95% case (someone coming back to pray) has to find their retreat below the form. The library is a flat list; a series of 36 weeks would be 36 identical lines.
 5. **Setup is far from the moment it matters.** Prayer order and silence lengths live in "2. Choose voices and a model," far above the day's "Pray this day" button.
-6. **Praying happens in a small bar.** The prayer player is a fixed bottom bar with the browser's native audio control. It works (lock screen, continues when the phone locks) but it doesn't feel like prayer: no calm full-screen view, no big play/pause, no progress through the parts, the page's admin content still visible behind it.
+6. **Praying happens in a small bar over the admin page.** The player is a fixed bottom bar with the browser's native audio control. It works (lock screen, continues when the phone locks) but the day's painting isn't shown while praying, there's no progress through the parts, and the page's settings are visible behind it.
 7. **Making a retreat is two stages and eight clicks.** Plan first, then build each day separately, each with a text status line and a wait. There's no "upload and go."
-8. **Nothing is captured.** The design spec calls for the word you paused on and a short journal; neither exists. A prayed day leaves no trace.
+8. **Nothing is captured.** No record of what was played, so a missed or half-finished day can't be told apart from a prayed one, and nothing syncs between phone and laptop. The design spec's word-you-paused-on and journal don't exist.
 9. **Phone install is generic.** No manifest, no icon, no theme color, so "Add to Home Screen" gives a blank icon and opens in a browser frame. The app is phone-first for praying, so this matters.
 10. **Copy is admin-speak.** "1. Upload your material," "2. Choose voices and a model, then build a day," "Build audio," "Rewrite and record," "Re-record with these voices," "Connected." Three different verbs for building; a status line meant for the developer.
 
@@ -42,7 +42,7 @@ Three views in the same static page, chosen by the URL:
 
 Backend: creating a retreat takes all the build options and, once planned, builds every day one after another without another request. A start date, "prayed" marks and a journal entry per day are added. Everything else on the server stays as it is.
 
-## Tier 1: must ship (about 2.5 hours)
+## Tier 1: must ship (about 3 hours)
 
 ### 1. One-shot creation (API)
 
@@ -70,7 +70,7 @@ Backend: creating a retreat takes all the build options and, once planned, build
 ### 4. Retreat view
 
 - Header: retreat title, "Week N of a series" if applicable, the image once.
-- **Day strip:** n tappable chips with state: ready (filled), prayed (filled with a check), today (ring), failed (outline with a mark), being made (spinner). Default selection: today if the start date puts today in this week, else the first ready-and-unprayed day, else day 1.
+- **Day strip:** n tappable chips with state: ready (filled), started (half-filled), prayed (filled with a check), missed (a small dot), today (ring), failed (outline with a mark), being made (spinner). Default selection: a started-but-unfinished day, else a missed day, else today if the start date puts today in this week, else the first ready-and-unprayed day, else day 1.
 - **Day panel:** title, source reference, the grace in italics, and the **passage in full, in the serif face, larger than body text**, not collapsed. Then one large **Pray this day** button with the duration, and a quieter row: Prayed ✓ / Mark as prayed, Printable script (PDF), and a "…" menu with Rewrite, Re-record and, when the day failed, Try again. The whole-retreat PDF button lives in the header and appears once at least one day has been written; a day's PDF only once that day is ready. Both rules exist today and must be kept.
 - The three track players and their scripts move under a **Listen to a part** toggle, collapsed by default.
 - Journal: the word paused on and the note, editable, shown when present.
@@ -78,11 +78,31 @@ Backend: creating a retreat takes all the build options and, once planned, build
 
 ### 5. Praying view
 
-- Opens from "Pray this day". Full-viewport, calm: the day's image faded, "Day 3 · The Father Runs", the current part's name, the guidance or pause text large in the serif face, a thin progress bar with one segment per part (the silence as a longer segment), big play/pause, then Back · Skip · Stop, and the time left.
-- The single `<audio>` element and `buildSequence()` stay exactly as they are; this is a new skin over the existing player. Media Session stays.
-- When the sequence ends: a short **After praying** screen: "What word or phrase stayed with you?" (one input) and an optional note, **Save** (also marks the day prayed) and **Done**. Skipping is fine; Stop anywhere marks nothing.
-- Remember position: save `{retreat, day, stepIndex}` to localStorage every step; on reopening that retreat, offer "Resume Day 3 at For the heart?" once.
+- Opens from "Pray this day". The single `<audio>` element and `buildSequence()` stay exactly as they are; this is a new skin over the existing player. Media Session stays, and its artwork is set to the day's image so the lock screen shows it too.
+- **The day's images are the screen.** While the prayer plays, the view shows the images associated with the day (see "Images per day" below), full-bleed, `object-fit: contain` on a dark backdrop so paintings aren't cropped. With more than one image, they cross-fade slowly: one per part of the prayer, or every 45 seconds within a long part. With no images, a quiet backdrop with the day's title and grace in the serif face.
+- **Phone layout (under 700 px wide, the main case):** the image fills the screen above a **small player docked at the bottom**, about 120 px tall plus the safe-area inset: the current part's name, a thin progress bar segmented by part, play/pause, Back, Skip, and the time left. Tapping the player expands it into a sheet with Stop, the guidance or silence text, and the list of parts; tapping the image or swiping down collapses it. During the silence, the guidance line ("Stay with one word or phrase…") shows over the bottom of the image.
+- **Wide layout:** image on the left two-thirds, the part list and guidance text on the right, controls below.
+- When the sequence ends: a short **After praying** screen over the image: "What word or phrase stayed with you?" (one input) and an optional note, **Save** and **Done**.
+- Remember position (see "Listening progress"): reopening a day that was stopped partway offers "Continue Day 3 at For the heart?"
 - Request a screen wake lock while praying if the browser supports it; release on stop.
+
+### 5a. Listening progress (API and web)
+
+The app remembers what has been played, per day, so a missed or interrupted day is obvious later.
+
+- `POST /api/retreats/{id}/days/{n}/progress` with `{step, part, seconds, completed_parts: [...], finished: bool}`. The player sends it when a part starts, when a part ends, every 15 seconds while playing, and on Stop (use `navigator.sendBeacon` on page hide). The server stores `days[n].listening = {parts_played: [...], last_step, last_part, seconds_in_part, started_at, updated_at, finished_at}` and writes it at most once every 10 seconds per day (merge in memory, save on the heartbeat) so the database isn't hammered.
+- A day counts as **prayed** automatically when the sequence finishes (`finished: true`); the journal is optional on top. "Mark as prayed" stays for someone who prayed from the PDF.
+- **Day states** used everywhere (day strip, library, Continue card): *not started*, *started* (some parts played; show which: "Reading and For the heart played"), *prayed*, plus *missed*, meaning the start date puts the day in the past and it's not prayed.
+- **The day panel** shows the listening state in words: "You listened to the first reading and For the heart on Tuesday, then stopped" with **Continue** (resumes at `last_step`) and **Start over**.
+- **The Continue card** in the Library picks the earliest day that's missed or started-but-unfinished, not just the next day in order, and says so: "You missed Day 3 · Continue where you left off" or "Day 3 · not started yet". A retreat's chips in the Library show prayed / started / missed at a glance.
+- Listening progress is per retreat and belongs to the retreat's owner; it syncs across devices because it's on the server (start on the phone, see it on the laptop).
+- The PDF marks prayed days with the date.
+- Tests: progress merges and throttles, `finished` sets prayed, missed is computed from the start date, the summary returns per-day states.
+
+### 5b. Images per day (API)
+
+- Today each planned day has one `image_index`. Add `image_indexes: [int]` to the plan schema (all images the planner judges belong with the day, in order), keeping `image_index` as the first of them so the PDF and older retreats keep working. Update the planning prompt's fixed part to ask for this. A retreat planned before the change uses `[image_index]` when it's not -1.
+- The Retreat view's day panel shows the day's first image; the Praying view uses all of them.
 
 ### 6. Backend: start date, prayed marks, journal (API)
 
@@ -127,4 +147,4 @@ Accounts and payments, a native app, offline audio, a shared or public gallery, 
 
 ## Definition of done
 
-A new user uploads a handout, presses **Make my retreat**, and comes back twenty minutes later to a week ready to pray, without touching another button. A returning user opens the site on a phone and, in two taps (Continue → Pray), is in a calm full-screen prayer for today's day, with the passage visible before they start, the day marked prayed when they finish, and a word saved. Everything adjustable is in the Advanced tab, and nothing there is required.
+A new user uploads a handout, presses **Make my retreat**, and comes back twenty minutes later to a week ready to pray, without touching another button. A returning user opens the site on an iPhone and, in two taps (Continue → Pray), is praying the right day, including one they missed or stopped partway, with the day's painting filling the screen and a small player at the bottom; the day is marked prayed when the audio finishes, and the laptop shows the same. Everything adjustable is in the Advanced tab, and nothing there is required.
