@@ -182,7 +182,9 @@ async def create_retreat(
     except ExtractError as exc:
         raise HTTPException(400, str(exc)) from exc
     llm_log.tag(email=user.email or ("guest" if user.anonymous else None))  # inherited by the planning job
-    retreat = await pipeline.create_retreat(user.id, file.filename or "upload", source, plan_prompt, model)
+    retreat = await pipeline.create_retreat(
+        user.id, file.filename or "upload", source, plan_prompt, model, email=user.email or ("guest" if user.anonymous else None)
+    )
     return await pipeline.public_view(retreat)
 
 

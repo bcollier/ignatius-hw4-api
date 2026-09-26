@@ -3,9 +3,17 @@
 Retreats being worked on are held in memory and saved to storage (Supabase, or
 disk locally) at each step, so they survive restarts and can be opened from any
 device the owner signs in on.
+
+Jobs survive restarts. A running job saves a heartbeat every HEARTBEAT seconds.
+If a retreat is found mid-job with no running task here and a heartbeat older than
+STALE seconds (a redeploy or crash; during Render's zero-downtime deploys the old
+server may still be finishing, hence the wait), the job is resumed: planning
+restarts from the saved source, and a day build continues, keeping finished
+recordings and already-written scripts. After MAX_RESUMES it gives up.
 """
 
 import asyncio
+import json
 import logging
 import re
 import tempfile
@@ -14,7 +22,7 @@ import uuid
 from pathlib import Path
 
 from . import config, llm, llm_log, pricing, prompts, search, tts
-from .extract import Extracted
+from .extract import Extracted, Image
 from .storage import StorageError, store
 
 log = logging.getLogger(__name__)
@@ -22,6 +30,9 @@ log = logging.getLogger(__name__)
 TRACKS = ("reading", "heart", "deep")
 
 active: dict[str, dict] = {}  # retreats with a job running, by id
+HEARTBEAT = 20
+STALE = 90
+MAX_RESUMES = 2
 _jobs = asyncio.Semaphore(config.MAX_CONCURRENT_JOBS)
 _tasks: set[asyncio.Task] = set()  # keep references so running tasks aren't garbage collected
 
@@ -32,7 +43,8 @@ def _busy(retreat: dict) -> bool:
 
 def spawn(retreat: dict, coro) -> None:
     active[retreat["id"]] = retreat
-    task = asyncio.create_task(coro)
+    retreat["heartbeat"] = time.time()
+    task = asyncio.create_task(_with_heartbeat(retreat, coro))
     _tasks.add(task)
 
     def done(t: asyncio.Task) -> None:
@@ -41,6 +53,23 @@ def spawn(retreat: dict, coro) -> None:
             active.pop(retreat["id"], None)
 
     task.add_done_callback(done)
+
+
+async def _with_heartbeat(retreat: dict, coro) -> None:
+    """Run the job, saving a heartbeat while it runs, so another server can tell a
+    live job from one that died with its server."""
+
+    async def beat():
+        while True:
+            await asyncio.sleep(HEARTBEAT)
+            retreat["heartbeat"] = time.time()
+            await save(retreat)
+
+    beater = asyncio.create_task(beat())
+    try:
+        await coro
+    finally:
+        beater.cancel()
 
 
 async def save(retreat: dict) -> None:
@@ -59,20 +88,72 @@ async def get(retreat_id: str) -> dict | None:
         return None
     if retreat is None:
         return None
-    # A job that was running when the server restarted will never finish.
-    if _busy(retreat):
+    if _busy(retreat) and time.time() - retreat.get("heartbeat", 0) > STALE:
+        await _resume(retreat)
+    return retreat
+
+
+async def _resume(retreat: dict) -> None:
+    """Pick up a job whose server went away (see the module docstring)."""
+    retreat["resumes"] = retreat.get("resumes", 0) + 1
+    if retreat["resumes"] > MAX_RESUMES:
         if retreat["status"] == "planning":
-            retreat.update(status="failed", error="Planning was interrupted by a server restart. Upload the document again.")
+            retreat.update(status="failed", error="Planning was interrupted too many times. Upload the document again.")
         for state in retreat["days"].values():
             if state["status"] == "building":
+                state.update(status="failed", error="The build was interrupted too many times. Build this day again.")
+        return await save(retreat)
+
+    log.warning("resuming interrupted job for retreat %s (attempt %s)", retreat["id"], retreat["resumes"])
+    llm_log.tag(email=retreat.get("owner_email"))
+    if retreat["status"] == "planning":
+        source = await _load_source(retreat)
+        if source is None:
+            retreat.update(status="failed", error="Planning was interrupted by a server restart. Upload the document again.")
+            return await save(retreat)
+        spawn(retreat, _plan(retreat, source, retreat.get("plan_prompt") or prompts.PLAN_INSTRUCTIONS))
+        return
+    for day_no, state in retreat["days"].items():
+        if state["status"] == "building":
+            p = state.get("params")
+            if not p:  # built before resuming existed
                 state.update(status="failed", error="The build was interrupted by a server restart. Build this day again.")
-        await save(retreat)
-    return retreat
+                await save(retreat)
+                continue
+            kept = {k: t for k, t in state["tracks"].items() if t.get("script") and k in ("heart", "deep")}
+            meter = pricing.Meter(p["model"], await pricing.prices())
+            spawn(retreat, _build_day(retreat, int(day_no), p["heart_prompt"], p["deep_prompt"], p["guide"], kept, meter,
+                                      p.get("search_provider")))
+
+
+def _source_path(retreat: dict, name: str) -> str:
+    return f"{retreat['user_id']}/{retreat['id']}/{name}"
+
+
+async def _save_source(retreat: dict, source: Extracted) -> None:
+    """Keep what planning needs, so an interrupted plan can restart."""
+    meta = {"kind": source.kind, "text": source.text, "page_count": source.page_count, "truncated": source.truncated,
+            "scanned": [img.page for img in source.scanned_pages]}
+    await store.put_file(_source_path(retreat, "source.json"), json.dumps(meta).encode(), "application/json")
+    for i, img in enumerate(source.scanned_pages):
+        await store.put_file(_source_path(retreat, f"scan{i}.png"), img.data, img.mime)
+
+
+async def _load_source(retreat: dict) -> Extracted | None:
+    try:
+        meta = json.loads(await store.get_file(_source_path(retreat, "source.json")))
+        images = [Image(await store.get_file(img["path"]), "image/jpeg", 0, 0, img.get("page")) for img in retreat["images"]]
+        scans = [Image(await store.get_file(_source_path(retreat, f"scan{i}.png")), "image/png", 0, 0, page)
+                 for i, page in enumerate(meta.get("scanned", []))]
+    except (StorageError, ValueError):
+        return None
+    return Extracted(kind=meta["kind"], text=meta["text"], page_count=meta["page_count"], images=images,
+                     scanned_pages=scans, truncated=meta.get("truncated", False))
 
 
 async def public_view(retreat: dict) -> dict:
     """The retreat as the API returns it, with file paths turned into URLs."""
-    view = {k: v for k, v in retreat.items() if k != "user_id"}
+    view = {k: v for k, v in retreat.items() if k not in ("user_id", "owner_email", "plan_prompt")}
     paths = [img["path"] for img in retreat["images"]]
     for d in retreat["days"].values():
         for group in ("tracks", "guide"):
@@ -90,7 +171,9 @@ async def public_view(retreat: dict) -> dict:
     return view
 
 
-async def create_retreat(user_id: str, filename: str, source: Extracted, plan_prompt: str, model: str) -> dict:
+async def create_retreat(
+    user_id: str, filename: str, source: Extracted, plan_prompt: str, model: str, email: str | None = None
+) -> dict:
     retreat_id = str(uuid.uuid4())
     images = []
     for i, img in enumerate(source.images):
@@ -106,6 +189,8 @@ async def create_retreat(user_id: str, filename: str, source: Extracted, plan_pr
         "status": "planning",
         "error": None,
         "custom_plan_prompt": plan_prompt != prompts.PLAN_INSTRUCTIONS,
+        "plan_prompt": plan_prompt if plan_prompt != prompts.PLAN_INSTRUCTIONS else None,
+        "owner_email": email,
         "model": model,
         "costs": {},
         "source": {
@@ -120,6 +205,7 @@ async def create_retreat(user_id: str, filename: str, source: Extracted, plan_pr
         "plan": None,
         "days": {},
     }
+    await _save_source(retreat, source)
     await store.save(retreat)
     spawn(retreat, _plan(retreat, source, plan_prompt))
     return retreat
@@ -183,6 +269,8 @@ async def start_day_build(
         tracks={name: {"status": "waiting"} for name in TRACKS},
         guide={name: {"status": "waiting"} for name in guide},
         cost=None,
+        params={"heart_prompt": heart_prompt, "deep_prompt": deep_prompt, "guide": guide, "model": model,
+                "search_provider": search_provider},
     )
     await save(retreat)
     meter = pricing.Meter(model, await pricing.prices())
@@ -237,11 +325,14 @@ async def _build_day(
                      research=search.PROVIDERS.get(searched) if isinstance(searched, str) else None)
 
     reading = re.sub(r"\n{3,}", "\n\n", day["passage_text"]).strip()
-    jobs = {("tracks", "reading"): record("tracks", "reading", reading, voices["reading"]),
-            ("tracks", "heart"): heart(),
-            ("tracks", "deep"): deep()}
+    work = {("tracks", "reading"): lambda: record("tracks", "reading", reading, voices["reading"]),
+            ("tracks", "heart"): heart,
+            ("tracks", "deep"): deep}
     for name, template in guide.items():
-        jobs[("guide", name)] = record("guide", name, prompts.guide_text(template, day), voices["guide"])
+        work[("guide", name)] = lambda name=name, template=template: record(
+            "guide", name, prompts.guide_text(template, day), voices["guide"])
+    # A resumed build skips whatever finished before the interruption.
+    jobs = {key: make() for key, make in work.items() if state[key[0]].get(key[1], {}).get("status") != "ready"}
 
     async with _jobs:
         results = await asyncio.gather(*jobs.values(), return_exceptions=True)

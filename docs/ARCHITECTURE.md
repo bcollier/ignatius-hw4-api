@@ -330,6 +330,7 @@ retreats/                                   private bucket
 └── {user_id}/
     └── {retreat_id}/
         ├── image0.jpg … imageN.jpg         images extracted from the upload (max 8, ≤1568 px)
+        ├── source.json, scan0.png …        extracted text and scanned pages, so planning can resume
         ├── day1_reading.mp3                recorded once, played four times
         ├── day1_heart.mp3
         ├── day1_deep.mp3
@@ -663,7 +664,8 @@ stateDiagram-v2
     state "Retreat" as R {
         [*] --> planning: upload accepted
         planning --> ready: plan saved
-        planning --> failed: model error, or server restarted mid-job
+        planning --> planning: server restarted, resumed from saved source
+        planning --> failed: model error, or interrupted more than twice
     }
 ```
 
@@ -674,7 +676,8 @@ stateDiagram-v2
         [*] --> idle: plan saved
         idle --> building: Build audio
         building --> ready: every section recorded
-        building --> failed: any section failed, or server restarted mid-job
+        building --> building: server restarted, resumed (finished parts kept)
+        building --> failed: any section failed, or interrupted more than twice
         ready --> building: Re-record or Rewrite
         failed --> building: Rebuild
     }
@@ -940,7 +943,7 @@ flowchart LR
 | What goes wrong | What the user sees | What happens |
 | --- | --- | --- |
 | Render is asleep | "Can't reach the server… may be waking up" with Retry | First request wakes the service (about a minute). |
-| Server restarts during a job | The job's status becomes failed with "interrupted by a server restart" | On the next read, any retreat or day still marked planning/building with no running task is marked failed. |
+| Server restarts or redeploys during a job | Nothing, or a short pause in progress | Jobs save a heartbeat every 20 s. If a retreat is mid-job, no task is running on this server, and the heartbeat is over 90 s old, the job resumes: planning restarts from the saved source (`source.json`, scanned pages, images), and a day build continues, keeping finished recordings and written scripts. After two resumes it's marked failed with a message. A fresh heartbeat is left alone, because during Render's zero-downtime deploys the old server may still be finishing. |
 | Claude errors (rate limit, auth, refusal, ran out of room) | The section's reason, e.g. "The model provider is rate limiting requests" | Other sections still finish; the day is `failed` with per-section errors; Rebuild retries. |
 | OpenRouter rejects structured output | Nothing | Planning retries with the schema described in the prompt. |
 | OpenRouter rejects web search | Nothing; `web_search: false` on the deep dive | The deep dive is written without search, told to keep to well-established claims. |

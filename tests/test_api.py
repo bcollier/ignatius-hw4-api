@@ -1,3 +1,4 @@
+import json
 import time
 from pathlib import Path
 
@@ -140,15 +141,74 @@ def test_retreat_survives_restart_and_is_private(client):
     assert client.get(url).status_code == 404
 
 
-def test_interrupted_build_is_marked_failed(client):
+def test_interrupted_planning_resumes(client):
     retreat = upload(client, "loose-passages-web.pdf").json()
     url = f"/api/retreats/{retreat['id']}"
-    retreat = wait_for(client, url, lambda b: b["status"] != "planning")
+    wait_for(client, url, lambda b: b["status"] != "planning")
+    # As if the server died mid-plan: stored as planning, old heartbeat, no running task.
     stored = store.rows / f"{retreat['id']}.json"
-    stored.write_text(stored.read_text().replace('"status": "idle"', '"status": "building"', 1))
+    data = json.loads(stored.read_text())
+    data.update(status="planning", plan=None, days={}, heartbeat=0)
+    stored.write_text(json.dumps(data))
     pipeline.active.clear()
-    day = client.get(url).json()["days"]["1"]
-    assert day["status"] == "failed" and "restart" in day["error"]
+    body = wait_for(client, url, lambda b: b["status"] != "planning")
+    assert body["status"] == "ready" and body["resumes"] == 1 and len(body["plan"]["days"]) == 7
+
+
+def test_recent_heartbeat_is_left_alone(client):
+    """During a zero-downtime deploy the old server may still be working."""
+    retreat = upload(client, "loose-passages-web.pdf").json()
+    url = f"/api/retreats/{retreat['id']}"
+    wait_for(client, url, lambda b: b["status"] != "planning")
+    stored = store.rows / f"{retreat['id']}.json"
+    data = json.loads(stored.read_text())
+    data.update(status="planning", heartbeat=time.time())
+    stored.write_text(json.dumps(data))
+    pipeline.active.clear()
+    body = client.get(url).json()
+    assert body["status"] == "planning" and "resumes" not in body
+
+
+def test_interrupted_build_resumes_and_keeps_finished_work(client, monkeypatch):
+    retreat = upload(client, "loose-passages-web.pdf").json()
+    url = f"/api/retreats/{retreat['id']}"
+    wait_for(client, url, lambda b: b["status"] != "planning")
+    client.post(f"{url}/days/1/build", json={"voice": "en-US-AvaMultilingualNeural"})
+    wait_for(client, url, lambda b: b["days"]["1"]["status"] != "building")
+    # Pretend the server died after the reading and the heart reflection were done.
+    stored = store.rows / f"{retreat['id']}.json"
+    data = json.loads(stored.read_text())
+    day = data["days"]["1"]
+    day["status"] = "building"
+    day["tracks"]["deep"] = {"status": "writing"}
+    day["guide"]["closing"] = {"status": "waiting"}
+    data["heartbeat"] = 0
+    stored.write_text(json.dumps(data))
+    pipeline.active.clear()
+    recorded = []
+    real = tts.synthesize
+
+    async def spy(text, voice, out_path):
+        recorded.append(text[:20])
+        return await real(text, voice, out_path)
+
+    monkeypatch.setattr(tts, "synthesize", spy)
+    body = wait_for(client, url, lambda b: b["days"]["1"]["status"] != "building")
+    assert body["days"]["1"]["status"] == "ready" and body["resumes"] == 1
+    assert len(recorded) == 2  # only the deep dive and the closing were redone
+
+
+def test_gives_up_after_too_many_resumes(client):
+    retreat = upload(client, "loose-passages-web.pdf").json()
+    url = f"/api/retreats/{retreat['id']}"
+    wait_for(client, url, lambda b: b["status"] != "planning")
+    stored = store.rows / f"{retreat['id']}.json"
+    data = json.loads(stored.read_text())
+    data.update(status="planning", heartbeat=0, resumes=pipeline.MAX_RESUMES)
+    stored.write_text(json.dumps(data))
+    pipeline.active.clear()
+    body = client.get(url).json()
+    assert body["status"] == "failed" and "too many times" in body["error"]
 
 
 def test_delete_removes_retreat(client):
