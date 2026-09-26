@@ -22,7 +22,7 @@ PLAN_FIXED = """Plan at most {max_days} days.
 
 For each day, passage_text is the text the listener will hear read aloud. Copy it word for word from the source, including the translation's wording. Remove only page numbers, running headers and footers, line-break hyphens, and verse numbers. If a day has no scripture (a consideration, a review day), use the source's own words for that day. Scanned pages are included as images; transcribe from them exactly.
 
-grace is the grace to ask for that day, in one sentence, taken from the source when it names one. focus is one or two sentences telling the writers what the day is about. image_index is the index of the supplied image that best fits the day, or -1 for none. In images, describe each supplied image briefly for the writers; this text is never shown to the listener."""
+grace is the grace to ask for that day, in one sentence, taken from the source when it names one. focus is one or two sentences telling the writers what the day is about. image_indexes lists every supplied image that belongs with the day, best first (the listener sees them while praying), or is empty; image_index is the first of them, or -1 for none. An image may serve several days. In images, describe each supplied image briefly for the writers; this text is never shown to the listener."""
 
 PLAN_SCHEMA = {
     "type": "object",
@@ -51,8 +51,9 @@ PLAN_SCHEMA = {
                     "grace": {"type": "string"},
                     "focus": {"type": "string"},
                     "image_index": {"type": "integer"},
+                    "image_indexes": {"type": "array", "items": {"type": "integer"}},
                 },
-                "required": ["day", "title", "source_ref", "passage_text", "grace", "focus", "image_index"],
+                "required": ["day", "title", "source_ref", "passage_text", "grace", "focus", "image_index", "image_indexes"],
                 "additionalProperties": False,
             },
         },
@@ -176,7 +177,26 @@ SEARCH_QUERIES = (
 SEARCH_OFF = "You cannot search the web. Make only claims you are confident are well established, and say when a point is debated."
 
 
-def day_context(retreat_title: str, day: dict, image_description: str | None) -> str:
+GUIDE_TAILOR = """You write the short spoken guidance for one day of a prayer retreat: the lines a guide says before each reading and around the silence. The listener hears them in this order, between the parts shown below: opening, then the first reading, the reflection for the heart, the second reading, the deep dive, the third reading, the silence, the last reading, and the closing.
+
+For each line you're given the text the retreat uses by default. Keep its purpose, its place and roughly its length, and adapt it to this day so the parts hold together: point back to an image, word or question from the reflection or the deep dive where it helps the listener pray the next reading (for example, the line before the second reading can recall what the reflection invited them to notice). Don't summarize the reflection or the deep dive. Keep the opening's request for the grace word for word. Each line is read aloud once, by the same calm voice.
+
+""" + HOUSE_STYLE + """
+
+Reply with only a JSON object whose keys are the line names given, each with its text."""
+
+
+def tailor_input(context: str, heart: str, deep: str, lines: dict) -> str:
+    parts = [context]
+    if heart:
+        parts.append(f"<heart_reflection>\n{heart}\n</heart_reflection>")
+    if deep:
+        parts.append(f"<deep_dive>\n{deep}\n</deep_dive>")
+    parts.append("<default_lines>\n" + "\n".join(f"{name}: {text}" for name, text in lines.items()) + "\n</default_lines>")
+    return "\n\n".join(parts)
+
+
+def day_context(retreat_title: str, day: dict, image_description: str | None, heart: str | None = None) -> str:
     """The user message for the heart and deep prompts. The image description helps the
     writers connect the day's picture to the text; the listener sees the image itself."""
     lines = [
@@ -189,4 +209,9 @@ def day_context(retreat_title: str, day: dict, image_description: str | None) ->
     if image_description:
         lines.append(f"Image for this day: {image_description}")
     lines.append(f"\nPassage:\n{day['passage_text']}")
+    if heart:
+        lines.append(
+            "\nThe reflection for the heart, which the listener hears just before this, between the first and "
+            "second readings. Build on it and don't repeat it:\n<heart_reflection>\n" + heart + "\n</heart_reflection>"
+        )
     return "\n".join(lines)

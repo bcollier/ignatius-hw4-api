@@ -3,6 +3,7 @@ someone can follow along on paper or a tablet. Built with PyMuPDF's HTML layout.
 
 import html
 import io
+from datetime import datetime
 
 import pymupdf
 
@@ -101,16 +102,38 @@ def day_html(retreat: dict, day: dict, state: dict, order: str, grace_silence: i
         cue("last")
         reading("Last reading")
     cue("closing")
+    journal = (state or {}).get("journal") or {}
+    if (state or {}).get("prayed_at") or journal:
+        out.append("<h3>After praying</h3>")
+        if state.get("prayed_at"):
+            out.append(f'<p class="meta">Prayed {html.escape(_date(state["prayed_at"]))}</p>')
+        if journal.get("word"):
+            out.append(f'<p class="grace">The word that stayed: {html.escape(journal["word"])}</p>')
+        if journal.get("note"):
+            out.append(_paragraphs(journal["note"]))
     return "".join(out)
 
 
-def cover_html(retreat: dict, days: list[dict]) -> str:
+def _date(iso: str) -> str:
+    try:
+        return datetime.fromisoformat(iso.replace("Z", "+00:00")).strftime("%A, %B %-d, %Y")
+    except ValueError:
+        return iso[:10]
+
+
+def cover_html(retreat: dict, days: list[dict], series_titles: list[str] | None = None) -> str:
     plan = retreat["plan"]
     toc = "".join(f"<li>Day {d['day']}: {html.escape(d['title'])}</li>" for d in days)
+    series = ""
+    if series_titles:
+        earlier = "".join(f"<li>Week {i}: {html.escape(t)}</li>" for i, t in enumerate(series_titles, start=1))
+        series = (f'<p class="meta">Week {len(series_titles) + 1} of a series. Earlier weeks:</p>'
+                  f'<div class="toc"><ul>{earlier}</ul></div>')
     return (
         f"<h1>{html.escape(plan['title'])}</h1>"
         f"{_paragraphs(plan.get('summary', ''))}"
         f'<p class="meta">From {html.escape(retreat["filename"])} · Ignatius at Home</p>'
+        f"{series}"
         f'<div class="toc"><ul>{toc}</ul></div>'
     )
 

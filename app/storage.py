@@ -33,6 +33,8 @@ def _iso(epoch: float) -> str:
 
 def summary(retreat: dict) -> dict:
     days = retreat.get("days", {})
+    prayed = [d.get("prayed_at") for d in days.values() if d.get("prayed_at")]
+    plan_days = {str(d["day"]): d for d in (retreat.get("plan") or {}).get("days", [])}
     return {
         "id": retreat["id"],
         "title": (retreat.get("plan") or {}).get("title") or retreat["filename"],
@@ -41,7 +43,23 @@ def summary(retreat: dict) -> dict:
         "status": retreat["status"],
         "days": len(days),
         "days_built": sum(1 for d in days.values() if d["status"] == "ready"),
+        "days_prayed": len(prayed),
+        "last_prayed_at": max(prayed) if prayed else None,
         "series": retreat.get("series", []),
+        "start_date": retreat.get("start_date"),
+        "progress": retreat.get("progress"),
+        # One entry per day, for the library's day chips and the Continue card.
+        "day_states": [
+            {
+                "day": int(n),
+                "title": plan_days.get(n, {}).get("title", ""),
+                "status": d["status"],
+                "prayed_at": d.get("prayed_at"),
+                "started": bool((d.get("listening") or {}).get("parts_played")),
+                "finished": bool((d.get("listening") or {}).get("finished_at")),
+            }
+            for n, d in sorted(days.items(), key=lambda kv: int(kv[0]))
+        ],
     }
 
 

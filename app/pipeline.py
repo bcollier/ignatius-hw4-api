@@ -38,7 +38,9 @@ _tasks: set[asyncio.Task] = set()  # keep references so running tasks aren't gar
 
 
 def _busy(retreat: dict) -> bool:
-    return retreat["status"] == "planning" or any(d["status"] == "building" for d in retreat["days"].values())
+    return retreat["status"] in ("planning", "building") or any(
+        d["status"] in ("building", "queued") for d in retreat["days"].values()
+    )
 
 
 def spawn(retreat: dict, coro) -> None:
@@ -100,8 +102,10 @@ async def _resume(retreat: dict) -> None:
         if retreat["status"] == "planning":
             retreat.update(status="failed", error="Planning was interrupted too many times. Upload the document again.")
         for state in retreat["days"].values():
-            if state["status"] == "building":
-                state.update(status="failed", error="The build was interrupted too many times. Build this day again.")
+            if state["status"] in ("building", "queued"):
+                state.update(status="failed", error="Making this day was interrupted too many times. Try again.")
+        if retreat["status"] == "building":
+            _finish_building(retreat)
         return await save(retreat)
 
     log.warning("resuming interrupted job for retreat %s (attempt %s)", retreat["id"], retreat["resumes"])
@@ -112,6 +116,9 @@ async def _resume(retreat: dict) -> None:
             retreat.update(status="failed", error="Planning was interrupted by a server restart. Upload the document again.")
             return await save(retreat)
         spawn(retreat, _plan(retreat, source, retreat.get("plan_prompt") or prompts.PLAN_INSTRUCTIONS))
+        return
+    if retreat["status"] == "building" and retreat.get("build_options"):
+        spawn(retreat, _build_all(retreat))  # continues from the first day that isn't done
         return
     for day_no, state in retreat["days"].items():
         if state["status"] == "building":
@@ -168,12 +175,17 @@ async def public_view(retreat: dict) -> dict:
         n: {**d, "tracks": with_urls(d["tracks"]), "guide": with_urls(d.get("guide", {}))}
         for n, d in retreat["days"].items()
     }
+    if view.get("plan"):  # retreats planned before image_indexes existed
+        view["plan"] = {**view["plan"], "days": [
+            {**d, "image_indexes": d.get("image_indexes", [d["image_index"]] if d.get("image_index", -1) >= 0 else [])}
+            for d in view["plan"]["days"]
+        ]}
     return view
 
 
 async def create_retreat(
     user_id: str, filename: str, source: Extracted, plan_prompt: str, model: str, email: str | None = None,
-    series_ids: list[str] | None = None,
+    series_ids: list[str] | None = None, build_options: dict | None = None, start_date: str | None = None,
 ) -> dict:
     retreat_id = str(uuid.uuid4())
     images = []
@@ -195,6 +207,10 @@ async def create_retreat(
         "model": model,
         "series": series_ids or [],  # earlier retreats, oldest first
         "series_info": None,
+        # With build options, every day is made right after planning (see _build_all).
+        "build_options": build_options,
+        "progress": None,
+        "start_date": start_date,
         "costs": {},
         "source": {
             "kind": source.kind,
@@ -249,12 +265,62 @@ async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
         if 0 <= note.get("index", -1) < len(retreat["images"]):
             retreat["images"][note["index"]]["description"] = note["description"]
     retreat["plan"] = plan
+    first = "queued" if retreat.get("build_options") else "idle"
     retreat["days"] = {
-        str(d["day"]): {"status": "idle", "error": None, "tracks": {}, "guide": {}, "cost": None} for d in plan["days"]
+        str(d["day"]): {"status": first, "error": None, "tracks": {}, "guide": {}, "cost": None} for d in plan["days"]
     }
-    retreat["status"] = "ready"
     retreat["costs"] = {"plan": meter.summary()}
+    if retreat.get("build_options"):
+        retreat["status"] = "building"
+        retreat["progress"] = {"done": 0, "total": len(plan["days"]), "current_day": None, "failed": []}
+        await save(retreat)
+        await _build_all(retreat)
+    else:
+        retreat["status"] = "ready"
+        await save(retreat)
+
+
+async def _build_all(retreat: dict) -> None:
+    """Make every day, one after another, with the options chosen at upload. A day that
+    fails is left failed and the rest continue. After a restart this picks up where it
+    stopped: finished days are skipped, a day caught mid-build keeps what it finished."""
+    opts = retreat["build_options"]
+    for day_no in sorted(retreat["days"], key=int):
+        state = retreat["days"][day_no]
+        if state["status"] not in ("queued", "building"):
+            continue
+        retreat["progress"]["current_day"] = int(day_no)
+        try:
+            if state["status"] == "queued":
+                kept, meter = await _prepare_day(retreat, int(day_no), opts, keep_scripts=False)
+            else:  # resuming a day that was mid-build
+                kept = {k: t for k, t in state["tracks"].items() if t.get("script") and k in ("heart", "deep")}
+                kept["guide"] = {k: c["script"] for k, c in state.get("guide", {}).items() if c.get("script")}
+                meter = pricing.Meter(opts["write_model"], await pricing.prices())
+            await _build_day(retreat, int(day_no), opts["heart_prompt"], opts["deep_prompt"], opts["guide"], kept, meter,
+                             opts.get("search_provider"))
+        except Exception:  # one bad day must not stop the rest
+            log.exception("making day %s failed", day_no)
+            state.update(status="failed", error=state.get("error") or "Something went wrong making this day.")
+        _count_progress(retreat)
+        await save(retreat)
+    _finish_building(retreat)
     await save(retreat)
+
+
+def _count_progress(retreat: dict) -> None:
+    days = retreat["days"].values()
+    retreat["progress"].update(
+        done=sum(1 for d in days if d["status"] in ("ready", "failed")),
+        failed=[int(n) for n, d in retreat["days"].items() if d["status"] == "failed"],
+    )
+
+
+def _finish_building(retreat: dict) -> None:
+    if retreat.get("progress"):
+        _count_progress(retreat)
+        retreat["progress"]["current_day"] = None
+    retreat["status"] = "ready"
 
 
 # ---------------------------------------------------------------- building a day
@@ -273,14 +339,14 @@ def fit(text: str, max_chars: int) -> tuple[str, bool]:
 SECTIONS = ("guide", "reading", "heart", "deep")  # each can have its own voice
 
 
-async def start_day_build(
-    retreat: dict, day_no: int, voices: dict, heart_prompt: str, deep_prompt: str, guide: dict, keep_scripts: bool, model: str,
-    search_provider: str | None = None,
-) -> dict:
+async def _prepare_day(retreat: dict, day_no: int, opts: dict, keep_scripts: bool) -> tuple[dict, pricing.Meter]:
+    """Reset a day for building with the given options; returns (scripts to keep, meter)."""
+    voices = opts["voices"]
     for section in SECTIONS:
         tts.tier_of(voices[section])  # raises TTSError for an unknown voice
     state = retreat["days"][str(day_no)]
     old = {k: t for k, t in state.get("tracks", {}).items() if t.get("script")}
+    old["guide"] = {k: c["script"] for k, c in state.get("guide", {}).items() if c.get("script")}
     if keep_scripts and not all(name in old for name in ("heart", "deep")):
         keep_scripts = False  # nothing to keep yet; write them
     state.update(
@@ -288,29 +354,51 @@ async def start_day_build(
         error=None,
         voices=voices,
         tracks={name: {"status": "waiting"} for name in TRACKS},
-        guide={name: {"status": "waiting"} for name in guide},
+        guide={name: {"status": "waiting"} for name in opts["guide"]},
         cost=None,
-        params={"heart_prompt": heart_prompt, "deep_prompt": deep_prompt, "guide": guide, "model": model,
-                "search_provider": search_provider},
+        params={"heart_prompt": opts["heart_prompt"], "deep_prompt": opts["deep_prompt"], "guide": opts["guide"],
+                "model": opts["write_model"], "search_provider": opts.get("search_provider")},
     )
     await save(retreat)
-    meter = pricing.Meter(model, await pricing.prices())
-    spawn(retreat, _build_day(retreat, day_no, heart_prompt, deep_prompt, guide, old if keep_scripts else {}, meter, search_provider))
-    return state
+    return (old if keep_scripts else {}), pricing.Meter(opts["write_model"], await pricing.prices())
+
+
+async def start_day_build(
+    retreat: dict, day_no: int, voices: dict, heart_prompt: str, deep_prompt: str, guide: dict, keep_scripts: bool, model: str,
+    search_provider: str | None = None,
+) -> dict:
+    """Rebuild one day (Rewrite, Re-record, Try again)."""
+    opts = {"voices": voices, "heart_prompt": heart_prompt, "deep_prompt": deep_prompt, "guide": guide,
+            "write_model": model, "search_provider": search_provider}
+    kept, meter = await _prepare_day(retreat, day_no, opts, keep_scripts)
+    spawn(retreat, _build_day(retreat, day_no, heart_prompt, deep_prompt, guide, kept, meter, search_provider))
+    return retreat["days"][str(day_no)]
 
 
 async def _build_day(
     retreat: dict, day_no: int, heart_prompt: str, deep_prompt: str, guide: dict, kept: dict, meter: pricing.Meter,
     search_provider: str | None = None,
 ) -> None:
+    """Make one day. The parts are written in the order they're heard, each knowing the
+    ones before it: the reflection for the heart first, then the deep dive (which sees
+    the reflection and builds on it), then the spoken guidance (tailored to both).
+    Recordings start as soon as each script is ready. Finished parts are skipped, so a
+    resumed build only redoes what's missing; `kept` holds scripts to reuse unchanged
+    (a re-record, or a resume)."""
     state = retreat["days"][str(day_no)]
     day = retreat["plan"]["days"][day_no - 1]
     voices = state["voices"]
-    image = retreat["images"][day["image_index"]]["description"] if day["image_index"] >= 0 else None
-    context = prompts.day_context(retreat["plan"]["title"], day, image)
+    indexes = [i for i in day.get("image_indexes") or [day["image_index"]] if 0 <= i < len(retreat["images"])]
+    image = "; ".join(retreat["images"][i]["description"] for i in indexes) or None
+    title = retreat["plan"]["title"]
+    tailor = retreat.get("build_options", {}).get("tailor_guide", True) if retreat.get("build_options") else True
 
     def words_for(section: str) -> int:
         return int(tts.max_chars(voices[section]) / 6 * 0.85)  # about six characters per word with spaces
+
+    def ready(group: str, name: str) -> dict | None:
+        clip = state[group].get(name) or {}
+        return clip if clip.get("status") == "ready" else None
 
     async def record(group: str, name: str, script: str, voice: str, **extra) -> None:
         clip = state[group][name]
@@ -327,49 +415,83 @@ async def _build_day(
 
     llm_log.tag(user_id=retreat["user_id"], retreat_id=retreat["id"], day=day_no)
     series_text = await series_context(retreat, meter.model)
+    recordings: dict[tuple[str, str], asyncio.Task] = {}
+    errors: dict[tuple[str, str], Exception] = {}
 
-    async def heart() -> None:
-        llm_log.tag(purpose="heart")
-        if "heart" in kept:
-            return await record("tracks", "heart", kept["heart"]["script"], voices["heart"])
-        state["tracks"]["heart"]["status"] = "writing"
-        await record("tracks", "heart", await llm.write_heart(context, heart_prompt, words_for("heart"), meter, series_text), voices["heart"])
-
-    async def deep() -> None:
-        llm_log.tag(purpose="deep")
-        if "deep" in kept:
-            k = kept["deep"]
-            return await record("tracks", "deep", k["script"], voices["deep"], sources=k.get("sources", []), web_search=k.get("web_search"))
-        state["tracks"]["deep"]["status"] = "writing"
-        script, sources, searched = await llm.write_deep(context, deep_prompt, words_for("deep"), meter, search_provider, series_text)
-        # For Jetstream models `searched` names the research service that answered.
-        await record("tracks", "deep", script, voices["deep"], sources=sources, web_search=bool(searched),
-                     research=search.PROVIDERS.get(searched) if isinstance(searched, str) else None)
-
-    reading = re.sub(r"\n{3,}", "\n\n", day["passage_text"]).strip()
-    work = {("tracks", "reading"): lambda: record("tracks", "reading", reading, voices["reading"]),
-            ("tracks", "heart"): heart,
-            ("tracks", "deep"): deep}
-    for name, template in guide.items():
-        work[("guide", name)] = lambda name=name, template=template: record(
-            "guide", name, prompts.guide_text(template, day), voices["guide"])
-    # A resumed build skips whatever finished before the interruption.
-    jobs = {key: make() for key, make in work.items() if state[key[0]].get(key[1], {}).get("status") != "ready"}
+    def start_recording(group: str, name: str, script: str, voice: str, **extra) -> None:
+        if not ready(group, name):
+            recordings[(group, name)] = asyncio.create_task(record(group, name, script, voice, **extra))
 
     async with _jobs:
-        results = await asyncio.gather(*jobs.values(), return_exceptions=True)
+        # The reading needs no writing: record it right away.
+        start_recording("tracks", "reading", re.sub(r"\n{3,}", "\n\n", day["passage_text"]).strip(), voices["reading"])
 
-    errors = []
-    for (group, name), result in zip(jobs, results):
+        # 1. For the heart.
+        heart_script = ""
+        try:
+            llm_log.tag(purpose="heart")
+            done = ready("tracks", "heart") or kept.get("heart")
+            if done:
+                heart_script = done["script"]
+            else:
+                state["tracks"]["heart"]["status"] = "writing"
+                heart_script = await llm.write_heart(prompts.day_context(title, day, image), heart_prompt,
+                                                     words_for("heart"), meter, series_text)
+            start_recording("tracks", "heart", heart_script, voices["heart"])
+        except Exception as exc:
+            errors[("tracks", "heart")] = exc
+
+        # 2. The deep dive, knowing the reflection.
+        deep_script = ""
+        try:
+            llm_log.tag(purpose="deep")
+            done = ready("tracks", "deep") or kept.get("deep")
+            if done:
+                deep_script = done["script"]
+                start_recording("tracks", "deep", deep_script, voices["deep"], sources=done.get("sources", []),
+                                web_search=done.get("web_search"), research=done.get("research"))
+            else:
+                state["tracks"]["deep"]["status"] = "writing"
+                context = prompts.day_context(title, day, image, heart=heart_script)
+                deep_script, sources, searched = await llm.write_deep(context, deep_prompt, words_for("deep"), meter,
+                                                                      search_provider, series_text)
+                # For Jetstream models `searched` names the research service that answered.
+                start_recording("tracks", "deep", deep_script, voices["deep"], sources=sources, web_search=bool(searched),
+                                research=search.PROVIDERS.get(searched) if isinstance(searched, str) else None)
+        except Exception as exc:
+            errors[("tracks", "deep")] = exc
+
+        # 3. The spoken guidance, tailored to what the listener will hear.
+        lines = {name: prompts.guide_text(template, day) for name, template in guide.items()}
+        missing = {n: t for n, t in lines.items() if not ready("guide", n)}
+        if missing:
+            reuse = kept.get("guide") or {}
+            if reuse and all(n in reuse for n in missing):
+                texts = {n: reuse[n] for n in missing}
+            elif tailor:
+                llm_log.tag(purpose="guide")
+                texts = await llm.tailor_guide(prompts.day_context(title, day, image), heart_script, deep_script,
+                                               missing, meter)
+            else:
+                texts = missing
+            for name, text in texts.items():
+                start_recording("guide", name, text, voices["guide"])
+
+        results = await asyncio.gather(*recordings.values(), return_exceptions=True)
+    for key, result in zip(recordings, results):
         if isinstance(result, Exception):
-            known = isinstance(result, (llm.LLMError, tts.TTSError, StorageError))
-            if not known:
-                log.error("day build failed", exc_info=result)
-            message = str(result) if known else "Unexpected error."
-            state[group][name].update(status="failed", error=message)
-            errors.append(f"{name}: {message}")
-    state["status"] = "failed" if errors else "ready"
-    state["error"] = "; ".join(dict.fromkeys(errors)) or None
+            errors[key] = result
+
+    messages = []
+    for (group, name), exc in errors.items():
+        known = isinstance(exc, (llm.LLMError, tts.TTSError, StorageError))
+        if not known:
+            log.error("day build failed", exc_info=exc)
+        message = str(exc) if known else "Unexpected error."
+        state[group].setdefault(name, {}).update(status="failed", error=message)
+        messages.append(f"{name}: {message}")
+    state["status"] = "failed" if messages else "ready"
+    state["error"] = "; ".join(dict.fromkeys(messages)) or None
     state["cost"] = _day_cost(state, meter)
     await save(retreat)
 

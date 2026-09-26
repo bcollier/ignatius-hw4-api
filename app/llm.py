@@ -208,8 +208,12 @@ def _clean_plan(plan: dict, image_count: int) -> dict:
         raise LLMError("The model couldn't find any usable passages in this document.")
     for n, day in enumerate(days, start=1):
         day["day"] = n
-        if not 0 <= day.get("image_index", -1) < image_count:
-            day["image_index"] = -1
+        indexes = [i for i in day.get("image_indexes") or [] if isinstance(i, int) and 0 <= i < image_count]
+        first = day.get("image_index", -1)
+        if isinstance(first, int) and 0 <= first < image_count and first not in indexes:
+            indexes.insert(0, first)
+        day["image_indexes"] = list(dict.fromkeys(indexes))
+        day["image_index"] = day["image_indexes"][0] if day["image_indexes"] else -1
     plan["days"] = days
     return plan
 
@@ -235,6 +239,7 @@ def stub_plan(source: Extracted, filename: str) -> dict:
             "grace": "To know God's closeness in this passage.",
             "focus": "Stub plan: set OPENROUTER_API_KEY for a real one.",
             "image_index": i if i < len(source.images) else -1,
+            "image_indexes": [i] if i < len(source.images) else [],
         })
     return {
         "title": filename.rsplit(".", 1)[0],
@@ -279,6 +284,40 @@ async def _deep_jetstream(
         urls = {r["url"] for r in results}
         sources = [line for line in sources if any(u in line for u in urls)]  # drop anything not from the results
     return script, sources, (research.provider or False) if results else False  # the service that answered
+
+
+async def tailor_guide(context: str, heart: str, deep: str, lines: dict, meter: pricing.Meter) -> dict:
+    """Adapt the spoken guidance to this day's reflection and deep dive. Returns the
+    lines to use; any line the model drops, empties or badly overruns keeps its default,
+    and any failure returns the defaults unchanged (tailoring is never required)."""
+    if config.LLM_MODE == "stub" or not lines:
+        return dict(lines)
+    user = prompts.tailor_input(context, heart, deep, lines)
+    schema = {"type": "object", "properties": {k: {"type": "string"} for k in lines},
+              "required": list(lines), "additionalProperties": False}
+    try:
+        if pricing.is_jetstream(meter.model):
+            reply = await jetstream.complete(pricing.api_model(meter.model), prompts.GUIDE_TAILOR, user, meter)
+        else:
+            try:
+                message = await _call(meter, system=prompts.GUIDE_TAILOR, max_tokens=8000, messages=[{"role": "user", "content": user}],
+                                      output_config={"format": {"type": "json_schema", "schema": schema}})
+            except anthropic.BadRequestError:
+                message = await _call(meter, system=prompts.GUIDE_TAILOR, max_tokens=8000, messages=[{"role": "user", "content": user}])
+            reply = _text(message)
+        tailored = _parse_json(reply)
+    except Exception:  # LLMError, JetstreamError, bad JSON: keep the defaults
+        log.warning("couldn't tailor the spoken guidance; using the default lines")
+        return dict(lines)
+    out = {}
+    for name, default in lines.items():
+        text = " ".join(str(tailored.get(name) or "").split())
+        ok = 0 < len(text) <= max(2 * len(default), 600)
+        if ok and name == "opening" and "Ask for" in default:
+            grace = default[default.index("Ask for"):].split(". ")[0]
+            ok = grace in text  # the request for the grace must survive word for word
+        out[name] = text if ok else default
+    return out
 
 
 def _split_script(text: str) -> tuple[str, list[str]]:
