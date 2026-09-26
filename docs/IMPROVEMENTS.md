@@ -1,6 +1,6 @@
 # Ignatius at Home: next-level improvement spec
 
-A spec for one extended Claude Code run of about 3 to 4 hours. It reshapes the web app from a control panel into a place to pray, adds the few backend pieces that make a week-by-week retreat feel like a practice, and leaves the working parts alone.
+A spec for one extended Claude Code run of about 4 hours. Everything in it ships; there is no optional tier. It reshapes the web app from a control panel into a place to pray, adds the few backend pieces that make a week-by-week retreat feel like a practice, and leaves the working parts alone.
 
 Repos: the web app is `~/Code/ignatius-hw4-web` (plain HTML, CSS, JS on GitHub Pages); the API is `~/Code/ignatius-hw4-api` (FastAPI on Render). Read `docs/ARCHITECTURE.md` first. Everything below refers to those two repos.
 
@@ -42,7 +42,7 @@ Three views in the same static page, chosen by the URL:
 
 Backend: creating a retreat takes all the build options and, once planned, builds every day one after another without another request. A start date, "prayed" marks and a journal entry per day are added. Everything else on the server stays as it is.
 
-## Tier 1: must ship (about 3 hours)
+## The work (all of it ships, about 4 hours)
 
 ### 1. One-shot creation (API)
 
@@ -123,7 +123,7 @@ The app remembers what has been played, per day, so a missed or interrupted day 
 - Headings: "New retreat", "Simple" / "Advanced", "Listen to a part", "After praying". No numbered headings.
 - Costs: for premium users only, one line under Make my retreat (the estimate) and one line in the retreat header after it's made ("This retreat cost $5.80"). The full breakdown (tokens, searches, per day, ElevenLabs balance) goes in a **Costs** `<details>` at the bottom of the retreat view.
 
-## Tier 2: if time remains (about 1 hour)
+### 9. Finishing touches
 
 - **Today awareness in the Library:** "Today is Day 4 of Week 12" computed from start dates; the Continue card uses it.
 - **Notifications:** when a retreat finishes being made and the tab is open, a small toast; if `Notification.permission` is granted, a system notification. Ask for permission only from a button on the progress panel ("Tell me when it's ready"), never on load.
