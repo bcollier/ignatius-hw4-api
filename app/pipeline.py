@@ -21,7 +21,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import config, llm, llm_log, pricing, prompts, search, tts
+from . import config, llm, llm_log, pricing, prompts, search, series, tts
 from .extract import Extracted, Image
 from .storage import StorageError, store
 
@@ -172,7 +172,8 @@ async def public_view(retreat: dict) -> dict:
 
 
 async def create_retreat(
-    user_id: str, filename: str, source: Extracted, plan_prompt: str, model: str, email: str | None = None
+    user_id: str, filename: str, source: Extracted, plan_prompt: str, model: str, email: str | None = None,
+    series_ids: list[str] | None = None,
 ) -> dict:
     retreat_id = str(uuid.uuid4())
     images = []
@@ -192,6 +193,8 @@ async def create_retreat(
         "plan_prompt": plan_prompt if plan_prompt != prompts.PLAN_INSTRUCTIONS else None,
         "owner_email": email,
         "model": model,
+        "series": series_ids or [],  # earlier retreats, oldest first
+        "series_info": None,
         "costs": {},
         "source": {
             "kind": source.kind,
@@ -211,12 +214,30 @@ async def create_retreat(
     return retreat
 
 
+async def series_context(retreat: dict, model: str) -> str:
+    """The earlier retreats in this one's series, as text for the model (see series.py)."""
+    if not retreat.get("series"):
+        return ""
+    previous = []
+    for rid in retreat["series"]:
+        try:
+            r = await store.load(rid)
+        except StorageError:
+            r = None
+        if r and r["user_id"] == retreat["user_id"]:  # deleted or someone else's: skip
+            previous.append(r)
+    text, stats = series.context(previous, series.budget_for(model))
+    retreat["series_info"] = stats
+    return text
+
+
 async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
     meter = pricing.Meter(retreat["model"], await pricing.prices())
     llm_log.tag(user_id=retreat["user_id"], retreat_id=retreat["id"], purpose="plan")
+    series_text = await series_context(retreat, retreat["model"])
     async with _jobs:
         try:
-            plan = await llm.plan_retreat(source, retreat["filename"], plan_prompt, meter)
+            plan = await llm.plan_retreat(source, retreat["filename"], plan_prompt, meter, series_text)
         except llm.LLMError as exc:
             retreat.update(status="failed", error=str(exc), costs={"plan": meter.summary()})
             return await save(retreat)
@@ -305,13 +326,14 @@ async def _build_day(
         await save(retreat)
 
     llm_log.tag(user_id=retreat["user_id"], retreat_id=retreat["id"], day=day_no)
+    series_text = await series_context(retreat, meter.model)
 
     async def heart() -> None:
         llm_log.tag(purpose="heart")
         if "heart" in kept:
             return await record("tracks", "heart", kept["heart"]["script"], voices["heart"])
         state["tracks"]["heart"]["status"] = "writing"
-        await record("tracks", "heart", await llm.write_heart(context, heart_prompt, words_for("heart"), meter), voices["heart"])
+        await record("tracks", "heart", await llm.write_heart(context, heart_prompt, words_for("heart"), meter, series_text), voices["heart"])
 
     async def deep() -> None:
         llm_log.tag(purpose="deep")
@@ -319,7 +341,7 @@ async def _build_day(
             k = kept["deep"]
             return await record("tracks", "deep", k["script"], voices["deep"], sources=k.get("sources", []), web_search=k.get("web_search"))
         state["tracks"]["deep"]["status"] = "writing"
-        script, sources, searched = await llm.write_deep(context, deep_prompt, words_for("deep"), meter, search_provider)
+        script, sources, searched = await llm.write_deep(context, deep_prompt, words_for("deep"), meter, search_provider, series_text)
         # For Jetstream models `searched` names the research service that answered.
         await record("tracks", "deep", script, voices["deep"], sources=sources, web_search=bool(searched),
                      research=search.PROVIDERS.get(searched) if isinstance(searched, str) else None)

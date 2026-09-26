@@ -41,7 +41,7 @@ When Supabase is configured, the endpoints marked 🔒 need `Authorization: Bear
 | `GET /api/options` | none | Voice tiers and voices, default prompts and guidance, upload limits, the Claude models with live OpenRouter prices, the ElevenLabs balance, and the public Supabase URL and publishable key for the sign-in form |
 | `GET /api/me` 🔒 | none | `{id, email}` |
 | `GET /api/retreats` 🔒 | none | `{retreats: [{id, title, filename, created_at, status, days, days_built}]}`, newest first |
-| `POST /api/retreats` 🔒 | multipart: `file` (.pdf or .docx, up to 15 MB and 40 pages), optional `plan_prompt`, optional `model` | **202** with the retreat, `status: "planning"`. 400 for unreadable or empty files, 413 if too large |
+| `POST /api/retreats` 🔒 | multipart: `file` (.pdf or .docx, up to 15 MB and 40 pages), optional `plan_prompt`, `model`, and `series` (comma-separated ids of earlier retreats this one continues) | **202** with the retreat, `status: "planning"`. 400 for unreadable or empty files, 413 if too large |
 | `GET /api/retreats/{id}` 🔒 | none | The retreat: `status` (`planning`, `ready`, `failed`), `source` stats, `images` (with signed `url`), `plan` (title, summary, mode, days with passage, grace, image), and `days` (build state per day, tracks with `status`, `script`, `url`, `sources`) |
 | `GET /api/retreats/{id}/script.pdf` 🔒 | query: `day` (omit for the whole retreat), `order` (`lectio` or `simple`), `grace_silence`, `pause` (seconds) | A printable PDF of the script in prayer order, with images, guidance, silences and sources. The whole retreat adds a cover and contents; unbuilt days show their passage and grace |
 | `DELETE /api/retreats/{id}` 🔒 | none | `{deleted: id}`; removes the row and its files. 409 while a job is running |

@@ -250,7 +250,9 @@ erDiagram
         float created_at "Unix seconds"
         enum status "planning | ready | failed"
         string error
-        string model "OpenRouter id used for planning"
+        string model "model id used for planning"
+        list series "earlier retreats this one continues, oldest first"
+        json series_info "retreats, characters sent, items shortened"
         bool custom_plan_prompt
     }
     SOURCE {
@@ -475,6 +477,22 @@ sequenceDiagram
     API->>ST: sign image URLs (24 h)
     API-->>W: retreat with plan and image URLs
 ```
+
+**Series.** A retreat can continue earlier ones ("This retreat is part of a series"), for someone praying a long retreat week by week. The API checks that each earlier retreat is the user's and has been planned, and stores them oldest first. Every model call for the new retreat (planning, and each day's reflection and deep dive) then receives the whole series: for each earlier week, every day's title, source, grace, passage, reflection and deep dive, with instructions to continue the arc, refer back, and not repeat earlier explanations.
+
+```mermaid
+flowchart LR
+    W1["Week 1"] --> S["series.context()"]
+    W2["Week 2"] --> S
+    WN["… Week N"] --> S
+    S --> B{"Over the budget?<br/>Claude 600k chars · Jetstream 80k"}
+    B -- no --> ALL["Everything, in order"]
+    B -- yes --> CUT["Shorten oldest weeks first:<br/>deep dives, then reflections, then passages<br/>(titles, sources and graces always kept)"]
+    ALL --> M["Planning, reflection, deep dive"]
+    CUT --> M
+```
+
+With Claude the series goes in its own system block marked for prompt caching, so the calls for the days of a week read it from the cache at a fraction of the input price. Jetstream receives it at the start of the request. The retreat records what was sent in `series_info`, and the page shows "Week N of a series, continuing: …".
 
 **Plan modes.** If the source already lays out days ("Day 1", "Day 2"...), Claude keeps them in order with their titles and passages (`follows_source`). If it is loose material, Claude composes about seven days from it (`composed`), reusing a passage for repetition when the source is thin. In both modes `passage_text` is copied word for word; only page furniture and verse numbers may be removed.
 
@@ -971,6 +989,7 @@ flowchart LR
 | `app/prompts.py` | Default prompts, house style, spoken guidance templates |
 | `app/tts.py` | Voices, tiers, chunking, Microsoft and ElevenLabs recording, lengths |
 | `app/script_pdf.py` | The printable script PDF |
+| `app/series.py` | Earlier retreats in a series as model context, within a size budget |
 | `app/llm_log.py` | The model call log |
 | `app/search.py` | Research services for free-mode deep dives |
 | `app/pricing.py` | Model list, live prices, cost meter, ElevenLabs balance |
@@ -1024,3 +1043,4 @@ flowchart LR
 | `MAX_DAYS` / `DEFAULT_DAYS` | 14 / 7 | Plan size |
 | `MAX_TRACK_CHARS` / `PREMIUM_MAX_TRACK_CHARS` | 6,000 / 2,500 | Section length caps |
 | `MAX_CONCURRENT_JOBS` | 2 | Jobs running at once |
+| `SERIES_MAX_CHARS` / `SERIES_MAX_CHARS_FREE` | 600,000 / 80,000 | How much of an earlier series is sent to Claude / to Jetstream models |

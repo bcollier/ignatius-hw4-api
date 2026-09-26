@@ -98,3 +98,7 @@ MAX_TRACK_CHARS = _int("MAX_TRACK_CHARS", 6000)
 PREMIUM_MAX_TRACK_CHARS = _int("PREMIUM_MAX_TRACK_CHARS", 2500)
 
 MAX_CONCURRENT_JOBS = _int("MAX_CONCURRENT_JOBS", 2)
+
+# How much of an earlier series goes to the model, in characters (about 4 per token).
+SERIES_MAX_CHARS = _int("SERIES_MAX_CHARS", 600_000)  # Claude: about 150k tokens of a 1M window
+SERIES_MAX_CHARS_FREE = _int("SERIES_MAX_CHARS_FREE", 80_000)  # Jetstream models: about 20k tokens

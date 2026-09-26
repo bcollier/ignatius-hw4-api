@@ -12,7 +12,7 @@ import re
 
 import anthropic
 
-from . import config, jetstream, llm_log, pricing, prompts, search
+from . import config, jetstream, llm_log, pricing, prompts, search, series
 from .extract import Extracted
 
 log = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ async def _call(meter: pricing.Meter, **params) -> anthropic.types.Message:
         await llm_log.record(
             provider=config.LLM_MODE,
             model=meter.model,
-            system=params.get("system", ""),
+            system=_system_text(params.get("system", "")),
             messages=request_messages,
             response_text=_text(message) if message else None,
             response_extra={
@@ -92,6 +92,27 @@ async def _call(meter: pricing.Meter, **params) -> anthropic.types.Message:
             duration_ms=timer.ms,
             error=error,
         )
+
+
+def _system(instructions: str, series_text: str):
+    """The system prompt, with an earlier series (if any) as a separate block first,
+    marked for prompt caching: it's identical across the days of a week, so later
+    calls read it from cache at a fraction of the price."""
+    if not series_text:
+        return instructions
+    return [
+        {"type": "text", "text": series.INSTRUCTIONS + "\n\n" + series_text, "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": instructions},
+    ]
+
+
+def _with_series(text: str, series_text: str) -> str:
+    """For Jetstream (no system blocks or caching): the series goes before the request."""
+    return f"{series.INSTRUCTIONS}\n\n{series_text}\n\n{text}" if series_text else text
+
+
+def _system_text(system) -> str:
+    return system if isinstance(system, str) else "\n\n".join(b.get("text", "") for b in system)
 
 
 def _text(message: anthropic.types.Message) -> str:
@@ -115,11 +136,13 @@ def _image_block(data: bytes, mime: str) -> dict:
 # ---------------------------------------------------------------- planning
 
 
-async def plan_retreat(source: Extracted, filename: str, instructions: str, meter: pricing.Meter) -> dict:
+async def plan_retreat(
+    source: Extracted, filename: str, instructions: str, meter: pricing.Meter, series_text: str = ""
+) -> dict:
     if config.LLM_MODE == "stub":
         return stub_plan(source, filename)
     if pricing.is_jetstream(meter.model):
-        return await _plan_jetstream(source, filename, instructions, meter)
+        return await _plan_jetstream(source, filename, instructions, meter, series_text)
 
     content: list[dict] = []
     for i, img in enumerate(source.images):
@@ -129,7 +152,7 @@ async def plan_retreat(source: Extracted, filename: str, instructions: str, mete
         content += [{"type": "text", "text": f"Scanned page {img.page} (no text layer):"}, _image_block(img.data, img.mime)]
     content.append({"type": "text", "text": f"Source file: {filename}\n\n<source>\n{source.text}\n</source>"})
 
-    system = instructions + "\n\n" + prompts.PLAN_FIXED.format(max_days=config.MAX_DAYS)
+    system = _system(instructions + "\n\n" + prompts.PLAN_FIXED.format(max_days=config.MAX_DAYS), series_text)
     params = dict(system=system, max_tokens=32000, messages=[{"role": "user", "content": content}])
     try:
         message = await _call(
@@ -139,7 +162,11 @@ async def plan_retreat(source: Extracted, filename: str, instructions: str, mete
     except anthropic.BadRequestError:
         # Some gateways don't pass structured outputs through; ask for JSON in the prompt instead.
         log.warning("structured output rejected; retrying with a JSON instruction")
-        params["system"] += "\n\nReply with only a JSON object matching this schema:\n" + json.dumps(prompts.PLAN_SCHEMA)
+        schema_note = "\n\nReply with only a JSON object matching this schema:\n" + json.dumps(prompts.PLAN_SCHEMA)
+        if isinstance(params["system"], str):
+            params["system"] += schema_note
+        else:
+            params["system"][-1]["text"] += schema_note
         try:
             message = await _call(meter, **params)
         except anthropic.BadRequestError as exc:
@@ -147,7 +174,9 @@ async def plan_retreat(source: Extracted, filename: str, instructions: str, mete
     return _clean_plan(_parse_json(_text(message)), len(source.images))
 
 
-async def _plan_jetstream(source: Extracted, filename: str, instructions: str, meter: pricing.Meter) -> dict:
+async def _plan_jetstream(
+    source: Extracted, filename: str, instructions: str, meter: pricing.Meter, series_text: str = ""
+) -> dict:
     """Open models don't take a JSON schema here, so the schema goes in the prompt.
     Images are offered to the model; if they're refused, it plans from the text."""
     system = (
@@ -160,6 +189,7 @@ async def _plan_jetstream(source: Extracted, filename: str, instructions: str, m
     if notes:
         text += "Attached images, in order: " + "; ".join(notes) + "\n"
     text += f"\n<source>\n{source.text}\n</source>"
+    text = _with_series(text, series_text)
     images = [(img.data, img.mime) for img in source.images + source.scanned_pages]
     try:
         try:
@@ -219,7 +249,7 @@ def stub_plan(source: Extracted, filename: str) -> dict:
 
 
 async def _deep_jetstream(
-    context: str, instructions: str, words: int, meter: pricing.Meter, provider: str | None
+    context: str, instructions: str, words: int, meter: pricing.Meter, provider: str | None, series_text: str = ""
 ) -> tuple[str, list[str], bool]:
     """Jetstream models can't search, so the server does: the model proposes queries,
     a search service runs them, and the model writes from the results. Sources are
@@ -241,7 +271,7 @@ async def _deep_jetstream(
         note = prompts.SEARCH_RESULTS if results else prompts.SEARCH_OFF
         system = instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=note, words=words)
         user = context + ("\n\n" + search.as_prompt(results) if results else "")
-        reply = await jetstream.complete(model, system, user, meter)
+        reply = await jetstream.complete(model, system, _with_series(user, series_text), meter)
     except jetstream.JetstreamError as exc:
         raise LLMError(str(exc)) from exc
     script, sources = _split_script(reply)
@@ -259,25 +289,27 @@ def _split_script(text: str) -> tuple[str, list[str]]:
     return body, [ln for ln in lines if ln]
 
 
-async def write_heart(context: str, instructions: str, words: int, meter: pricing.Meter) -> str:
+async def write_heart(context: str, instructions: str, words: int, meter: pricing.Meter, series_text: str = "") -> str:
     if config.LLM_MODE == "stub":
         return f"Stub heart reflection. Sit with the passage for a moment. {context[-400:]}"
     system = instructions + "\n\n" + prompts.HEART_FIXED.format(words=words)
     if pricing.is_jetstream(meter.model):
         try:
-            reply = await jetstream.complete(pricing.api_model(meter.model), system, context, meter)
+            reply = await jetstream.complete(pricing.api_model(meter.model), system, _with_series(context, series_text), meter)
         except jetstream.JetstreamError as exc:
             raise LLMError(str(exc)) from exc
         return _split_script(reply)[0]
     try:
-        message = await _call(meter, system=system, max_tokens=16000, messages=[{"role": "user", "content": context}])
+        message = await _call(meter, system=_system(system, series_text), max_tokens=16000,
+                              messages=[{"role": "user", "content": context}])
     except anthropic.BadRequestError as exc:
         raise LLMError(f"The model provider rejected the request: {exc.message}") from exc
     return _split_script(_text(message))[0]
 
 
 async def write_deep(
-    context: str, instructions: str, words: int, meter: pricing.Meter, search_provider: str | None = None
+    context: str, instructions: str, words: int, meter: pricing.Meter, search_provider: str | None = None,
+    series_text: str = "",
 ) -> tuple[str, list[str], bool]:
     """Returns (script, sources, searched)."""
     if config.LLM_MODE == "stub":
@@ -286,10 +318,11 @@ async def write_deep(
     async def attempt(search: bool):
         system = instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=prompts.SEARCH_ON if search else prompts.SEARCH_OFF, words=words)
         extra = {"tools": [pricing.web_search_tool(meter.model)]} if search else {}
-        return await _call(meter, system=system, max_tokens=16000, messages=[{"role": "user", "content": context}], **extra)
+        return await _call(meter, system=_system(system, series_text), max_tokens=16000,
+                           messages=[{"role": "user", "content": context}], **extra)
 
     if pricing.is_jetstream(meter.model):
-        return await _deep_jetstream(context, instructions, words, meter, search_provider)
+        return await _deep_jetstream(context, instructions, words, meter, search_provider, series_text)
 
     searched = config.WEB_SEARCH
     try:

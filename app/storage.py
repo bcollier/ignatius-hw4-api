@@ -41,6 +41,7 @@ def summary(retreat: dict) -> dict:
         "status": retreat["status"],
         "days": len(days),
         "days_built": sum(1 for d in days.values() if d["status"] == "ready"),
+        "series": retreat.get("series", []),
     }
 
 

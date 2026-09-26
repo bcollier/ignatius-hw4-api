@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import auth, config, llm_log, pipeline, pricing, prompts, script_pdf, search, tts
+from . import auth, config, llm_log, pipeline, pricing, prompts, script_pdf, search, series, tts
 from .auth import User, current_user
 from .extract import ExtractError, extract
 from .storage import LocalStore, StorageError, store
@@ -57,6 +57,23 @@ def check_prompt(text: str | None, default: str, name: str) -> str:
     if len(text) > prompts.MAX_PROMPT_CHARS:
         raise HTTPException(400, f"The {name} prompt is longer than {prompts.MAX_PROMPT_CHARS} characters.")
     return text or default
+
+
+async def check_series(raw: str, user: User) -> list[str]:
+    """Earlier retreats for a series: comma-separated ids, all the user's own and planned.
+    Returned oldest first, whatever order they were sent in."""
+    ids = list(dict.fromkeys(i.strip() for i in raw.split(",") if i.strip()))
+    if len(ids) > series.MAX_PREVIOUS:
+        raise HTTPException(400, f"A series can include up to {series.MAX_PREVIOUS} earlier retreats.")
+    found = []
+    for rid in ids:
+        r = await pipeline.get(rid)
+        if not r or r["user_id"] != user.id:
+            raise HTTPException(400, "One of the earlier retreats in the series wasn't found.")
+        if not r.get("plan"):
+            raise HTTPException(400, f"'{r['filename']}' hasn't finished planning, so it can't be part of a series yet.")
+        found.append(r)
+    return [r["id"] for r in sorted(found, key=lambda r: r["created_at"])]
 
 
 async def my_retreat(retreat_id: str, user: User = Depends(current_user)) -> dict:
@@ -164,6 +181,7 @@ async def create_retreat(
     file: UploadFile = File(...),
     plan_prompt: str = Form(""),
     model: str = Form(""),
+    series_ids: str = Form("", alias="series"),
     user: User = Depends(current_user),
 ):
     plan_prompt = check_prompt(plan_prompt, prompts.PLAN_INSTRUCTIONS, "planning")
@@ -182,8 +200,10 @@ async def create_retreat(
     except ExtractError as exc:
         raise HTTPException(400, str(exc)) from exc
     llm_log.tag(email=user.email or ("guest" if user.anonymous else None))  # inherited by the planning job
+    ids = await check_series(series_ids, user)
     retreat = await pipeline.create_retreat(
-        user.id, file.filename or "upload", source, plan_prompt, model, email=user.email or ("guest" if user.anonymous else None)
+        user.id, file.filename or "upload", source, plan_prompt, model,
+        email=user.email or ("guest" if user.anonymous else None), series_ids=ids,
     )
     return await pipeline.public_view(retreat)
 
