@@ -267,7 +267,8 @@ def day_context(retreat_title: str, day: dict, image_description: str | None, he
         f"Focus: {day['focus']}",
     ]
     if image_description:
-        lines.append(f"Image for this day: {image_description}")
+        # For reference only: the listener sees the painting, so the writers don't describe it.
+        lines.append(f"Painting on the listener's screen (they can see it; don't describe it): {image_description}")
     if so_far:
         lines.append("\n" + so_far + "\n")
     lines.append(f"\nToday's passage:\n{day['passage_text']}")

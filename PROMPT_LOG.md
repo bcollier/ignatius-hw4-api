@@ -762,6 +762,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Noted for the real redesign: keep the slow drift and zoom on every painting, and build the "look closer" zoom to the detail each part is about.
 
+### 122. 2026-09-27, 01:30 UTC
+
+> I'm listening to the premium and it spends a lot of time verbally describing the images. That seems really bad, the focus shouldn't be on the image but the words. Why the long description. They can see it. Have a meaningful personal lesson from the heart ones, what does god want people to know in their heart about this scripture
+
+**What was done:** The prompts told every writer to bring in the painting and describe it so someone with closed eyes could see it. They now say the opposite: the listener can see the painting, so don't describe it; mention it at most once, in a few words, and only to point back to the text. The heart reflection (both voices) now has a clear center: one true, personal thing God wants this person to know in their heart through this passage, said plainly once. Tested on the prodigal son day with Claude Opus 5.5: one brief mention of the painting, and a center ("You do not have to finish the apology to be held").
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
