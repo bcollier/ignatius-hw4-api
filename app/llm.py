@@ -325,7 +325,38 @@ def passage_start(text: str, start: str, after: int = 0) -> int | None:
     return m.start() if m else None
 
 
+# Verse numbers copied from a printed page ("…revealed to us. 19 For the anxious…
+# 21 that the creation…"). They'd be read aloud, so they come out; the reference is
+# shown on screen instead. A verse number is a small number standing before a word,
+# and verse numbers count up (19, 20, 21…), which is how they're told apart from a
+# number that belongs to the text ("the 5000", "Psalm 23").
+NUMBER_BEFORE_WORD = re.compile(r"(?:(?<=\s)|(?<=^)|(?<=[.;:!?\u201d\"]))(\d{1,3})[ \t]*(?=[A-Za-z\u201c\"\u2018'(])", re.M)
+
+
+def strip_verse_numbers(text: str) -> str:
+    found = list(NUMBER_BEFORE_WORD.finditer(text))
+    values = [int(m.group(1)) for m in found]
+    verse = [False] * len(found)
+    for k in range(len(found)):
+        before = k > 0 and values[k] == values[k - 1] + 1
+        after = k + 1 < len(found) and values[k + 1] == values[k] + 1
+        verse[k] = before or after
+    # A lone number at the very start ("18 For I consider…") is the first verse too.
+    if found and not any(verse) and found[0].start() == 0:
+        verse[0] = True
+    out, pos = [], 0
+    for m, is_verse in zip(found, verse):
+        if is_verse:
+            out.append(text[pos:m.start()])
+            pos = m.end()
+    out.append(text[pos:])
+    return re.sub(r"[ \t]{2,}", " ", "".join(out)).strip()
+
+
 def _clean_plan(plan: dict, image_count: int) -> dict:
+    for d in plan.get("days", []):
+        if d.get("kind") != "exercise":
+            d["passage_text"] = strip_verse_numbers(d.get("passage_text") or "")
     days = [d for d in plan.get("days", []) if d.get("passage_text", "").strip()][: config.MAX_DAYS]
     if not days:
         raise LLMError("The model couldn't find any usable passages in this document.")

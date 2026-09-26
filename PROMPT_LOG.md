@@ -826,6 +826,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Added a full-screen button to the prayer player. On computers, Android and iPad it hides the browser (and leaves full screen when the prayer closes). An iPhone doesn't let websites do that, so there the button explains how to add the app to the Home Screen, where it opens full screen by itself. It notes that the Home Screen app keeps its own sign-in. The button is hidden once the app is opened from the Home Screen.
 
+### 132. 2026-09-26, 23:27 UTC
+
+> This version of the text has numbers in it and. The reader is saying them out loud *(with a screenshot of Romans 8 on the prayer screen showing verse numbers 19, 20, 21)*
+
+**What was done:** Verse numbers are now taken out of every passage when a plan is made. They're recognized by counting up (19, 20, 21…) whatever word follows them, so a number that belongs to the text stays. The compact-plan path had copied them straight from the PDF. Only the "2-PrepDays" retreat was affected (Day 4, Romans 8, and Day 5, Psalm 33); both readings were cleaned and recorded again.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

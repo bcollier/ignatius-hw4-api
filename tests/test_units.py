@@ -151,3 +151,15 @@ def test_a_retreats_files_include_its_guidance_recordings():
         "tracks": {"heart": {"path": "u/r/day1_heart.mp3", "research_path": None}},
         "guide": {"opening": {"path": "u/r/day1_opening.mp3"}, "closing": {"status": "failed"}}}}}
     assert set(file_paths(retreat)) == {"u/r/image0.jpg", "u/r/day1_heart.mp3", "u/r/day1_opening.mp3"}
+
+
+def test_verse_numbers_are_taken_out_of_the_reading():
+    from app.llm import strip_verse_numbers
+
+    romans = ("18 For I consider that the sufferings of this present time are not worthy. 19 For the anxious longing "
+              "of the creation waits. 20 For the creation was subjected to futility, in hope 21 that the creation itself "
+              "also will be set free. 22 For we know.")
+    got = strip_verse_numbers(romans)
+    assert not any(ch.isdigit() for ch in got) and "in hope that the creation" in got and got.startswith("For I consider")
+    assert strip_verse_numbers("He fed about 5000 with five loaves, and 12 baskets were left") == "He fed about 5000 with five loaves, and 12 baskets were left"
+    assert strip_verse_numbers("7He gathers the waters.\n8Let all the earth fear") == "He gathers the waters.\nLet all the earth fear"
