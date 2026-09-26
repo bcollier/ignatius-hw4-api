@@ -51,6 +51,7 @@ flowchart LR
 
     subgraph AI["Model and voice services"]
         OR["OpenRouter<br/>Anthropic-compatible API"]
+        JS["Jetstream2 inference<br/>(Open WebUI proxy, OpenAI-compatible)<br/>free mode"]
         CLAUDE["Claude<br/>(Opus 5 by default)<br/>+ web search"]
         EDGE["Microsoft neural voices<br/>(edge-tts, free)"]
         ELEVEN["ElevenLabs<br/>(premium voices)"]
@@ -65,6 +66,7 @@ flowchart LR
     AUDIO -- "signed URLs<br/>(MP3, JPEG)" --> ST
     API --> JOBS
     JOBS -- "plan, reflection, deep dive" --> OR --> CLAUDE
+    JOBS -- "free mode: plan, reflection, deep dive" --> JS
     JOBS -- "free voices" --> EDGE
     JOBS -- "premium voices" --> ELEVEN
     API -- "prices" --> OR
@@ -78,7 +80,8 @@ flowchart LR
 | Auth | Supabase Auth | Emails sign-in links, issues and refreshes access tokens. |
 | Database | Supabase Postgres | One row per retreat; the retreat itself is a JSON document. |
 | File storage | Supabase Storage | Extracted images and every MP3, in a private bucket. |
-| Claude | Anthropic, reached through OpenRouter | Plans the retreat, writes the reflection and deep dive, searches the web for the deep dive. |
+| Claude | Anthropic, reached through OpenRouter | Plans the retreat, writes the reflection and deep dive, searches the web for the deep dive (full mode). |
+| Open models | Jetstream2 inference service (Llama 4 Scout, Muse Glimmer) | The same writing jobs for free-mode users, without web search. |
 | Voices | Microsoft (free), ElevenLabs (premium) | Turn scripts into MP3. |
 
 ---
@@ -351,13 +354,29 @@ sequenceDiagram
     Note over W,SA: Access tokens last 1 hour. supabase-js refreshes them<br/>in the background with the refresh token, so the user<br/>stays signed in until they sign out or clear site data.
 ```
 
+**Guests.** "Try it without an account" calls `signInAnonymously()`. Supabase creates an anonymous user and session in this browser only; `/auth/v1/user` reports `is_anonymous: true`, and the API treats the session as free mode.
+
+```mermaid
+flowchart TD
+    T["Token checked with Supabase"] --> A{Anonymous?}
+    A -- yes --> F["Free mode"]
+    A -- no --> E{Email on ALLOWED_EMAILS<br/>or list empty?}
+    E -- yes --> FULL["Full mode:<br/>Claude, web search, ElevenLabs"]
+    E -- no --> FM{Free mode on?<br/>JETSTREAM_API_KEY set}
+    FM -- yes --> F
+    FM -- no --> X["403: not on the allowed list"]
+    F --> FL["Jetstream models only · free voices only · up to 3 retreats"]
+```
+
 **Rules the API applies**
 
 | Case | Response |
 | --- | --- |
 | No `Authorization` header | 401 "Sign in to continue." |
 | Token rejected by Supabase (expired, revoked) | 401 "Your sign-in has expired. Sign in again." The page shows the sign-in form. |
-| Valid token, email not on `ALLOWED_EMAILS` | 403 "This account isn't on the list of allowed users for this demo." |
+| Valid token, email not on `ALLOWED_EMAILS` (or a guest) | Free mode if Jetstream is configured; otherwise 403 "This account isn't on the list of allowed users for this demo." |
+| Free-mode user asks for Claude or an ElevenLabs voice | 403 "Free mode uses the Jetstream models…" / "…the free Microsoft voices." |
+| Free-mode user already has 3 retreats | 403 "Free mode keeps up to 3 retreats. Delete one to make another." |
 | Valid token for another user's retreat | 404 "Retreat not found." (same answer as a missing retreat) |
 | Supabase Auth unreachable | 503 "Couldn't reach the sign-in service." |
 
@@ -752,6 +771,7 @@ Serves files from `DATA_DIR` when Supabase isn't configured. In production, file
 | Supabase Storage | `GET/POST /storage/v1/bucket` | Startup: create the bucket if missing |
 | OpenRouter | `POST /api/v1/messages` (Anthropic Messages format, streamed) | Planning, reflection, deep dive |
 | OpenRouter | `GET /api/v1/models` | Prices, cached 6 hours |
+| Jetstream2 | `POST /api/chat/completions` (OpenAI format, `Authorization: Bearer <token>`) | Free-mode planning and writing; images are offered for planning and dropped if refused |
 | Microsoft (edge-tts) | WebSocket speech synthesis | Free voices |
 | ElevenLabs | `POST /v1/text-to-speech/{voice}` | Premium voices |
 | ElevenLabs | `GET /v1/user/subscription` | Character balance, cached 5 minutes |
@@ -791,7 +811,7 @@ flowchart LR
 | Database access | Row level security is enabled with no policies, so the publishable key can't read or write `retreats`. The API filters every read by the caller's user id. |
 | Other users' retreats | Answered with 404, the same as a missing retreat. |
 | Files | Private bucket; the browser gets signed URLs that expire after 24 hours. Paths start with the owner's user id. |
-| Spending | `ALLOWED_EMAILS` limits who can use the deployed demo; upload size, page count, text length, prompt length and track length are capped. |
+| Spending | Only `ALLOWED_EMAILS` get Claude and ElevenLabs; everyone else is in free mode on Jetstream with a retreat cap; upload size, page count, text length, prompt length and track length are capped. |
 | Cross-site calls | CORS only for the origins in `ALLOWED_ORIGINS`. |
 | Local file route | `/api/files/…` exists only without Supabase and refuses paths outside `DATA_DIR`. |
 | Copyright | Users upload only material they own or may use; each retreat is private to its owner and nothing is shared between users. The public demo uses public-domain material. |
@@ -826,7 +846,8 @@ flowchart LR
 | `app/storage.py` | `SupabaseStore` (Postgres rows, Storage files, signed URLs) and `LocalStore` |
 | `app/pipeline.py` | Background jobs: planning, building a day, saving progress, recovery after restart, costs |
 | `app/extract.py` | PDF and Word extraction: text, images, scanned pages |
-| `app/llm.py` | Claude calls through OpenRouter: streaming, structured output with fallback, web search with fallback |
+| `app/llm.py` | Model calls: Claude through OpenRouter (streaming, structured output with fallback, web search with fallback), or Jetstream for free mode |
+| `app/jetstream.py` | Jetstream2 client (OpenAI-style chat completions) |
 | `app/prompts.py` | Default prompts, house style, spoken guidance templates |
 | `app/tts.py` | Voices, tiers, chunking, Microsoft and ElevenLabs recording, lengths |
 | `app/pricing.py` | Model list, live prices, cost meter, ElevenLabs balance |
@@ -860,7 +881,12 @@ flowchart LR
 | `ELEVENLABS_USD_PER_1K_CHARS` | `0.30` | For cost estimates |
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | | Sign-in, database, storage |
 | `SUPABASE_BUCKET` | `retreats` | Storage bucket |
-| `ALLOWED_EMAILS` | anyone | Who may use the deployment |
+| `ALLOWED_EMAILS` | anyone | Who gets full mode |
+| `JETSTREAM_API_KEY` | | Turns on free mode |
+| `JETSTREAM_BASE_URL` | `https://llm.jetstream-cloud.org/api` | Jetstream Open WebUI proxy |
+| `JETSTREAM_MODELS` | `llama-4-scout,muse-glimmer` | Free-mode models |
+| `FREE_MODE` / `FREE_MAX_RETREATS` | `1` / 3 | Free mode switch and retreat cap |
+| `LOCAL_USER_MODE` | | `free` previews free mode locally |
 | `ALLOWED_ORIGINS` | localhost ports | CORS origins |
 | `DATA_DIR` | `/tmp/ignatius` | Local storage when Supabase is off |
 | `MAX_UPLOAD_MB` / `MAX_PAGES` / `MAX_SOURCE_CHARS` | 15 / 40 / 80,000 | Upload limits |

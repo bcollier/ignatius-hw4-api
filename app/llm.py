@@ -12,7 +12,7 @@ import re
 
 import anthropic
 
-from . import config, pricing, prompts
+from . import config, jetstream, pricing, prompts
 from .extract import Extracted
 
 log = logging.getLogger(__name__)
@@ -88,6 +88,8 @@ def _image_block(data: bytes, mime: str) -> dict:
 async def plan_retreat(source: Extracted, filename: str, instructions: str, meter: pricing.Meter) -> dict:
     if config.LLM_MODE == "stub":
         return stub_plan(source, filename)
+    if pricing.is_jetstream(meter.model):
+        return await _plan_jetstream(source, filename, instructions, meter)
 
     content: list[dict] = []
     for i, img in enumerate(source.images):
@@ -113,6 +115,31 @@ async def plan_retreat(source: Extracted, filename: str, instructions: str, mete
         except anthropic.BadRequestError as exc:
             raise LLMError(f"The model provider rejected the request: {exc.message}") from exc
     return _clean_plan(_parse_json(_text(message)), len(source.images))
+
+
+async def _plan_jetstream(source: Extracted, filename: str, instructions: str, meter: pricing.Meter) -> dict:
+    """Open models don't take a JSON schema here, so the schema goes in the prompt.
+    Images are offered to the model; if they're refused, it plans from the text."""
+    system = (
+        instructions + "\n\n" + prompts.PLAN_FIXED.format(max_days=config.MAX_DAYS)
+        + "\n\nReply with only a JSON object, no other text, matching this schema:\n" + json.dumps(prompts.PLAN_SCHEMA)
+    )
+    notes = [f"Image {i}" + (f" from page {img.page}" if img.page else "") for i, img in enumerate(source.images)]
+    notes += [f"Scanned page {img.page} (no text layer)" for img in source.scanned_pages]
+    text = f"Source file: {filename}\n"
+    if notes:
+        text += "Attached images, in order: " + "; ".join(notes) + "\n"
+    text += f"\n<source>\n{source.text}\n</source>"
+    images = [(img.data, img.mime) for img in source.images + source.scanned_pages]
+    try:
+        try:
+            reply = await jetstream.complete(pricing.api_model(meter.model), system, text, meter, images=images, max_tokens=16000)
+        except jetstream.ImagesRejected:
+            log.warning("jetstream refused images; planning from text only")
+            reply = await jetstream.complete(pricing.api_model(meter.model), system, text, meter, max_tokens=16000)
+    except jetstream.JetstreamError as exc:
+        raise LLMError(str(exc)) from exc
+    return _clean_plan(_parse_json(reply), len(source.images))
 
 
 def _clean_plan(plan: dict, image_count: int) -> dict:
@@ -173,6 +200,12 @@ async def write_heart(context: str, instructions: str, words: int, meter: pricin
     if config.LLM_MODE == "stub":
         return f"Stub heart reflection. Sit with the passage for a moment. {context[-400:]}"
     system = instructions + "\n\n" + prompts.HEART_FIXED.format(words=words)
+    if pricing.is_jetstream(meter.model):
+        try:
+            reply = await jetstream.complete(pricing.api_model(meter.model), system, context, meter)
+        except jetstream.JetstreamError as exc:
+            raise LLMError(str(exc)) from exc
+        return _split_script(reply)[0]
     try:
         message = await _call(meter, system=system, max_tokens=16000, messages=[{"role": "user", "content": context}])
     except anthropic.BadRequestError as exc:
@@ -189,6 +222,15 @@ async def write_deep(context: str, instructions: str, words: int, meter: pricing
         system = instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=prompts.SEARCH_ON if search else prompts.SEARCH_OFF, words=words)
         extra = {"tools": [pricing.web_search_tool(meter.model)]} if search else {}
         return await _call(meter, system=system, max_tokens=16000, messages=[{"role": "user", "content": context}], **extra)
+
+    if pricing.is_jetstream(meter.model):  # no web search on Jetstream
+        system = instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=prompts.SEARCH_OFF, words=words)
+        try:
+            reply = await jetstream.complete(pricing.api_model(meter.model), system, context, meter)
+        except jetstream.JetstreamError as exc:
+            raise LLMError(str(exc)) from exc
+        script, sources = _split_script(reply)
+        return script, sources, False
 
     searched = config.WEB_SEARCH
     try:

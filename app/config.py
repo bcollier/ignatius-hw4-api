@@ -50,8 +50,19 @@ SUPABASE_PUBLISHABLE_KEY = os.environ.get("SUPABASE_PUBLISHABLE_KEY", "").strip(
 SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "").strip()  # server only
 SUPABASE_BUCKET = os.environ.get("SUPABASE_BUCKET", "retreats")
 
-# Who may sign in and spend API credit. Empty means anyone with an account.
+# Jetstream2 inference service (academic, no per-token cost), through its Open
+# WebUI proxy, which is OpenAI-compatible and reachable from outside Jetstream.
+JETSTREAM_API_KEY = os.environ.get("JETSTREAM_API_KEY", "").strip()
+JETSTREAM_BASE_URL = os.environ.get("JETSTREAM_BASE_URL", "https://llm.jetstream-cloud.org/api").rstrip("/")
+JETSTREAM_MODELS = _list("JETSTREAM_MODELS", "llama-4-scout,muse-glimmer")
+
+# Who gets the full app (Claude, web search, ElevenLabs). Empty means everyone.
 ALLOWED_EMAILS = [e.lower() for e in _list("ALLOWED_EMAILS", "")]
+# Everyone else, including anonymous "try it" sessions, gets free mode: Jetstream
+# models and free voices only, with a cap on retreats. Off when there is no
+# Jetstream key, in which case people not on ALLOWED_EMAILS are refused.
+FREE_MODE = os.environ.get("FREE_MODE", "1") == "1" and bool(JETSTREAM_API_KEY)
+FREE_MAX_RETREATS = _int("FREE_MAX_RETREATS", 3)
 
 ALLOWED_ORIGINS = _list(
     "ALLOWED_ORIGINS",

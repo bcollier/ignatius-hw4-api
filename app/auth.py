@@ -2,6 +2,7 @@
 and sends its access token; the backend asks Supabase who the token belongs to.
 Without Supabase (tests, local development) every request is one local user."""
 
+import os
 import time
 from dataclasses import dataclass
 
@@ -19,6 +20,8 @@ CACHE_SECONDS = 300
 class User:
     id: str
     email: str
+    full: bool = True  # False: free mode (Jetstream models, free voices, few retreats)
+    anonymous: bool = False
 
 
 def enabled() -> bool:
@@ -31,7 +34,8 @@ def email_allowed(email: str) -> bool:
 
 async def current_user(authorization: str = Header(default="")) -> User:
     if not enabled():
-        return User(LOCAL_USER_ID, "local")
+        # Local development: one user; LOCAL_USER_MODE=free previews free mode.
+        return User(LOCAL_USER_ID, "local", full=os.environ.get("LOCAL_USER_MODE") != "free")
 
     token = authorization.removeprefix("Bearer ").strip()
     if not token:
@@ -52,8 +56,11 @@ async def current_user(authorization: str = Header(default="")) -> User:
         raise HTTPException(401, "Your sign-in has expired. Sign in again.")
 
     data = response.json()
-    user = User(data["id"], (data.get("email") or "").lower())
-    if not email_allowed(user.email):
+    email = (data.get("email") or "").lower()
+    anonymous = bool(data.get("is_anonymous"))
+    full = bool(email) and not anonymous and email_allowed(email)
+    if not full and not config.FREE_MODE:
         raise HTTPException(403, "This account isn't on the list of allowed users for this demo.")
+    user = User(data["id"], email, full=full, anonymous=anonymous)
     _cache[token] = (user, time.time())
     return user

@@ -71,6 +71,19 @@ cp .env.example .env        # then fill in keys; all are optional for a first ru
 - Tests: `.venv/bin/python -m pytest` (no network or keys needed; Supabase is faked).
 - Sample uploads in `samples/` are public domain: World English Bible passages, Rembrandt's *Return of the Prodigal Son* and Tanner's *The Annunciation*. `samples/make_samples.py` rebuilds them.
 
+## Full mode and free mode
+
+| | Full mode (emails on `ALLOWED_EMAILS`) | Free mode (everyone else, and guests) |
+| --- | --- | --- |
+| Sign-in | Email link | Email link, or **Try it without an account** (anonymous Supabase session, this browser only) |
+| Models | Claude on OpenRouter (Opus 5 default; Opus 5.5, Fable 5.1, Sonnet 5, Haiku 4.5) | Jetstream2 open models: Llama 4 Scout, Muse Glimmer |
+| Deep dive research | Web search | No web search; keeps to well-established claims |
+| Voices | Free Microsoft voices and ElevenLabs | Free Microsoft voices |
+| Limits | Upload and length caps | Also at most `FREE_MAX_RETREATS` (3) retreats |
+| Cost to the site owner | Model and ElevenLabs charges | None (Jetstream is an academic allocation) |
+
+Free mode is on whenever `JETSTREAM_API_KEY` is set. It reaches Jetstream through its Open WebUI proxy at `https://llm.jetstream-cloud.org/api`, which is OpenAI-compatible and reachable from Render; the direct model endpoints only work from inside Jetstream's network. Guests need **Allow anonymous sign-ins** turned on in Supabase (Authentication → Sign In / Providers).
+
 ## Supabase setup
 
 1. Create a project. In the SQL editor run:
@@ -91,6 +104,7 @@ cp .env.example .env        # then fill in keys; all are optional for a first ru
    Row level security is on with no policies, so the publishable key in the browser can't read the table; only the backend's secret key can.
 2. Authentication → URL Configuration: add the frontend URLs as redirect URLs.
 3. Copy the project URL, publishable key and secret key into the environment. The private `retreats` storage bucket is created on first start.
+4. For guest access, turn on **Allow anonymous sign-ins** under Authentication → Sign In / Providers.
 
 ## Deploy on Render
 

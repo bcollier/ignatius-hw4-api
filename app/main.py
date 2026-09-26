@@ -83,7 +83,13 @@ def health():
     }
 
 
-def check_model(model: str | None) -> str:
+def check_model(model: str | None, user: User) -> str:
+    free_models = [m for m, _ in pricing.jetstream_models()]
+    if not user.full:
+        model = model or (free_models[0] if free_models else "")
+        if model not in free_models:
+            raise HTTPException(403, "Free mode uses the Jetstream models. Claude is reserved for the site owner.")
+        return model
     model = model or config.LLM_MODEL
     if model not in pricing.model_ids():
         raise HTTPException(400, f"Unknown model: {model}")
@@ -105,6 +111,11 @@ async def options():
             "usd_per_1k_chars": config.ELEVENLABS_USD_PER_1K_CHARS,
             "balance": await pricing.elevenlabs_balance(),
         },
+        "free_mode": {
+            "enabled": config.FREE_MODE,
+            "models": [m for m, _ in pricing.jetstream_models()],
+            "max_retreats": config.FREE_MAX_RETREATS,
+        },
         "auth": {"url": config.SUPABASE_URL, "publishable_key": config.SUPABASE_PUBLISHABLE_KEY}
         if auth.enabled()
         else None,
@@ -124,12 +135,20 @@ async def model_options() -> list[dict]:
             "output_per_m": round(p.get("completion", 0) * 1e6, 3),
             "web_search_each": p.get("web_search", 0.01),
         })
+    for model, label in pricing.jetstream_models():
+        out.append({"id": model, "label": label, "input_per_m": 0, "output_per_m": 0, "web_search_each": 0, "free": True})
     return out
 
 
 @app.get("/api/me")
 def me(user: User = Depends(current_user)):
-    return {"id": user.id, "email": user.email}
+    return {
+        "id": user.id,
+        "email": user.email,
+        "anonymous": user.anonymous,
+        "mode": "full" if user.full else "free",
+        "max_retreats": None if user.full else config.FREE_MAX_RETREATS,
+    }
 
 
 @app.get("/api/retreats")
@@ -145,7 +164,11 @@ async def create_retreat(
     user: User = Depends(current_user),
 ):
     plan_prompt = check_prompt(plan_prompt, prompts.PLAN_INSTRUCTIONS, "planning")
-    model = check_model(model)
+    model = check_model(model, user)
+    if not user.full and len(await store.list_for(user.id)) >= config.FREE_MAX_RETREATS:
+        raise HTTPException(
+            403, f"Free mode keeps up to {config.FREE_MAX_RETREATS} retreats. Delete one to make another."
+        )
     data = await file.read(config.MAX_UPLOAD_MB * 1024 * 1024 + 1)
     if len(data) > config.MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(413, f"File is larger than {config.MAX_UPLOAD_MB} MB.")
@@ -192,7 +215,9 @@ class BuildRequest(BaseModel):
 
 
 @app.post("/api/retreats/{retreat_id}/days/{day}/build", status_code=202)
-async def build_day(day: int, body: BuildRequest, retreat: dict = Depends(my_retreat)):
+async def build_day(
+    day: int, body: BuildRequest, retreat: dict = Depends(my_retreat), user: User = Depends(current_user)
+):
     if retreat["status"] != "ready":
         raise HTTPException(409, "The retreat plan isn't ready yet.")
     state = retreat["days"].get(str(day))
@@ -202,8 +227,10 @@ async def build_day(day: int, body: BuildRequest, retreat: dict = Depends(my_ret
         raise HTTPException(409, f"Day {day} is already being built.")
     heart = check_prompt(body.heart_prompt, prompts.HEART_PRESETS["companion"], "heart")
     deep = check_prompt(body.deep_prompt, prompts.DEEP_INSTRUCTIONS, "deep dive")
-    model = check_model(body.model)
+    model = check_model(body.model, user)
     voices = {section: body.voices.get(section) or body.voice for section in pipeline.SECTIONS}
+    if not user.full and any(v not in tts.FREE_VOICES for v in voices.values()):
+        raise HTTPException(403, "Free mode uses the free Microsoft voices.")
     guide = {}
     for name, default in prompts.GUIDE_DEFAULTS.items():
         text = body.guide.get(name, default).strip()

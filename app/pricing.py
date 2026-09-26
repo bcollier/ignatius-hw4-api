@@ -25,6 +25,24 @@ MODELS = [
 ]
 BASIC_SEARCH_MODELS = {"anthropic/claude-haiku-4.5"}
 
+JETSTREAM_LABELS = {
+    "llama-4-scout": "Llama 4 Scout (Jetstream, free)",
+    "muse-glimmer": "Muse Glimmer (Jetstream, free)",
+    "gpt-oss-120b": "gpt-oss-120b (Jetstream, free)",
+}
+JETSTREAM_PREFIX = "jetstream/"
+
+
+def jetstream_models() -> list[tuple[str, str]]:
+    """(our id, label) for each configured Jetstream model; ids are "jetstream/<name>"."""
+    if not config.JETSTREAM_API_KEY:
+        return []
+    return [(JETSTREAM_PREFIX + m, JETSTREAM_LABELS.get(m, f"{m} (Jetstream, free)")) for m in config.JETSTREAM_MODELS]
+
+
+def is_jetstream(model: str) -> bool:
+    return model.startswith(JETSTREAM_PREFIX)
+
 # Dollars per token, and per web search. Used when OpenRouter can't be reached.
 FALLBACK_PRICES = {
     "anthropic/claude-opus-5": {"prompt": 5e-6, "completion": 25e-6, "input_cache_read": 0.5e-6, "input_cache_write": 6.25e-6, "web_search": 0.01},
@@ -40,12 +58,18 @@ _eleven: dict = {}
 _eleven_at = 0.0
 
 
-def model_ids() -> list[str]:
+def claude_ids() -> list[str]:
     return [m[0] for m in MODELS]
+
+
+def model_ids() -> list[str]:
+    return claude_ids() + [m for m, _ in jetstream_models()]
 
 
 def api_model(model: str) -> str:
     """The id to send: OpenRouter's, or the Anthropic API's when calling Anthropic directly."""
+    if is_jetstream(model):
+        return model.removeprefix(JETSTREAM_PREFIX)
     if config.LLM_MODE == "openrouter":
         return model
     return next((a for o, a, _ in MODELS if o == model), model)
@@ -87,7 +111,8 @@ class Meter:
 
     def __init__(self, model: str, table: dict):
         self.model = model
-        self.price = table.get(model) or FALLBACK_PRICES.get(model, {})
+        # Jetstream is an academic allocation: tokens are counted but cost nothing.
+        self.price = {} if is_jetstream(model) else (table.get(model) or FALLBACK_PRICES.get(model, {}))
         self.input_tokens = self.output_tokens = self.searches = 0
         self.usd = 0.0
 
@@ -109,6 +134,12 @@ class Meter:
             + cache_write * p.get("input_cache_write", p.get("prompt", 0))
             + searches * p.get("web_search", 0.01)
         )
+
+    def add_tokens(self, input_tokens: int, output_tokens: int) -> None:
+        """For OpenAI-style usage (Jetstream)."""
+        self.input_tokens += input_tokens
+        self.output_tokens += output_tokens
+        self.usd += input_tokens * self.price.get("prompt", 0) + output_tokens * self.price.get("completion", 0)
 
     def summary(self) -> dict:
         return {
