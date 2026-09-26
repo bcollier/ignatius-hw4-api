@@ -499,6 +499,11 @@ async def retry_failed(retreat: dict, day_no: int) -> dict:
     return state
 
 
+def is_exercise(day: dict) -> bool:
+    """A day the planner marked as an activity rather than a text to pray with."""
+    return day.get("kind") == "exercise"
+
+
 async def _build_day(
     retreat: dict, day_no: int, heart_prompt: str, deep_prompt: str, guide: dict, kept: dict, meter: pricing.Meter,
     search_provider: str | None = None,
@@ -545,6 +550,8 @@ class _DayBuild:
         self.series_text = await series_context(self.retreat, self.meter.model)
         # The rest of this retreat: earlier days as heard, coming days as readings only.
         self.so_far = prompts.retreat_so_far(self.retreat["plan"], self.retreat["days"], self.day_no)
+        if is_exercise(self.day):
+            return await self._exercise_day()
         async with _jobs:
             self._record_reading()
             heart = await self._write_heart()
@@ -676,6 +683,17 @@ class _DayBuild:
         await save(self.retreat)
 
     # ------------------------------------------------------------ the end of the day
+
+    async def _exercise_day(self) -> None:
+        """A day that is an activity from the handout (a worksheet, a review): nothing to
+        write or record; the page shows the instruction and a Mark as complete button."""
+        self.state.update(kind="exercise", tracks={}, guide={}, status="ready", error=None,
+                          cost=_day_cost(self.state, self.meter))
+        await llm_log.step(f"Day {self.day_no}: {self.day['title']} is an exercise from the handout, "
+                           "so there's nothing to record. Its page shows the instruction and Mark as complete.")
+        if self.retreat.get("progress"):
+            _count_progress(self.retreat)
+        await save(self.retreat)
 
     async def _finish(self) -> None:
         """Mark failed parts, the day's status and cost, and the retreat's progress."""

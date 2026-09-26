@@ -83,3 +83,7 @@ Write the summary for the person who uploaded the material, in a few plain sente
 <before_you_finish>
 Read your plan once through as the listener will meet it: day by day, title spoken, grace asked, passage read four times. Check that every passage_text can be found word for word in the source and carries no verse numbers, page numbers or headings. Check that the days are numbered from one in order, that each title can be spoken without digits, that each grace completes "Ask for this grace," that each focus carries what the writers cannot see, that every image is described and assigned only where it fits, and that the mode you named is the truth about what you did.
 </before_you_finish>
+
+<exercise_days>
+Some days in a handout are not a text to pray with but an activity: "Spend time with the Dossier Worksheet," "Review and savor the week," "Journal about…," "Take a walk and notice…," a review or repetition day that points back to earlier material without giving a passage. Mark such a day with kind "exercise" and put the handout's instruction for it, word for word, in passage_text; give it a short plain title and leave the grace and focus brief. The app does not record or write anything for an exercise day; it shows the instruction and asks the person to go and do it and mark it complete. Every other day has kind "reading". Do not turn a real passage into an exercise, and do not invent a passage for an exercise day.
+</exercise_days>

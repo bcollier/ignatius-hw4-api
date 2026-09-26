@@ -247,3 +247,22 @@ def test_try_again_records_only_what_failed(client, monkeypatch):
     assert len(calls) == sum(1 for g in ("tracks", "guide") for k in day[g] if k not in ready_before)
     assert client.post(f"/api/retreats/{rid}/days/{n}/retry").status_code == 409  # nothing left to retry
     assert day["cost"]["llm"]["input_tokens"] == body["days"][n]["cost"]["llm"]["input_tokens"]  # writing cost kept
+
+
+def test_an_exercise_day_has_nothing_to_record(client, monkeypatch):
+    real_plan = llm.stub_plan
+
+    def plan_with_exercise(source, filename):
+        plan = real_plan(source, filename)
+        plan["days"][1].update(kind="exercise", passage_text="Spend time with the Dossier Worksheet.")
+        return plan
+
+    monkeypatch.setattr(llm, "stub_plan", plan_with_exercise)
+    body = until(client, make(client).json()["id"], finished)
+    day = body["days"]["2"]
+    assert body["status"] == "ready" and day["status"] == "ready" and day["kind"] == "exercise"
+    assert day["tracks"] == {} and day["guide"] == {} and body["days"]["1"]["tracks"]["heart"]["status"] == "ready"
+    r = client.post(f"/api/retreats/{body['id']}/days/2/prayed", json={})
+    assert r.json()["days"]["2"]["prayed_at"]
+    pdf = client.get(f"/api/retreats/{body['id']}/script.pdf")
+    assert pdf.status_code == 200 and pdf.content[:4] == b"%PDF"

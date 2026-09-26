@@ -78,6 +78,8 @@ PLAN_SCHEMA = {
                     "title": {"type": "string"},
                     "source_ref": {"type": "string"},
                     "passage_text": {"type": "string"},
+                    # "exercise": the day is an activity (a worksheet, a review day), not a text to pray with
+                    "kind": {"type": "string", "enum": ["reading", "exercise"]},
                     "grace": {"type": "string"},
                     "focus": {"type": "string"},
                     "image_index": {"type": "integer"},
