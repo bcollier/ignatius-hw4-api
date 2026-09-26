@@ -714,6 +714,24 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** An example's page now has "Remove it from my home page". It's saved to the person's account with their progress, so it holds across devices. The home page shows "Show … again" when any are hidden. New endpoint: POST /api/retreats/{id}/hidden.
 
+### 114. 2026-09-27, 00:00 UTC
+
+> Remove all references to JetStream and remove reference to this being homework project
+
+**What was done:** Began a cleanup across both repositories, then narrowed it at the next prompt.
+
+### 115. 2026-09-27, 00:05 UTC
+
+> Just remove references in the app to homework and jetstream the code and repo is fine
+
+**What was done:** Changed only what the app shows. The About page no longer says it was built for a course, model names read "Muse Glimmer (free)" and "Llama 4 Scout (free)", the cost report and build log say "Open models", and error messages say "the open-model service". The code, repositories and documentation are unchanged.
+
+### 116. 2026-09-27, 00:10 UTC
+
+> The visual design of the app is still pretty blah and ai generated looking what would take it to the next level? Don't change anything just give me ideas
+
+**What was done:** Ideas only, with no changes: what reads as AI-generated in the current design, and a recommended direction (a modern book of hours with color taken from each day's painting), with specific moves.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
