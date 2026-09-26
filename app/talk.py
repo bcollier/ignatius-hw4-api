@@ -105,21 +105,42 @@ def _days_between(earlier: str | float | None, now: datetime) -> int | None:
     return (now.astimezone(timezone.utc).date() - then.astimezone(timezone.utc).date()).days
 
 
+CONTEXT_MAX_CHARS = 60_000  # the whole context given to the live model
+TRANSCRIPT_TAIL_CHARS = 4000  # the end of each recent conversation
+PASSAGE_CHARS = 900
+HEART_OPENING_CHARS = 500
+NOTE_CHARS = 400
+
+
 def context(retreat: dict | None, about: str, notes: str, history: dict | None = None, local_time: str | None = None) -> str:
     """What the companion knows: the person's notes and wishes, the time where they
     are, past conversations, and the retreat with what they've listened to, including
     what's new since they last talked."""
     now, when = _when(local_time)
+    history = history or {}
+    past = history.get("conversations", [])
+    last = past[-1] if past else None
+    last_time = (last.get("ended_at") or last.get("started_at")) if last else None
     parts = [COMPANION, prompts.BACKGROUND, "Right now: " + when]
+    parts += _about_them(about, notes)
+    parts += _past_conversations(history, last, last_time, now)
+    if retreat and retreat.get("plan"):
+        parts.append(_the_retreat(retreat, now, last, last_time))
+    return "\n\n".join(parts)[:CONTEXT_MAX_CHARS]
+
+
+def _about_them(about: str, notes: str) -> list[str]:
+    parts = []
     if about.strip():
         parts.append(prompts.person_block(about))
     if notes.strip():
         parts.append("What they've said they want from this conversation companion:\n<wants>\n" + notes.strip() + "\n</wants>")
+    return parts
 
-    history = history or {}
-    past = history.get("conversations", [])
-    last = past[-1] if past else None
-    last_time = last.get("ended_at") or last.get("started_at") if last else None
+
+def _past_conversations(history: dict, last: dict | None, last_time, now: datetime) -> list[str]:
+    """When they last talked, the memory of older talks, and the latest transcripts."""
+    parts = []
     if last:
         gap = _days_between(last_time, now)
         ago = "earlier today" if gap == 0 else "yesterday" if gap == 1 else f"{gap} days ago"
@@ -129,49 +150,58 @@ def context(retreat: dict | None, about: str, notes: str, history: dict | None =
         parts.append("This is your first conversation with them.")
     if history.get("memory"):
         parts.append("What you remember from earlier conversations (a summary):\n<memory>\n" + history["memory"] + "\n</memory>")
-    recent = past[-3:]
+    recent = history.get("conversations", [])[-HISTORY_KEEP:]
     if recent:
-        blocks = []
-        for c in recent:
-            blocks.append(f"[{str(c.get('started_at'))[:16]} · {c.get('retreat_title') or 'no retreat'} · {round((c.get('seconds') or 0) / 60)} min]\n"
-                          + (c.get("transcript") or "")[-4000:])
+        blocks = [f"[{str(c.get('started_at'))[:16]} · {c.get('retreat_title') or 'no retreat'} · {round((c.get('seconds') or 0) / 60)} min]\n"
+                  + (c.get("transcript") or "")[-TRANSCRIPT_TAIL_CHARS:] for c in recent]
         parts.append("Your most recent conversations with them (transcripts, newest last):\n<recent>\n" + "\n\n".join(blocks) + "\n</recent>")
+    return parts
 
-    if retreat and retreat.get("plan"):
-        plan = retreat["plan"]
-        lines = [f"The retreat they're making: {plan['title']}. {plan.get('summary', '')}"]
-        if retreat.get("start_date"):
-            day_no = _days_between(retreat["start_date"], now)
-            if day_no is not None:
-                lines.append(f"They started it on {retreat['start_date']}, so by the calendar today is day {day_no + 1} of {len(plan['days'])}.")
-        since = []
-        for d in plan["days"]:
-            st = retreat["days"].get(str(d["day"]), {})
-            listening = st.get("listening") or {}
-            touched = st.get("prayed_at") or listening.get("updated_at")
-            if st.get("prayed_at"):
-                done = f"prayed ({st['prayed_at'][:10]})"
-            elif listening.get("parts_played"):
-                done = f"started ({str(listening.get('updated_at'))[:10]}), stopped at {listening.get('last_part') or 'part way'}"
-            else:
-                done = "not listened to yet"
-            if touched and last_time and str(touched) > str(last_time):
-                since.append(f"Day {d['day']}")
-            lines.append(f"\nDay {d['day']}: {d['title']} ({d.get('source_ref', '')}). Grace: {d.get('grace', '')}. Status: {done}.")
-            lines.append(f"Passage: {d.get('passage_text', '')[:900]}")
-            heart = (st.get("tracks", {}).get("heart") or {}).get("script", "")
-            if heart:
-                lines.append(f"The reflection they heard began: {heart[:500]}")
-            journal = st.get("journal") or {}
-            if journal.get("word"):
-                lines.append(f"The word that stayed with them: {journal['word']}")
-            if journal.get("note"):
-                lines.append(f"Their note: {journal['note'][:400]}")
-        if last:
-            lines.insert(1, ("Since your last conversation they have listened to or prayed " + ", ".join(since) + ".")
-                         if since else "They haven't listened to any days of this retreat since your last conversation.")
-        parts.append("\n".join(lines))
-    return "\n\n".join(parts)[:60_000]
+
+def _the_retreat(retreat: dict, now: datetime, last: dict | None, last_time) -> str:
+    """The retreat day by day: passage, grace, what they've prayed or started, their notes,
+    and which days are new since the last conversation."""
+    plan = retreat["plan"]
+    lines = [f"The retreat they're making: {plan['title']}. {plan.get('summary', '')}"]
+    if retreat.get("start_date"):
+        day_no = _days_between(retreat["start_date"], now)
+        if day_no is not None:
+            lines.append(f"They started it on {retreat['start_date']}, so by the calendar today is day {day_no + 1} of {len(plan['days'])}.")
+    since = []
+    for d in plan["days"]:
+        st = retreat["days"].get(str(d["day"]), {})
+        listening = st.get("listening") or {}
+        touched = st.get("prayed_at") or listening.get("updated_at")
+        if touched and last_time and str(touched) > str(last_time):
+            since.append(f"Day {d['day']}")
+        lines += _day_lines(d, st)
+    if last:
+        lines.insert(1, ("Since your last conversation they have listened to or prayed " + ", ".join(since) + ".")
+                     if since else "They haven't listened to any days of this retreat since your last conversation.")
+    return "\n".join(lines)
+
+
+def _day_lines(d: dict, st: dict) -> list[str]:
+    lines = [f"\nDay {d['day']}: {d['title']} ({d.get('source_ref', '')}). Grace: {d.get('grace', '')}. Status: {_day_status(st)}.",
+             f"Passage: {d.get('passage_text', '')[:PASSAGE_CHARS]}"]
+    heart = (st.get("tracks", {}).get("heart") or {}).get("script", "")
+    if heart:
+        lines.append(f"The reflection they heard began: {heart[:HEART_OPENING_CHARS]}")
+    journal = st.get("journal") or {}
+    if journal.get("word"):
+        lines.append(f"The word that stayed with them: {journal['word']}")
+    if journal.get("note"):
+        lines.append(f"Their note: {journal['note'][:NOTE_CHARS]}")
+    return lines
+
+
+def _day_status(st: dict) -> str:
+    listening = st.get("listening") or {}
+    if st.get("prayed_at"):
+        return f"prayed ({st['prayed_at'][:10]})"
+    if listening.get("parts_played"):
+        return f"started ({str(listening.get('updated_at'))[:10]}), stopped at {listening.get('last_part') or 'part way'}"
+    return "not listened to yet"
 
 
 # ---------------------------------------------------------------- memory of past conversations
