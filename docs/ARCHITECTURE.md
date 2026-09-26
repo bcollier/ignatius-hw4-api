@@ -11,7 +11,7 @@ This document describes the whole system: what runs where, how the pieces talk t
 5. [Signing in](#5-signing-in)
 6. [Uploading and planning a retreat](#6-uploading-and-planning-a-retreat)
 7. [Building a day](#7-building-a-day)
-8. [Praying a day: the player](#8-praying-a-day-the-player)
+8. [Praying a day: the player](#8-praying-a-day-the-player) · [8a progress](#8a-listening-progress-prayed-days-and-the-journal) · [8b About me](#8b-about-me-user-infomd) · [8c Talk it over](#8c-talk-it-over-live-conversation) · [8d Example retreats](#8d-example-retreats) · [8e Research page](#8e-research-done-for-this-retreat)
 9. [Status lifecycles](#9-status-lifecycles)
 10. [API reference](#10-api-reference)
 11. [Costs](#11-costs)
@@ -93,7 +93,7 @@ flowchart LR
 | File storage | Supabase Storage | Extracted images and every MP3, in a private bucket. |
 | Claude | Anthropic, reached through OpenRouter | Plans the retreat, writes the reflection and deep dive, searches the web for the deep dive (full mode). |
 | Open models | Jetstream2 inference service (Llama 4 Scout, Muse Glimmer) | The same writing jobs for free-mode users. |
-| Research services | Brave Search, Exa, Tavily, Firecrawl, Linkup, Brave Answers | Web research for free-mode deep dives, run by the server; the user picks one, others are fallbacks. |
+| Research services | Brave Search, Exa, Tavily, Firecrawl, Linkup, Brave Answers | Web research for free-mode deep dives, run by the server; by default every service at once with the results combined, or one chosen service with the others as fallbacks. |
 | Voices | Microsoft (free), ElevenLabs (premium) | Turn scripts into MP3. |
 
 ---
@@ -172,7 +172,7 @@ erDiagram
         text email "or guest"
         uuid retreat_id FK
         int day
-        text purpose "plan | heart | deep | search_queries | research"
+        text purpose "plan | heart | deep | guide | search_queries | research | talk | talk_memory | profile"
         text provider "openrouter | anthropic | jetstream | brave | exa | tavily | firecrawl | linkup | linkup_deep | brave_answers"
         text model
         jsonb request "system + messages, images as placeholders"
@@ -192,6 +192,8 @@ erDiagram
         text content_type "image/jpeg or audio/mpeg"
     }
 ```
+
+> **Where are the users?** `AUTH_USERS` is Supabase Auth's own table, `auth.users`, in the **`auth` schema**. The Table Editor shows the `public` schema by default, so it won't appear next to `retreats` and `llm_calls`. See it under **Authentication → Users**, or switch the Table Editor's schema dropdown to `auth`. The app never keeps a users table of its own; `user_id` columns point at `auth.users.id`.
 
 ```sql
 create table public.retreats (
@@ -347,12 +349,15 @@ retreats/                                   private bucket
         ├── day1_deep.mp3
         ├── day1_opening.mp3                spoken guidance clips
         ├── day1_first.mp3 … day1_closing.mp3
+        ├── day1_research.json              the deep dive's searches, every result, what was cited (8e)
         └── day2_…
     ├── user info.md                        what the person wrote about themselves (maybe a summary)
     ├── profile.json                        summary flag, original length, what they want from the companion
     ├── conversations.json                  past conversations with the companion and its memory summary
-    └── talk_usage.json                     seconds of free conversation used today
+    ├── talk_usage.json                     seconds of free conversation used today
+    └── demo_state.json                     this person's start date, progress and notes in example retreats (8d)
 system/search_status.json                   research services paused for credits or errors
+system/demos.json                           which retreats are examples, with their labels (8d)
 ```
 
 Files are never public. The API hands the browser **signed URLs** that expire after 24 hours and caches them for 23 hours, so a page left open longer than a day needs a reload.
@@ -593,7 +598,22 @@ flowchart LR
 
 Both services produce constant-bitrate MP3, so pieces can be joined byte for byte and the length follows directly from the file size.
 
-**Free-mode deep dive.** Jetstream's models can't search, so the server does it for them, with the service chosen on the page ("Web research for the deep dive"):
+**Free-mode deep dive.** Jetstream's models can't search, so the server does it for them. The page's "Web research for the deep dive" menu offers **All services, combined** (the default, `SEARCH_PROVIDER=all`) or any one service:
+
+```mermaid
+flowchart LR
+    Q["Three queries<br/>written by the model"] --> ALL{"All services,<br/>combined?"}
+    ALL -- yes --> PAR["Every configured service in parallel<br/>(not Linkup deep research)<br/>paused services skipped"]
+    PAR --> MIX["Interleave: one result from each service in turn<br/>dedupe by URL, up to 20<br/>each result tagged with its service"]
+    ALL -- "no, one service" --> ONE["That service, then the others<br/>as fallbacks until one finds results"]
+    MIX --> W["Model writes the deep dive<br/>citing only returned URLs"]
+    ONE --> W
+    W --> SAVE[("day n research.json<br/>for the Research page")]
+```
+
+**Premium too.** Claude models get the same combined free-service results first, as a head start (Claude writes the three searches, the free services run them), and then still use their own web search at its full allowance (up to 5 searches), told to search further wherever the free results are thin and never to be limited by them. The free results save some paid searches; they never cap the depth of a premium deep dive. The research record then holds both: the free results and Claude's own searches and pages.
+
+Combining means no single index decides what the model reads: Brave's independent index, Exa's meaning-based search, Tavily's cleaned extracts, Firecrawl's page content, Linkup and Brave Answers' sourced answers all land in one numbered list. The services are:
 
 | Service | Call | What becomes a result |
 | --- | --- | --- |
@@ -641,7 +661,8 @@ sequenceDiagram
     end
     J->>M: deep-dive prompt + day context + numbered results<br/>"cite only URLs from the results"
     M-->>J: script + sources
-    J->>J: keep only sources whose URL came back from Tavily
+    J->>J: keep only sources whose URL came back from the research
+    J->>J: save queries, results and cited sources (day n research.json)
 ```
 
 **What Claude is asked.** Each prompt has an editable part (shown on the page) and a fixed part the server always appends: the length target and the output format (`<script>…</script>`, plus `<sources>` for the deep dive). A house style for listening applies to both: plain paragraphs, no lists, parentheses or dashes, no verse numbers with colons, and never inventing a Hebrew or Greek word, a textual variant, a quotation or a historical fact.
@@ -761,6 +782,58 @@ sequenceDiagram
 - **Limits:** free users get 60 seconds a day (`FREE_TALK_SECONDS`), checked by the server before a session starts and enforced in the browser; OpenAI sessions are also hung up by the server. Premium users get up to 30 minutes a call.
 - **Memory** lives in the person's storage folder (Supabase Storage in production). The page lists past conversations with their transcripts and has **Forget all our conversations**. Transcripts are also logged in `llm_calls`.
 
+## 8d. Example retreats
+
+Everyone who signs in, guests included, finds two ready-made retreats under **Examples** in the library, made from the same "Come and See" package (`samples/demo/`: seven Gospel encounters from the public-domain World English Bible, each with a public-domain painting). One was made the free way (Muse Glimmer, Microsoft voices, combined web research), the other the premium way (Claude Fable 5.1, ElevenLabs voices), so anyone can hear the difference without spending anything. Until someone has a retreat of their own, the Continue card offers "Start here · an example retreat."
+
+Examples are ordinary retreats owned by whoever built them, listed in `system/demos.json`. Everyone else sees them read only, with their own progress:
+
+```mermaid
+flowchart TD
+    REQ["GET or POST on /api/retreats/{id}…"] --> OWN{"Caller owns<br/>the retreat?"}
+    OWN -- yes --> FULL["Their retreat:<br/>read, build, rename, delete"]
+    OWN -- no --> REG{"Listed in<br/>system/demos.json?"}
+    REG -- no --> NF["404 Retreat not found"]
+    REG -- yes --> OVER["Shared retreat + this person's<br/>demo_state.json laid over it<br/>(start date, prayed, journal, listening)<br/>read_only, costs removed"]
+    OVER --> READS["Read, PDF, Research page,<br/>Talk it over"]
+    OVER --> WRITES["Prayed, progress, start date<br/>saved to their demo_state.json only"]
+    OVER --> BLOCK["Build, delete: 404<br/>Rename: 403"]
+```
+
+- `readable_retreat` (in `app/main.py`) returns either the owner's retreat or the personal view (`demos.personal`); `save_retreat` writes the owner's retreat, or for an example only the person's own fields to `{user_id}/demo_state.json`. Build and delete keep the owner-only `my_retreat` check.
+- `GET /api/retreats` returns `examples` beside `retreats`: each a summary with the person's own progress, `demo: {label, kind}`, `read_only: true` and a signed `cover` image URL.
+- The web page shows examples as cards with the first day's painting, notes on the retreat view that it's an example and that progress is personal, and hides Rewrite, Re-record and Delete.
+- To make one: `python tools/build_demo.py free|premium OWNER_USER_ID` makes the retreat with that kind's models and voices, waits for every day, then registers it. `demos.unregister` removes it from the list.
+
+## 8e. Research done for this retreat
+
+A page for seeing how each day was made, meant for a computer (hidden on phones), turned on with **Show a "Research" page for each retreat** under Advanced. It adds a **Research** button to the retreat and a "Research for this day" item to each day's More menu.
+
+For each day it shows the passage and notes the planner took from the document (theme, grace, image description); how the deep dive was researched (the service or services, "results from Brave Search, Exa, Tavily…", services skipped and why); the searches; every result with its title, link, snippet and the service that found it, with the cited ones marked; and the deep dive's source list.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant J as Build job
+    participant M as Model
+    participant R as Research services
+    participant ST as Storage
+    participant B as Browser (Research page)
+    participant API as API
+    J->>M: write three searches (free models)
+    J->>R: run them (all services, combined)
+    R-->>J: results, each tagged with its service
+    J->>M: write the deep dive from the results
+    M-->>J: script + sources
+    J->>ST: day n research.json {queries, results, cited, contributors, skipped, model}
+    Note over J,ST: For Claude models the free results and the searches Claude ran itself, with the pages returned, are both saved
+    B->>API: GET /api/retreats/{id}/research
+    API->>ST: each day's research.json
+    API-->>B: days with passage, notes, research, cited sources
+```
+
+Days made before research was saved show only their cited sources. The research file lives with the retreat's other files and is deleted with it.
+
 ## 9. Status lifecycles
 
 ```mermaid
@@ -867,7 +940,7 @@ Everything the page needs before sign-in.
 
 ### `GET /api/retreats` 🔒
 
-The signed-in user's retreats, newest first.
+The signed-in user's retreats, newest first, and the example retreats (section 8d) with the person's own progress. Each example also has `demo: {label, kind}`, `read_only: true` and a signed `cover` URL; an example the caller owns appears only under `retreats`.
 
 ```json
 {"retreats": [
@@ -1016,6 +1089,32 @@ The person's notes (`user info.md`). `GET` returns `{file, about, summarized, or
 
 `GET` returns `{memory, conversations: [{id, started_at, ended_at, retreat_id, retreat_title, provider, voice, seconds, transcript}]}` (older transcripts are `null` once folded into `memory`). `DELETE` forgets everything.
 
+### `POST /api/retreats/{id}/days/{n}/retry` 🔒
+
+Try again after a failed day: records only the tracks and guidance clips that aren't ready, from their saved scripts, with the options the day was made with. Nothing is rewritten. Returns **202** with the retreat; **409** if a failed part has no script (rewrite the day instead). Owner only.
+
+### `GET /api/retreats/{id}/research` 🔒
+
+The research behind each day (section 8e). Works for the caller's own retreats and for examples.
+
+```json
+{"id": "…", "title": "Come and See", "model": "jetstream/muse-glimmer", "source_filename": "come-and-see.pdf",
+ "days": [{"day": 1, "title": "Follow Me", "source_ref": "Mark 1:16-20", "passage_text": "…",
+           "notes": {"grace": "…", "image_description": "…"}, "status": "ready",
+           "web_search": true, "research_service": "several services, combined",
+           "cited": ["Title — https://…"],
+           "research": {"how": "server search", "service": "all", "queries": ["…", "…", "…"],
+                        "contributors": ["brave", "exa", "tavily"], "skipped": [],
+                        "results": [{"title": "…", "url": "https://…", "content": "…", "service": "exa"}],
+                        "cited": ["…"], "model": "jetstream/muse-glimmer", "made_at": 1790500000.0}}]}
+```
+
+`research` is `null` for a day made before research was saved or made without research.
+
+### Example retreats and the other endpoints
+
+For an example retreat (section 8d), `GET /api/retreats/{id}`, `script.pdf`, `/research`, `/days/{n}/prayed`, `/days/{n}/progress`, `PATCH` with `start_date`, and `POST /api/talk/session` with its `retreat_id` all work, with the person's own progress; `PATCH` with `title` returns 403, and `build` and `DELETE` return 404.
+
 ### `GET /api/files/{path}` (local development only)
 
 Serves files from `DATA_DIR` when Supabase isn't configured. In production, files come from signed Storage URLs and this route doesn't exist.
@@ -1031,7 +1130,7 @@ Serves files from `DATA_DIR` when Supabase isn't configured. In production, file
 | Supabase Storage | `GET/POST /storage/v1/bucket` | Startup: create the bucket if missing |
 | OpenRouter | `POST /api/v1/messages` (Anthropic Messages format, streamed) | Planning, reflection, deep dive |
 | OpenRouter | `GET /api/v1/models` | Prices, cached 6 hours |
-| Brave Search / Exa / Tavily / Firecrawl / Linkup / Brave Answers | See section 7 | Free-mode deep dives: three queries with the chosen service, falling back to the others |
+| Brave Search / Exa / Tavily / Firecrawl / Linkup / Brave Answers | See section 7 | Free-mode deep dives: three queries sent to every service at once (default), or to one chosen service falling back to the others |
 | OpenAI | `POST /v1/live/sessions` (SDK `live.create`), `POST /v1/live/sessions/{id}/hangup` | Talk it over (GPT-Live) |
 | xAI | `POST /v1/realtime/client_secrets`, `GET /v1/tts/voices` | Talk it over (Grok voice): token and voice list |
 | Jetstream2 | `POST /api/chat/completions` (OpenAI format, `Authorization: Bearer <token>`) | Free-mode planning and writing; images are offered for planning and dropped if refused |
@@ -1072,12 +1171,12 @@ flowchart LR
 | API keys | Environment variables only: `.env` locally (gitignored), Render's dashboard in production. `.env.example` lists names with empty values. |
 | Supabase keys | The **secret** key stays on the server. The browser gets only the **publishable** key, which is designed to be public. |
 | Database access | Row level security is enabled with no policies, so the publishable key can't read or write `retreats`. The API filters every read by the caller's user id. |
-| Other users' retreats | Answered with 404, the same as a missing retreat. |
+| Other users' retreats | Answered with 404, the same as a missing retreat, unless the retreat is a registered example (8d), which everyone can read but only its owner can build, rename or delete; a visitor's progress in it is written to their own folder, never to the shared retreat. |
 | Files | Private bucket; the browser gets signed URLs that expire after 24 hours. Paths start with the owner's user id. |
 | Spending | Only `ALLOWED_EMAILS` get Claude and ElevenLabs; everyone else is in free mode on Jetstream; upload size, page count, text length, prompt length and track length are capped. |
 | Cross-site calls | CORS only for the origins in `ALLOWED_ORIGINS`. |
 | Local file route | `/api/files/…` exists only without Supabase and refuses paths outside `DATA_DIR`. |
-| Copyright | Users upload only material they own or may use; each retreat is private to its owner and nothing is shared between users. The public demo uses public-domain material. |
+| Copyright | Users upload only material they own or may use; each retreat is private to its owner. The only shared retreats are the two examples, made from public-domain material (the World English Bible and public-domain paintings). |
 
 ---
 
@@ -1090,6 +1189,8 @@ flowchart LR
 | Claude errors (rate limit, auth, refusal, ran out of room) | The section's reason, e.g. "The model provider is rate limiting requests" | Other sections still finish; the day is `failed` with per-section errors; Rebuild retries. |
 | OpenRouter rejects structured output | Nothing | Planning retries with the schema described in the prompt. |
 | OpenRouter rejects web search | Nothing; `web_search: false` on the deep dive | The deep dive is written without search, told to keep to well-established claims. |
+| ElevenLabs refuses with 429 (too many requests at once) | Nothing, or a slower build | At most 2 ElevenLabs requests run at once across the server; a 429 is retried up to 5 times with backoff. |
+| A day finishes with failed clips | "Making this day didn't finish" with **Try again** | `POST /days/{n}/retry` records only the failed clips from their saved scripts with the day's own options; `tools/retry_days.py RETREAT_ID` does every failed day. |
 | Free voice service fails | "The free voice service didn't respond…" | Choose another voice or tier and rebuild. |
 | ElevenLabs out of credit | "ElevenLabs is out of credits or rate limited…" | Other sections continue; switch that section to a free voice and re-record. |
 | Scanned PDF | Planning reads the page images | Up to 4 text-less pages are sent to Claude as images. |
@@ -1118,7 +1219,11 @@ flowchart LR
 | `app/llm_log.py` | The model call log |
 | `app/profile.py` | About me: `user info.md`, condensing, loading the notes into each job |
 | `app/talk.py` | Talk it over: companion instructions and context, GPT-Live and Grok sessions, memory, free allowance |
-| `app/search.py` | Research services for free-mode deep dives |
+| `app/search.py` | Research services for free-mode deep dives, alone or all combined |
+| `app/demos.py` | Example retreats: the registry, each person's own progress laid over the shared retreat |
+| `tools/retry_days.py` | Finishes a retreat's failed days by re-recording only the failed clips |
+| `tools/build_demo.py` | Builds and registers an example retreat (free or premium) from `samples/demo/come-and-see.pdf` |
+| `samples/demo/` | The "Come and See" demo package: `make_demo.py`, the PDF, WEB passages and public-domain paintings |
 | `app/pricing.py` | Model list, live prices, cost meter, ElevenLabs balance |
 | `app/config.py` | Environment settings |
 | `tests/` | API flow, errors, storage and auth against a fake Supabase, cost math, text helpers |
@@ -1163,7 +1268,7 @@ flowchart LR
 | `BRAVE_ANSWERS_API_KEY` | | Brave Answers research (a separate Brave plan and key) |
 | `FIRECRAWL_API_KEY` | | Firecrawl research |
 | `LINKUP_API_KEY` | | Linkup search and deep research |
-| `SEARCH_PROVIDER` | `brave` | Default research service |
+| `SEARCH_PROVIDER` | `all` | Default research: `all` (every service, combined) or one service |
 | `ALLOWED_ORIGINS` | localhost ports | CORS origins |
 | `DATA_DIR` | `/tmp/ignatius` | Local storage when Supabase is off |
 | `MAX_UPLOAD_MB` / `MAX_PAGES` / `MAX_SOURCE_CHARS` | 15 / 40 / 80,000 | Upload limits |

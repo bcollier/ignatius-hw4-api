@@ -2,75 +2,609 @@
 
 > ## 📐 How it all works: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 >
-> The full documentation, with diagrams: the system and hosting on Render and Supabase, the database ERD, sign-in and guest flows, how a retreat is made step by step, the prayer player, status lifecycles, every API endpoint with example requests and responses, costs, security, the research services, and failure handling.
+> The full documentation, with 26 diagrams: the system and hosting on Render and Supabase, the database ERD, sign-in and guest flows, how a retreat is made step by step, the research services, the prayer player, Talk it over, example retreats, the research page, status lifecycles, every API endpoint with example requests and responses, costs, security, and failure handling.
 >
-> **Live app:** https://bcollier.github.io/ignatius-hw4-web/ · **Frontend repo:** [ignatius-hw4-web](https://github.com/bcollier/ignatius-hw4-web)
+> **Live app:** https://bcollier.github.io/ignatius-hw4-web/ · **Frontend repo, with screenshots and the full story:** [ignatius-hw4-web](https://github.com/bcollier/ignatius-hw4-web) · **Every prompt used to build it:** [PROMPT_LOG.md](PROMPT_LOG.md) · **Design spec:** [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md)
 
-Backend for **Ignatius at Home**, which turns material you have rights to (a prayer handout, scripture passages, a reading, with images) into a guided audio retreat you pray at home, day by day. Upload a document and press **Make my retreat**: the server plans the days and, for each one, writes and records:
+<p align="center">
+  <img src="https://raw.githubusercontent.com/bcollier/ignatius-hw4-web/main/docs/screenshots/iphone-hero.png" alt="Ignatius at Home on three iPhones" width="820">
+</p>
 
-1. **The reading**: the day's passage, word for word from your document.
-2. **For the heart**: a reflection addressed to the listener.
-3. **Deep dive**: the theology, history and hermeneutics of the passage, researched on the web, building on the reflection.
-4. **Spoken guidance**: the request for the day's grace and a line before each reading and the silence, tailored to that day's reflection and deep dive.
+The backend for **Ignatius at Home**, which turns material you have rights to (a prayer handout, scripture passages, a reading, with images) into a guided audio retreat you pray at home, day by day. Upload a document and press **Make my retreat**: the server reads it, plans the days, and for each day writes and records:
 
-The frontend ([ignatius-hw4-web](https://github.com/bcollier/ignatius-hw4-web), GitHub Pages) plays each day as a lectio divina sequence, with the day's images filling the screen, remembers what you've listened to and prayed, and offers **Talk it over**: a live spoken conversation with an AI prayer companion (OpenAI GPT-Live or xAI Grok voice) that knows the retreat, what you've told it about yourself (`user info.md`), and your past conversations.
+1. **The reading:** the day's passage, word for word from your document.
+2. **For the heart:** a reflection addressed to the listener.
+3. **Deep dive:** the theology, history and hermeneutics of the passage, researched on the web, building on the reflection.
+4. **Spoken guidance:** the request for the day's grace, a line before each of four readings and the silence, and a closing, tailored to that day's reflection and deep dive.
 
-Built with FastAPI on Render. Claude (through OpenRouter) or free Jetstream models write; Microsoft voices (free) or ElevenLabs (premium) record; Supabase handles sign-in, saved retreats, files and the call log.
+The frontend plays each day as a *lectio divina*, with the day's paintings filling the phone screen, remembers what you've listened to and prayed, and offers **Talk it over**, a live spoken conversation with an AI prayer companion that knows the retreat, what you've told it about yourself, and your past conversations. Everyone gets two ready-made **example retreats** at first sign-in, one made with free models and voices and one with Claude Fable and ElevenLabs.
 
-## How it works
+This is the **CMU 15-113 Homework 4** submission: server-side code deployed on Render, with a web front end. For what Ignatian spirituality, retreats and lectio divina are, and why the app is shaped the way it is, see the [web README](https://github.com/bcollier/ignatius-hw4-web#2-a-primer-ignatian-spirituality-retreats-and-lectio-divina).
 
-**Full documentation with diagrams:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+---
 
+## Contents
+
+1. [The system at a glance](#1-the-system-at-a-glance)
+2. [Hosting](#2-hosting)
+3. [What happens when you press "Make my retreat"](#3-what-happens-when-you-press-make-my-retreat)
+4. [Inside a day: parts that know about each other](#4-inside-a-day-parts-that-know-about-each-other)
+5. [Research: all the free services at once](#5-research-all-the-free-services-at-once)
+6. [Voices and recording](#6-voices-and-recording)
+7. [Talk it over](#7-talk-it-over)
+8. [Example retreats](#8-example-retreats)
+9. [The research page](#9-the-research-page)
+10. [Data model](#10-data-model)
+11. [Full mode and free mode](#11-full-mode-and-free-mode)
+12. [Endpoints](#12-endpoints)
+13. [Costs](#13-costs)
+14. [Logging every call](#14-logging-every-call)
+15. [Resilience](#15-resilience)
+16. [Security and secrets](#16-security-and-secrets)
+17. [Configuration](#17-configuration)
+18. [Code map](#18-code-map)
+19. [Tests](#19-tests)
+20. [Run it locally](#20-run-it-locally)
+21. [Supabase setup](#21-supabase-setup)
+22. [Deploy on Render](#22-deploy-on-render)
+23. [Building the example retreats](#23-building-the-example-retreats)
+24. [Rights and copyright](#24-rights-and-copyright)
+
+---
+
+## 1. The system at a glance
+
+```mermaid
+flowchart LR
+    subgraph Browser["Browser (laptop or phone)"]
+        UI["Web app<br/>GitHub Pages"]
+        AUDIO["audio player"]
+    end
+    subgraph RENDER["Render"]
+        API["FastAPI app"]
+        JOBS["Background jobs<br/>(asyncio tasks)"]
+    end
+    subgraph SUPA["Supabase"]
+        AUTH["Auth"]
+        DB[("Postgres<br/>retreats, llm_calls")]
+        ST[("Storage<br/>private bucket")]
+    end
+    subgraph WRITE["Writing"]
+        OR["OpenRouter<br/>Claude + web search"]
+        JS["Jetstream2<br/>Muse Glimmer, Llama 4 Scout"]
+        RS["Research services<br/>Brave, Brave Answers, Exa,<br/>Tavily, Firecrawl, Linkup"]
+    end
+    subgraph VOICE["Voices"]
+        EDGE["Microsoft voices<br/>(edge-tts, free)"]
+        ELEVEN["ElevenLabs<br/>(premium)"]
+    end
+    subgraph LIVE["Live conversation"]
+        GPT["OpenAI GPT-Live<br/>(WebRTC)"]
+        GROK["xAI Grok voice<br/>(WebSocket)"]
+    end
+    UI -- "JSON, Bearer token" --> API
+    UI -- "sign in" --> AUTH
+    API -- "check token" --> AUTH
+    API --> DB
+    API --> ST
+    API --> JOBS
+    JOBS --> OR
+    JOBS --> JS
+    JOBS --> RS
+    JOBS --> EDGE
+    JOBS --> ELEVEN
+    AUDIO -- "signed URLs" --> ST
+    API -- "session, token" --> GPT
+    API -- "short-lived token" --> GROK
+    AUDIO -- "live audio" --> GPT
+    AUDIO -- "live audio" --> GROK
 ```
-browser ── POST /api/retreats (PDF or .docx) ──▶ extract text, images, scanned pages (PyMuPDF, python-docx)
-        ◀── 202 {id, status: "planning"} ─────── background job: Claude plans the days (structured JSON)
-        ── GET /api/retreats/{id} every few seconds until status is "ready"
-        ── POST /api/retreats/{id}/days/{n}/build ─▶ background job, three tracks in parallel:
-                                                      reading: passage text ─▶ text to speech
-                                                      heart:   Claude ─▶ text to speech
-                                                      deep:    Claude + web search ─▶ text to speech
-        ── GET /api/retreats/{id} until the day is "ready"; tracks carry signed audio URLs
-```
 
-Long work runs as background jobs and the browser polls, so no request waits minutes for a model. Each step is saved to Supabase, so a retreat built on a laptop can be played from a phone after signing in with the same email.
-
-**Plan modes.** If the document already has days ("Day 1", "Day 2"...), they are kept in order with their passages. If it is loose material, Claude composes about seven days from it. Passages are copied word for word; the model may only remove page furniture and verse numbers.
-
-## Endpoints
-
-Every error response has the shape `{"error": {"status": 400, "message": "..."}}`, with a message meant to be shown to the user.
-
-When Supabase is configured, the endpoints marked 🔒 need `Authorization: Bearer <Supabase access token>`. A user only ever sees their own retreats; someone else's retreat returns 404.
-
-| Method and path | Parameters | Returns |
+| Piece | Runs on | Job |
 | --- | --- | --- |
-| `GET /api/health` | none | `{ok, llm, model, tiers, sign_in}` |
-| `GET /api/options` | none | Voice tiers and voices, default prompts and guidance, upload limits, the Claude models with live OpenRouter prices, the ElevenLabs balance, and the public Supabase URL and publishable key for the sign-in form |
-| `GET /api/me` 🔒 | none | `{id, email}` |
-| `GET /api/retreats` 🔒 | none | `{retreats: [{id, title, filename, created_at, status, days, days_built}]}`, newest first |
-| `POST /api/retreats` 🔒 | multipart: `file` (.pdf or .docx, up to 15 MB and 40 pages), optional `plan_prompt`, `model`, `series` (earlier retreats this one continues), `start_date`, and `options` (JSON build settings; with it every day is made after planning) | **202** with the retreat, `status: "planning"`. 400 for unreadable or empty files, 413 if too large |
-| `GET /api/retreats/{id}` 🔒 | none | The retreat: `status` (`planning`, `ready`, `failed`), `source` stats, `images` (with signed `url`), `plan` (title, summary, mode, days with passage, grace, image), and `days` (build state per day, tracks with `status`, `script`, `url`, `sources`) |
-| `GET /api/retreats/{id}/script.pdf` 🔒 | query: `day` (omit for the whole retreat), `order` (`lectio` or `simple`), `grace_silence`, `pause` (seconds) | A printable PDF of the script in prayer order, with images, guidance, silences and sources. The whole retreat adds a cover and contents; unbuilt days show their passage and grace |
-| `PATCH /api/retreats/{id}` 🔒 | JSON `start_date`, `title` | Changes the start date or title |
-| `POST /api/retreats/{id}/days/{n}/prayed` 🔒 | JSON `prayed`, `word`, `note` | Marks a day prayed and saves the word and note |
-| `POST /api/retreats/{id}/days/{n}/progress` 🔒 | JSON `step`, `part`, `seconds`, `parts_played`, `finished` | Listening progress; finishing marks the day prayed |
-| `GET`/`PUT /api/profile`, `POST /api/profile/upload` 🔒 | `about`, `companion_notes`, or a .txt/.md/.docx/.pdf | About me (`user info.md`), condensed if long |
-| `POST /api/talk/session` 🔒 | JSON `provider`, `voice`, `retreat_id`, `local_time`, `sdp` (OpenAI) | Starts a live conversation; returns the WebRTC answer or a Grok token |
-| `POST /api/talk/end`, `GET`/`DELETE /api/talk/history` 🔒 | `session_id`, `seconds`, `transcript` | Saves the conversation to memory; lists or forgets past conversations |
-| `DELETE /api/retreats/{id}` 🔒 | none | `{deleted: id}`; removes the row and its files. 409 while a job is running |
-| `POST /api/retreats/{id}/days/{n}/build` 🔒 | JSON: `voices` (a voice id from `/api/options` for each of `guide`, `reading`, `heart`, `deep`; free and premium can be mixed), optional `heart_prompt`, `deep_prompt`, `guide` (spoken guidance text by name; empty skips a clip), `keep_scripts` (re-record with new voices without rewriting), `model` | **202** with the retreat, that day `status: "building"`. 400 for an unknown voice or overlong text, 404 for a missing day, 409 if the plan isn't ready or the day is already building |
+| Web app | GitHub Pages | Everything the person sees. Plain HTML, CSS, JavaScript; no build step. |
+| API | Render, Python 3.12, FastAPI + Uvicorn | Checks who is calling, extracts documents, runs background jobs, saves state, returns JSON. |
+| Auth | Supabase Auth | Email sign-in links, anonymous guests, token refresh. |
+| Database | Supabase Postgres | One row per retreat (the retreat is a JSON document), and a row per model call. |
+| Files | Supabase Storage | Images, every MP3, research records, notes about the person, conversation memory. Private; signed URLs. |
+| Writing | Claude through OpenRouter (premium); Jetstream2 open models (free) | Planning, reflections, deep dives, tailoring the guidance, condensing notes. |
+| Research | Six web search services | Research for deep dives: all of it for free models, a head start before Claude's own web search for premium. |
+| Voices | Microsoft (free), ElevenLabs (premium) | Scripts to MP3. |
+| Conversation | OpenAI GPT-Live, xAI Grok voice | Talk it over. |
 
-Each built day has three `tracks` (reading, heart, deep) and a set of short `guide` clips: the opening, which asks for the day's grace, instructions before each of the four readings and the silence, and a closing. Every clip records its `voice` and its length in `seconds`, so the player can show the total time of the prayer.
+---
 
-**Costs.** Each model call's token usage and web searches are priced with OpenRouter's live rates. The totals are saved as `costs.plan` on the retreat and as `cost` on each built day: model dollars, characters per voice tier, and ElevenLabs dollars. ElevenLabs dollars use `ELEVENLABS_USD_PER_1K_CHARS` (default $0.30), since the real rate depends on the plan. The page also shows an estimate before each build.
+## 2. Hosting
 
-Track statuses move `waiting` → `writing` (Claude) → `speaking` (text to speech) → `ready`, or `failed` with an `error`. A job interrupted by a server restart is marked `failed` with a message to try again.
+```mermaid
+flowchart TB
+    DEV["Developer machine"] -- "git push" --> REPO_API["GitHub: ignatius-hw4-api"]
+    DEV -- "git push" --> REPO_WEB["GitHub: ignatius-hw4-web"]
+    REPO_WEB -- "Pages publishes main" --> PAGES["bcollier.github.io/ignatius-hw4-web"]
+    REPO_API -- "render.yaml Blueprint<br/>auto-deploy on push to main" --> BUILD["Render build<br/>pip install -r requirements.txt"]
+    BUILD --> SVC["Render web service (free)<br/>uvicorn app.main:app<br/>health check /api/health"]
+    ENV["Render environment variables<br/>(keys typed in the dashboard)"] -.-> SVC
+    SVC -- "startup: create bucket if missing" --> SUPA["Supabase project"]
+    SQL["SQL editor, once:<br/>sql/001_retreats.sql, sql/002_llm_calls.sql"] -.-> SUPA
+```
 
-**Custom prompts.** The frontend shows the default prompts and lets the user edit them. The server always appends the fixed part: output format, length limit, and the web-search instruction. That keeps a custom prompt from breaking parsing. Prompts are capped at 8,000 characters.
+- **Render** builds from `render.yaml`: a free Python web service in Virginia. Secrets are `sync: false` in the Blueprint and typed into the dashboard, never committed. Every push to `main` redeploys with zero downtime. The free instance sleeps after 15 minutes idle and takes about a minute to wake; its disk is temporary, which is why everything lives in Supabase.
+- **Supabase** provides Auth, Postgres and Storage in one project.
+- **Local development** needs none of it: with no Supabase settings the API uses `LocalStore` (JSON and files under `DATA_DIR`) and a single local user, and `LLM_MODE=stub` removes model calls.
 
-## Run it locally
+---
 
-Needs Python 3.12. `ffmpeg` is not required.
+## 3. What happens when you press "Make my retreat"
+
+One multipart request carries the file and every option. The server checks the options, extracts the document, answers **202** at once, and does the rest in a background job while the page polls.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant W as Web app
+    participant API as API
+    participant X as extract.py
+    participant ST as Storage
+    participant DB as Postgres
+    participant J as Job
+    participant M as Model
+
+    W->>API: POST /api/retreats (file, model, series, start_date, options)
+    API->>API: check sign-in, tier, voices, model, prompts, size
+    API->>X: extract text, images (up to 1568 px), scanned pages
+    API->>ST: images, source.json, scans (so planning can resume)
+    API->>DB: retreat {status: planning}
+    API-->>W: 202 retreat
+    J->>J: load About me into this job's context
+    J->>M: background + about me + series + planning prompt + images + text (JSON schema)
+    M-->>J: {title, summary, mode, images, days[]}
+    J->>DB: plan saved, days queued, status building
+    loop each day in turn
+        J->>J: write, research and record the day (section 4)
+        J->>DB: progress {done, total, current_day, failed}
+    end
+    J->>DB: status ready
+    loop every 3 s while making
+        W->>API: GET /api/retreats/{id}
+        API-->>W: retreat with signed URLs
+    end
+```
+
+**Plan modes.** If the document already has days ("Day 1", "Day 2"...), they are kept in order with their passages (`follows_source`). If it is loose material, the model composes about seven days (`composed`), choosing a grace, a focus and images for each. Passages are always copied word for word; the model may remove only page furniture and verse numbers. The output is constrained by a JSON schema (with a fallback that describes the schema in the prompt if the gateway refuses structured output).
+
+**Series.** A retreat can continue earlier weeks. Every call for the new retreat then gets every earlier week's titles, graces, passages, reflections and deep dives (shortened oldest-first if over budget: 600k characters for Claude, 80k for Jetstream), with Claude's copy in a cached system block so each day reads it at a fraction of the price.
+
+---
+
+## 4. Inside a day: parts that know about each other
+
+The parts are written in the order they are heard, and each sees what came before.
+
+```mermaid
+flowchart LR
+    READ["The reading<br/>(recorded at once)"]
+    HEART["For the heart<br/>written first"] --> DEEP["Deep dive<br/>sees the reflection,<br/>researched on the web"]
+    DEEP --> GUIDE["Spoken guidance<br/>tailored to both"]
+    HEART -. recorded when written .-> REC[("MP3s in Storage")]
+    DEEP -. recorded .-> REC
+    GUIDE -. recorded .-> REC
+    READ -.-> REC
+    DEEP -. research record .-> RJ[("day n research.json")]
+```
+
+- **Background for every call.** Every prompt to every model starts with `prompts.BACKGROUND` (the Exercises and their four weeks, the Principle and Foundation, asking for a grace, imaginative contemplation, colloquy, repetition, consolation and desolation, the Examen, Annotations 15 and 19, lectio divina per Guigo II and *Verbum Domini* 87, and how a day is prayed in this app), then the person's About me notes. It is added where calls go out (`llm._call`, `jetstream.complete`), so nothing can skip it.
+- **House style for listening:** plain paragraphs, no lists, parentheses or dashes, no verse numbers, and never inventing a Hebrew or Greek word, a variant, a quotation or a fact.
+- **Tailoring the guidance** keeps each line's purpose and length and the opening's request for the grace word for word; lines the model drops or overruns keep their default, and any failure falls back to the plain text. It can be turned off.
+- **Recording starts as soon as each script exists**, in parallel with the writing of the next part.
+
+---
+
+## 5. Research: all the free services at once
+
+The free Jetstream models can't search, so the server researches for them. By default (`SEARCH_PROVIDER=all`) it asks **every configured service at once** and combines the results:
+
+**Premium too.** Claude models get the same combined free-service results first, as a head start (Claude writes the three searches, the free services run them), and then still use their own web search at its full allowance (up to 5 searches), told to search further wherever the free results are thin and never to be limited by them. The free results save some paid searches; they never cap the depth of a premium deep dive. The research record then holds both: the free results and Claude's own searches and pages.
+
+```mermaid
+flowchart LR
+    Q["Model writes<br/>three searches"] --> ALL{"All services,<br/>combined?"}
+    ALL -- "yes (default)" --> PAR["Every configured service in parallel<br/>(not Linkup deep research)<br/>paused services skipped"]
+    PAR --> MIX["Interleave one result from each in turn<br/>dedupe by URL, up to 20<br/>tag each with its service"]
+    ALL -- "no, one chosen" --> ONE["That service, then the others<br/>as fallbacks until one finds results"]
+    MIX --> W["Model writes the deep dive<br/>citing only returned URLs"]
+    ONE --> W
+    W --> F["Drop any source not in the results"]
+    F --> SAVE[("day n research.json")]
+```
+
+| Service | Call | What becomes a result |
+| --- | --- | --- |
+| Brave Search | `GET api.search.brave.com/res/v1/web/search` | title, URL, description and extra snippets |
+| Brave Answers | `POST api.search.brave.com/res/v1/chat/completions` (own key), streamed, citations | the answer under its first cited URL, and each citation |
+| Exa | `POST api.exa.ai/search`, type auto, highlights | title, URL, highlights; reported cost added to the day |
+| Tavily | `POST api.tavily.com/search`, basic depth | title, URL, content |
+| Firecrawl | `POST api.firecrawl.dev/v2/search` | title, URL, description; credits logged |
+| Linkup | `POST api.linkup.so/v1/search`, standard depth | name, URL, content |
+| Linkup deep research | same endpoint, deep depth, sourced answer, 2-minute timeout | the answer and each source (only when chosen on its own) |
+
+**Failing softly.** Each service is wrapped so research can never break a build:
+
+```mermaid
+flowchart TD
+    RUN["Run a query (20 s timeout)"] --> R{Response}
+    R -- "results" --> OK["Keep them, reset the failure count"]
+    R -- "402, Tavily 432/433,<br/>or quota or credit words" --> CR["Pause until the 1st of next month"]
+    R -- "429" --> RL["Pause 1 minute"]
+    R -- "401 or 403" --> KEY["Pause 1 hour"]
+    R -- "timeout, 5xx, bad shape" --> FL["Count a failure<br/>(3 in a row: pause 10 minutes)"]
+    CR --> SKIP["Skip it and carry on with the others"]
+    RL --> SKIP
+    KEY --> SKIP
+```
+
+Pauses persist in `system/search_status.json`, so a restart or Render waking from sleep doesn't retry a service that's out of credits; `/api/options` reports each service's status for the menu. Linkup's two modes share one account and pause together. Every query, successful or not, is a row in `llm_calls`.
+
+---
+
+## 6. Voices and recording
+
+```mermaid
+flowchart LR
+    S["Script"] --> F["fit(): trim at a sentence boundary<br/>to the section's cap"]
+    F --> V{Voice tier}
+    V -- free --> E1["~400-character pieces"] --> E2["6 at a time, shared across the server<br/>each retried up to 4 times with backoff"] --> J1["Join MP3 pieces"]
+    V -- premium --> L1["~2,500-character pieces"] --> L2["In order, each with the previous text<br/>for smooth joins"] --> J2["Join MP3 pieces"]
+    J1 --> D["Length from bytes and bitrate"]
+    J2 --> D
+    D --> U["Upload to Storage, save seconds, voice, characters"]
+```
+
+| Tier | Voices | Notes |
+| --- | --- | --- |
+| Free (Microsoft neural, via `edge-tts`) | Andrew, Ava, Brian, Emma, Christopher, Aria | No key, no cost. 24 kHz mono MP3. |
+| Premium (ElevenLabs, `eleven_multilingual_v2`) | Brian, George, Bill, Sarah, Alice, Lily | Only for `ALLOWED_EMAILS`. 44.1 kHz 128 kbit/s MP3. At most 2 requests at once, 429s retried. The account's remaining characters are shown. |
+
+Samples of all twelve: the web app's [About page](https://bcollier.github.io/ignatius-hw4-web/?about#voices), or the links in the [web README](https://github.com/bcollier/ignatius-hw4-web#7-voices-hear-them-and-compare). Both services produce constant-bitrate MP3, so pieces join byte for byte and length follows from size. The reading is recorded once and played four times.
+
+---
+
+## 7. Talk it over
+
+A live spoken conversation with an AI prayer companion, modeled on how spiritual directors are taught to listen (mostly questions, little advice, noticing consolation and desolation and where God may be at work), which never calls itself spiritual direction and gives the 988 lifeline in a crisis.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant API as API
+    participant O as OpenAI GPT-Live
+    participant X as xAI Grok voice
+    participant ST as Storage
+
+    B->>API: POST /api/talk/session {provider, voice, retreat_id, local_time, sdp?}
+    API->>ST: user info.md, profile.json, conversations.json, free seconds used
+    API->>API: build the context: background, notes, time of day,<br/>memory, retreat days and progress, what's new since last talk
+    alt OpenAI (WebRTC)
+        API->>O: create session {gpt-live-1, instructions, voice, sdp offer}
+        O-->>API: session id + sdp answer
+        API-->>B: answer, max_seconds
+        B->>O: audio both ways, transcripts on a data channel
+        API->>O: hang up at the limit
+    else xAI (WebSocket)
+        API->>X: POST /v1/realtime/client_secrets
+        X-->>API: short-lived token
+        API-->>B: token, ws url, session config
+        B->>X: session.update, PCM16 audio both ways
+    end
+    B->>API: POST /api/talk/end {session_id, seconds, transcript}
+    API->>ST: save to conversations.json, count free seconds
+    API->>API: log to llm_calls, fold old transcripts into a memory summary
+```
+
+Free accounts get 60 seconds a day; premium up to 30 minutes a call. OpenRouter can't carry live audio, so `OPENAI_API_KEY` and `XAI_API_KEY` are used directly, and never reach the browser. OpenAI costs about $0.05 a minute, Grok about $0.08.
+
+---
+
+## 8. Example retreats
+
+Two ready-made retreats everyone sees at first sign-in, both made from the **"Come and See"** package in [`samples/demo/`](samples/demo) (seven Gospel encounters from the public-domain World English Bible, each day with a public-domain painting: Duccio, Caravaggio, Carl Bloch, Rembrandt, Titian). One was made free (Muse Glimmer, Microsoft voices, combined research), one premium (Claude Fable 5.1, ElevenLabs).
+
+```mermaid
+flowchart TD
+    REQ["Request for /api/retreats/{id}…"] --> OWN{"Caller owns it?"}
+    OWN -- yes --> FULL["Their retreat: read, build, rename, delete"]
+    OWN -- no --> REG{"In system/demos.json?"}
+    REG -- no --> NF["404 Retreat not found"]
+    REG -- yes --> OVER["Shared retreat with this person's<br/>demo_state.json laid over it<br/>read_only, costs removed"]
+    OVER --> OK["Read, PDF, research, talk,<br/>prayed, progress, start date"]
+    OVER --> NO["Build or delete: 404, rename: 403"]
+```
+
+- `readable_retreat` in `app/main.py` returns the owner's retreat or the personal view (`demos.personal`); `save_retreat` writes either the retreat or just the visitor's own fields (start date, prayed, journal, listening) to `{user_id}/demo_state.json`.
+- `GET /api/retreats` returns `{retreats, examples}`; each example is a summary with the person's own progress, `demo: {label, kind}`, `read_only: true` and a signed `cover` image URL.
+- Nobody's models or voices are spent when someone listens to an example.
+
+---
+
+## 9. The research page
+
+`GET /api/retreats/{id}/research` returns, for each day, the passage and the planner's notes, and the saved research record: the searches, every result (title, URL, snippet, the service that found it), which were cited, which services contributed or were skipped, and the model. For Claude, the searches Claude ran and the pages its web search returned are saved instead. The web app shows it on a desktop-only page turned on under Advanced.
+
+---
+
+## 10. Data model
+
+```mermaid
+erDiagram
+    AUTH_USERS ||--o{ RETREATS : owns
+    RETREATS ||--o{ STORAGE_OBJECTS : "files under user and retreat"
+    AUTH_USERS ||--o{ LLM_CALLS : made
+    RETREATS ||--o{ LLM_CALLS : for
+
+    AUTH_USERS {
+        uuid id PK
+        text email
+        bool is_anonymous
+    }
+    RETREATS {
+        uuid id PK
+        uuid user_id FK "on delete cascade"
+        text title
+        timestamptz created_at
+        timestamptz updated_at
+        jsonb data "the whole retreat"
+    }
+    LLM_CALLS {
+        bigint id PK
+        timestamptz created_at
+        uuid user_id FK
+        text email
+        uuid retreat_id FK
+        int day
+        text purpose "plan, heart, deep, guide, search_queries, research, talk, talk_memory, profile"
+        text provider
+        text model
+        jsonb request
+        text response_text
+        jsonb response
+        int input_tokens
+        int output_tokens
+        int web_searches
+        numeric usd
+        int duration_ms
+        text status
+        text error
+    }
+    STORAGE_OBJECTS {
+        text bucket_id "retreats, private"
+        text name "path"
+        text content_type
+    }
+```
+
+> **Where are the users?** `AUTH_USERS` is Supabase Auth's own table, `auth.users`, in the **`auth` schema**. The Table Editor shows the `public` schema by default, so it won't appear next to `retreats` and `llm_calls`. See it under **Authentication → Users**, or switch the Table Editor's schema dropdown to `auth`. The app never keeps a users table of its own; `user_id` columns point at `auth.users.id`.
+
+**Why a JSON document per retreat.** A retreat is read and written as a whole: one read and one upsert per step, no joins, and the shape grew (guidance clips, costs, progress, journal, research paths) without migrations. The API is the only writer, so it enforces the structure. Row level security is on with **no policies**, so the browser's publishable key can't touch the tables; only the API's secret key can.
+
+**Storage layout**
+
+```
+retreats/                                   private bucket
+├── {user_id}/
+│   ├── {retreat_id}/
+│   │   ├── image0.jpg … imageN.jpg         images from the upload (max 8, ≤1568 px)
+│   │   ├── source.json, scan0.png …        extracted text and scanned pages, for resuming
+│   │   ├── day1_reading.mp3, day1_heart.mp3, day1_deep.mp3
+│   │   ├── day1_opening.mp3 … day1_closing.mp3   spoken guidance
+│   │   └── day1_research.json              searches, results, citations
+│   ├── user info.md                        About me (maybe condensed)
+│   ├── profile.json                        summary flag, companion notes
+│   ├── conversations.json                  past conversations and memory summary
+│   ├── talk_usage.json                     free seconds used today
+│   └── demo_state.json                     own progress in example retreats
+└── system/
+    ├── search_status.json                  paused research services
+    └── demos.json                          which retreats are examples
+```
+
+The full shape of the retreat document is diagrammed in [ARCHITECTURE.md §3.2](docs/ARCHITECTURE.md#32-inside-a-retreat-data).
+
+---
+
+## 11. Full mode and free mode
+
+| | Full mode (emails on `ALLOWED_EMAILS`) | Free mode (everyone else, and guests) |
+| --- | --- | --- |
+| Sign-in | Email link | Email link, or **Try it without an account** (anonymous; add an email later to keep the retreats) |
+| Models | Claude via OpenRouter: Opus 5 (default), Opus 5.5, Fable 5.1, Sonnet 5, Haiku 4.5 | Jetstream2: Muse Glimmer (default) or Llama 4 Scout |
+| Deep-dive research | The six free services combined as a head start, then Claude's own web search at full depth | Six services, combined by default |
+| Voices | Microsoft and ElevenLabs, mixed freely | Microsoft |
+| Talk it over | Up to 30 minutes a call | 60 seconds a day |
+| Retreats | No limit | No limit |
+| Cost to the site owner | Model, ElevenLabs and conversation charges | None (Jetstream is an academic allocation; research uses free tiers) |
+
+Free mode is on whenever `JETSTREAM_API_KEY` is set. Jetstream is reached through its Open WebUI proxy (`https://llm.jetstream-cloud.org/api`, OpenAI-compatible), which is reachable from Render. Muse Glimmer is a reasoning model, so it's given generous token limits; images are offered for planning and dropped if refused.
+
+---
+
+## 12. Endpoints
+
+Every error has the shape `{"error": {"status": 400, "message": "..."}}`, with a message meant for people. Endpoints marked 🔒 need `Authorization: Bearer <Supabase access token>` when Supabase is configured. "Readable" means the caller's own retreat or an example retreat (section 8); anything else is 404. Full request and response examples: [ARCHITECTURE.md §10](docs/ARCHITECTURE.md#10-api-reference).
+
+| Method and path | Access | Parameters | Returns |
+| --- | --- | --- | --- |
+| `GET /` | public | | Name and links |
+| `GET /api/health` | public | | `{ok, llm, model, tiers, sign_in}` |
+| `GET /api/options` | public | | Voice tiers and voices, default prompts and guidance with labels, limits, models with live prices, default model, web search, ElevenLabs balance, conversation providers, voices and limits, research services with their status and the default, free mode, and the public Supabase settings |
+| `GET /api/me` | 🔒 | | `{id, email, anonymous, mode}` |
+| `GET /api/retreats` | 🔒 | | `{retreats: [...], examples: [...]}`: summaries with status, days, progress, day states, prayed counts, series; examples add `demo`, `read_only`, `cover` |
+| `POST /api/retreats` | 🔒 | multipart: `file` (.pdf/.docx, ≤15 MB, ≤40 pages), `model`, `plan_prompt`, `series`, `start_date`, `options` (JSON: voices, write model, research service, prompts, guidance, tailoring) | **202**, retreat `planning`; then `building` with `progress`; then `ready` |
+| `GET /api/retreats/{id}` | 🔒 readable | | The retreat with signed URLs: plan, days, tracks and guidance clips with scripts, sources, lengths; listening and journal; costs (owners only) |
+| `GET /api/retreats/{id}/script.pdf` | 🔒 readable | `day`, `order` (`lectio`/`simple`), `grace_silence`, `pause` | Printable script in prayer order, with images, guidance, silences, sources, journal; the whole retreat adds a cover and series titles |
+| `GET /api/retreats/{id}/research` | 🔒 readable | | Each day's passage, notes, searches, every result with its service, citations |
+| `PATCH /api/retreats/{id}` | 🔒 readable | `start_date`, `title` | The retreat; renaming an example is 403; an example's start date is saved per person |
+| `POST /api/retreats/{id}/days/{n}/prayed` | 🔒 readable | `prayed`, `word` (≤100), `note` (≤2,000) | The retreat |
+| `POST /api/retreats/{id}/days/{n}/progress` | 🔒 readable | `step`, `part`, `seconds`, `parts_played`, `finished` | `{listening, prayed_at}`; finishing marks the day prayed |
+| `POST /api/retreats/{id}/days/{n}/retry` | 🔒 owner | | **202**; **Try again**: records only the parts that failed, from their saved scripts, with the day's own options (nothing rewritten). 409 if a part has no script, in which case rewrite the day |
+| `POST /api/retreats/{id}/days/{n}/build` | 🔒 owner | `voices`, `voice`, `heart_prompt`, `deep_prompt`, `guide`, `keep_scripts`, `model`, `search_provider` | **202**; rewrite or re-record one day. 409 if busy |
+| `DELETE /api/retreats/{id}` | 🔒 owner | | `{deleted}`; removes the row and all its files. 409 while a job runs |
+| `GET`, `PUT /api/profile` | 🔒 | `about`, `companion_notes` | About me; long notes condensed with `summarized: true` |
+| `POST /api/profile/upload` | 🔒 | `.txt`, `.md`, `.docx`, `.pdf` | About me from the file |
+| `POST /api/talk/session` | 🔒 | `provider`, `voice`, `retreat_id` (readable), `local_time`, `sdp` | OpenAI: WebRTC answer; xAI: token, WebSocket URL, session config |
+| `POST /api/talk/end` | 🔒 | `session_id`, `seconds`, `transcript` | Saved to memory; seconds capped at real elapsed time |
+| `GET`, `DELETE /api/talk/history` | 🔒 | | Past conversations and memory; or forget them all |
+| `GET /api/files/{path}` | local only | | Files from `DATA_DIR` when Supabase is off |
+
+Interactive docs are at `/docs` on any running server.
+
+---
+
+## 13. Costs
+
+- **Models.** Each response's token usage (input, output including thinking, cache reads and writes, web searches) is priced at OpenRouter's live rates, fetched from `GET /api/v1/models` and cached 6 hours. Jetstream costs nothing. Totals are saved as `costs.plan` on the retreat and `cost` on each day.
+- **Research.** Services that report a cost (Exa) or credits (Firecrawl) have it logged; the rest use free monthly allowances.
+- **Voices.** Microsoft is free. ElevenLabs is billed by character; the dollar figure uses `ELEVENLABS_USD_PER_1K_CHARS` (default $0.30) and the page shows the account's remaining characters.
+- **Conversation.** Minutes × $0.05 (OpenAI) or $0.08 (xAI), logged per call.
+- **Estimates** before a retreat is made are computed in the browser from the same prices and the chosen voices. Costs appear only while making, on larger screens, and never for example retreats.
+
+---
+
+## 14. Logging every call
+
+Every call to a model or research service, including failures, adds a row to `llm_calls`: who (user id and email, or "guest"), which retreat and day, the purpose, the provider and model, the full prompt (images replaced by their type and size), the full response (stop reason, web search queries, reasoning), tokens, searches, cost, time and status. The context travels with each job in Python context variables, copied into each asyncio task, so parallel calls never mix up their tags or their person's notes. The `llm_usage_by_user` view totals it per person. A failure to log is recorded in the server log and never stops a job.
+
+```mermaid
+flowchart LR
+    REQ["Request<br/>(tags email)"] --> JOB["Background job<br/>(tags user, retreat, day, purpose)"]
+    JOB --> CALL["Model or search call"]
+    CALL --> ROW["llm_log.record()"]
+    ROW --> DB[("llm_calls")]
+    DB --> VIEW[("llm_usage_by_user")]
+```
+
+---
+
+## 15. Resilience
+
+| What goes wrong | What happens |
+| --- | --- |
+| Render redeploys or restarts mid-job | Jobs save a heartbeat every 20 s. A retreat that's mid-job with no task running here and a heartbeat over 90 s old is resumed: planning from the saved source, a day build keeping finished recordings and scripts. After two resumes it's marked failed. A fresh heartbeat is left alone, because during zero-downtime deploys the old server may still be finishing. |
+| A day fails | The other days continue; the retreat is ready with that day failed, and "Try again" rebuilds it. |
+| Too many jobs | At most `MAX_CONCURRENT_JOBS` (2) run at once; others wait their turn. |
+| A research service is out of credits, rate limited, or down | Paused (until next month, a minute, an hour, or ten minutes), skipped, and the others carry on; nothing found means writing without search. |
+| Microsoft's free voice service drops a request | Each piece retried up to 4 times with backoff (1.5 s, 3 s, 6 s). |
+| ElevenLabs refuses requests (429) | Plans cap simultaneous requests (Starter: 3), and a day's many short guidance clips used to start at once. Now at most 2 ElevenLabs requests run at a time across the server, and a 429 is retried up to 5 times with backoff. This, not credits, was why the first premium example build had failed clips. |
+| ElevenLabs out of credits | That section fails with a clear message; switch to a free voice and re-record. |
+| A day finished with some clips failed | **Try again** (`POST /days/{n}/retry`, or `tools/retry_days.py RETREAT_ID` for every failed day) records only the failed clips from the saved scripts, so nothing is rewritten or paid for twice. |
+| Structured output or web search rejected by the gateway | Retried without it (schema in the prompt; deep dive without search). |
+| A Jetstream model refuses images | Retried text only. |
+| A reasoning model runs out of room | Limits sized for thinking: planning 64k tokens, writing 32k, tailoring 16k. |
+| The About me notes can't be loaded | The job continues without them. |
+| Render asleep | The page explains and offers Retry; nothing is lost, since everything is in Supabase. |
+
+---
+
+## 16. Security and secrets
+
+- **Keys live only in environment variables:** `.env` locally (gitignored, never committed) and Render's dashboard in production. `.env.example` lists the names with empty values. No key has ever been committed or typed into a prompt.
+- **Supabase:** the secret key stays on the server; the browser gets only the publishable key, which is designed to be public. RLS is on with no policies.
+- **Retreats are private:** another person's retreat is 404, the same as a missing one, except example retreats, which are read-only and keep each visitor's progress in their own folder.
+- **Files** are in a private bucket, reached through signed URLs that expire after 24 hours (cached 23 hours). Paths start with the owner's id.
+- **Live conversation keys** never reach the browser: OpenAI's SDP is relayed by the server, and xAI gets a token that expires in 5 minutes.
+- **Spending** is limited to `ALLOWED_EMAILS`; free mode costs nothing; uploads, pages, text, prompts, track lengths and conversation time are capped.
+- **CORS** allows only `ALLOWED_ORIGINS`. The local file route exists only without Supabase and refuses paths outside `DATA_DIR`.
+
+---
+
+## 17. Configuration
+
+Names only; values go in `.env` or Render's dashboard.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `OPENROUTER_API_KEY` | | Claude through OpenRouter |
+| `ANTHROPIC_API_KEY` | | Claude directly, if no OpenRouter key |
+| `LLM_MODE` | from keys | `openrouter`, `anthropic` or `stub` |
+| `LLM_MODEL` | `anthropic/claude-opus-5` | Default model |
+| `WEB_SEARCH` | `1` | Web search for the deep dive |
+| `ELEVENLABS_API_KEY`, `ELEVENLABS_MODEL`, `ELEVENLABS_USD_PER_1K_CHARS` | / `eleven_multilingual_v2` / `0.30` | Premium voices |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_BUCKET` | / / / `retreats` | Sign-in, database, storage |
+| `ALLOWED_EMAILS` | anyone | Who gets full mode |
+| `JETSTREAM_API_KEY`, `JETSTREAM_BASE_URL`, `JETSTREAM_MODELS` | / proxy URL / `muse-glimmer,llama-4-scout` | Free mode |
+| `FREE_MODE`, `LOCAL_USER_MODE` | `1` / | Free mode switch; preview free mode locally |
+| `TAVILY_API_KEY`, `TAVILY_SEARCH_DEPTH` | / `basic` | Tavily |
+| `EXA_API_KEY`, `BRAVE_SEARCH_API_KEY`, `BRAVE_ANSWERS_API_KEY`, `FIRECRAWL_API_KEY`, `LINKUP_API_KEY` | | The other research services |
+| `SEARCH_PROVIDER` | `all` | `all` (combined) or one service |
+| `OPENAI_API_KEY` | | Talk it over with GPT-Live |
+| `XAI_API_KEY`, `XAI_VOICE_MODEL`, `XAI_DEFAULT_VOICE`, `XAI_USD_PER_MINUTE` | / `grok-voice-latest` / `eve` / `0.08` | Talk it over with Grok voice |
+| `FREE_TALK_SECONDS`, `TALK_MAX_SECONDS` | 60 / 1800 | Conversation limits |
+| `PROFILE_MAX_CHARS` | 6000 | About me is condensed above this |
+| `SERIES_MAX_CHARS`, `SERIES_MAX_CHARS_FREE` | 600000 / 80000 | Series context budgets |
+| `ALLOWED_ORIGINS` | localhost ports | CORS |
+| `DATA_DIR` | `/tmp/ignatius` | Local storage without Supabase |
+| `MAX_UPLOAD_MB`, `MAX_PAGES`, `MAX_SOURCE_CHARS` | 15 / 40 / 80000 | Upload limits |
+| `MAX_IMAGES`, `MAX_SCANNED_PAGES` | 8 / 4 | Extraction limits |
+| `MAX_DAYS`, `DEFAULT_DAYS` | 14 / 7 | Plan size |
+| `MAX_TRACK_CHARS`, `PREMIUM_MAX_TRACK_CHARS` | 6000 / 2500 | Section length caps |
+| `MAX_CONCURRENT_JOBS` | 2 | Jobs at once |
+
+---
+
+## 18. Code map
+
+| File | Responsibility |
+| --- | --- |
+| `app/main.py` | Routes, validation, error format, CORS, startup; `my_retreat` (owner) and `readable_retreat` (owner or example) |
+| `app/auth.py` | Token check with Supabase Auth (cached), allowlist, guests, local user |
+| `app/storage.py` | `SupabaseStore` (rows, files, signed URLs, call log) and `LocalStore`; library summaries |
+| `app/pipeline.py` | Background jobs: planning, making every day, building a day in listening order, saving research, heartbeat and resume, progress, costs |
+| `app/extract.py` | PDF and Word extraction: text, images scaled to fit, scanned pages |
+| `app/llm.py` | Claude through OpenRouter (streaming, structured output, web search, caching, fallbacks) and the Jetstream paths; planning, heart, deep dive, tailoring, condensing |
+| `app/jetstream.py` | Jetstream2 client |
+| `app/prompts.py` | Background, house style, default prompts, guidance, schemas |
+| `app/search.py` | The six research services, combined mode, pausing, logging |
+| `app/tts.py` | Voices, tiers, chunking, Microsoft (with retries) and ElevenLabs recording |
+| `app/talk.py` | Talk it over: companion instructions, context, sessions, memory, free allowance |
+| `app/profile.py` | About me: `user info.md`, condensing, loading into each job |
+| `app/demos.py` | Example retreats: registry, per-person overlay |
+| `app/series.py` | Earlier weeks as context, within a budget |
+| `app/script_pdf.py` | The printable script |
+| `app/pricing.py` | Models, live prices, cost meter, ElevenLabs balance |
+| `app/llm_log.py` | The call log and its context |
+| `app/config.py` | Settings from the environment |
+| `tools/build_demo.py` | Makes and registers an example retreat |
+| `tools/retry_days.py` | Finishes a retreat's failed days by re-recording only the failed clips |
+| `samples/demo/` | The "Come and See" package and `make_demo.py` |
+| `samples/` | Other public-domain sample uploads |
+| `sql/` | `001_retreats.sql`, `002_llm_calls.sql` |
+| `docs/` | `ARCHITECTURE.md`, `IMPROVEMENTS.md` |
+
+---
+
+## 19. Tests
+
+`.venv/bin/python -m pytest` runs 79 tests with no network and no keys: Supabase, the model gateways, the research services and the voice services are all faked (`tests/conftest.py` blanks every key).
+
+| File | Covers |
+| --- | --- |
+| `test_api.py` | Upload, plan, build, errors, voices, prompts, PDF |
+| `test_units.py` | Chunking, fitting, text helpers, cost math |
+| `test_supabase.py` | Storage and auth against a fake Supabase |
+| `test_free_mode.py` | Free mode, guests, Jetstream, tier rules |
+| `test_search.py` | Every research service's parsing, pausing on credits and rate limits, fallback, logging, combined mode, the free head start for Claude |
+| `test_llm_log.py` | The call log and its tags |
+| `test_series.py` | Series context and budgets |
+| `test_one_shot.py` | One-request making, bad options, a failed day and Try again, resume, prayed and journal, progress, start date and title, PDF, parts that know each other, tailoring, images per day |
+| `test_talk_profile.py` | About me (short, long, upload), notes in every call, no leaks between jobs, conversation limits and memory, what's new since last talk, Grok tokens |
+| `test_demos.py` | The research page, example retreats read only with personal progress |
+
+Beyond the tests, real end-to-end builds were run throughout with free models and voices, and every research service was checked with real keys.
+
+---
+
+## 20. Run it locally
+
+Needs Python 3.12.
 
 ```bash
 python3.12 -m venv .venv
@@ -79,64 +613,44 @@ cp .env.example .env        # then fill in keys; all are optional for a first ru
 .venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
-- With no keys at all, set `LLM_MODE=stub`: plans and reflections are placeholders, the free voices still record real audio, and storage is local under `DATA_DIR` with no sign-in.
-- Serve the frontend on port 5500 (for example `python3 -m http.server 5500` in the web repo); `config.js` points at `localhost:8000` automatically.
-- Interactive API docs: <http://localhost:8000/docs>.
-- Tests: `.venv/bin/python -m pytest` (no network or keys needed; Supabase is faked).
-- Sample uploads in `samples/` are public domain: World English Bible passages, Rembrandt's *Return of the Prodigal Son* and Tanner's *The Annunciation*. `samples/make_samples.py` rebuilds them.
+- With no keys, set `LLM_MODE=stub`: plans and scripts are placeholders, free voices still record real audio, storage is local under `DATA_DIR`, and there's no sign-in.
+- To try free mode locally, set `JETSTREAM_API_KEY` and `LOCAL_USER_MODE=free`.
+- Serve the web repo on port 5500 (`python3 -m http.server 5500`); its `config.js` points at `localhost:8000`.
+- Tests: `.venv/bin/python -m pytest -q`.
 
-## Full mode and free mode
+---
 
-| | Full mode (emails on `ALLOWED_EMAILS`) | Free mode (everyone else, and guests) |
-| --- | --- | --- |
-| Sign-in | Email link | Email link, or **Try it without an account** (anonymous Supabase session, this browser only) |
-| Models | Claude on OpenRouter (Opus 5 default; Opus 5.5, Fable 5.1, Sonnet 5, Haiku 4.5) | Jetstream2 open models: Muse Glimmer (default) or Llama 4 Scout |
-| Deep dive research | Claude's own web search | Research run by the server with the user's choice of Brave Search, Exa, Tavily, Firecrawl, Linkup (search or deep research) or Brave Answers (whichever have keys), falling back to the next if one is out of credits or failing; the model may cite only returned URLs |
-| Voices | Free Microsoft voices and ElevenLabs | Free Microsoft voices |
-| Limits | Upload and length caps | The same |
-| Cost to the site owner | Model and ElevenLabs charges | None (Jetstream is an academic allocation) |
+## 21. Supabase setup
 
-Free mode is on whenever `JETSTREAM_API_KEY` is set. It reaches Jetstream through its Open WebUI proxy at `https://llm.jetstream-cloud.org/api`, which is OpenAI-compatible and reachable from Render; the direct model endpoints only work from inside Jetstream's network. Guests need **Allow anonymous sign-ins** turned on in Supabase (Authentication → Sign In / Providers).
+1. Create a project. In the SQL editor run [`sql/001_retreats.sql`](sql/001_retreats.sql) and [`sql/002_llm_calls.sql`](sql/002_llm_calls.sql).
+2. Authentication → URL Configuration: add the frontend URLs (GitHub Pages, `http://localhost:5500`) as redirect URLs.
+3. Authentication → Sign In / Providers: turn on **Allow anonymous sign-ins** for guests.
+4. Copy the project URL, publishable key and secret key into the environment. The private `retreats` bucket is created on first start.
 
-## Supabase setup
+---
 
-1. Create a project. In the SQL editor, run [`sql/001_retreats.sql`](sql/001_retreats.sql), then [`sql/002_llm_calls.sql`](sql/002_llm_calls.sql). The second adds the log of every model call, and a per-user summary view. The first is also shown here:
+## 22. Deploy on Render
 
-   ```sql
-   create table public.retreats (
-     id uuid primary key,
-     user_id uuid not null references auth.users on delete cascade,
-     title text,
-     created_at timestamptz not null default now(),
-     updated_at timestamptz not null default now(),
-     data jsonb not null
-   );
-   create index retreats_user_idx on public.retreats (user_id, created_at desc);
-   alter table public.retreats enable row level security;
-   ```
+1. Push to GitHub. In Render choose **New → Blueprint** and pick the repo; `render.yaml` defines the free web service.
+2. Enter the secret values in the Environment tab.
+3. Check `https://<service>.onrender.com/api/health`.
 
-   Row level security is on with no policies, so the publishable key in the browser can't read the table; only the backend's secret key can.
-2. Authentication → URL Configuration: add the frontend URLs as redirect URLs.
-3. Copy the project URL, publishable key and secret key into the environment. The private `retreats` storage bucket is created on first start.
-4. For guest access, turn on **Allow anonymous sign-ins** under Authentication → Sign In / Providers.
+Every push to `main` redeploys.
 
-## Deploy on Render
+---
 
-1. Push this repo to GitHub.
-2. In Render, choose **New → Blueprint** and pick the repo; `render.yaml` defines a free Python web service. Or create a Web Service by hand with build command `pip install -r requirements.txt` and start command `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
-3. Enter the secret values in the Environment tab.
-4. Check `https://<service>.onrender.com/api/health`.
+## 23. Building the example retreats
 
-The free instance sleeps after 15 minutes idle and takes about a minute to wake; the frontend says so when the first request fails. Nothing is lost when it sleeps, because retreats and audio live in Supabase.
+```bash
+.venv/bin/python samples/demo/make_demo.py                         # rebuilds come-and-see.pdf (fetches WEB text and paintings once)
+.venv/bin/python tools/build_demo.py free    <OWNER_USER_ID>       # Muse Glimmer, Microsoft voices, combined research
+.venv/bin/python tools/build_demo.py premium <OWNER_USER_ID>       # Claude Fable 5.1, ElevenLabs voices
+```
 
-## Secrets
+Run against the production store (the `.env` Supabase settings), `build_demo.py` extracts the package, makes the retreat with that kind's models and voices through the normal pipeline, waits for every day, then registers it in `system/demos.json`. The premium build prints the ElevenLabs balance first (a full premium week is roughly 70,000 to 100,000 characters). If any clips fail (a dropped connection, an ElevenLabs 429), `tools/retry_days.py RETREAT_ID` finishes them from the saved scripts. `demos.unregister(id)` removes an example from the list.
 
-- Keys live only in environment variables: `.env` locally (listed in `.gitignore`, never committed) and the Render dashboard in production. `.env.example` lists the names with empty values.
-- The Supabase **secret** key stays on the server. The browser only gets the **publishable** key, which is designed to be public.
-- Audio and images are in a private bucket and reach the browser as signed URLs that expire after 24 hours.
-- `ALLOWED_EMAILS` limits who can use the deployed demo, since every build spends API credit.
-- CORS only allows the origins in `ALLOWED_ORIGINS`.
+---
 
-## Rights and copyright
+## 24. Rights and copyright
 
-Users upload only material they own or have permission to use, and every retreat is private to the account that made it. Nothing is published or shared between users. The demo uses public-domain material only.
+Users upload only material they own or have permission to use, and every retreat is private to the account that made it. The public examples and samples use only public-domain material: the World English Bible and paintings that are public domain or CC0 on Wikimedia Commons. Parish retreat handouts and copyrighted translations are never in these repositories.

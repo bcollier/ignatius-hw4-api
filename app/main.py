@@ -1,5 +1,6 @@
 """Ignatius at Home: turn an uploaded PDF or Word document into a guided audio retreat."""
 
+import json
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -12,10 +13,10 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import auth, config, llm_log, pipeline, pricing, profile, prompts, script_pdf, search, series, talk, tts
+from . import auth, config, demos, llm_log, pipeline, pricing, profile, prompts, script_pdf, search, series, talk, tts
 from .auth import User, current_user
 from .extract import ExtractError, extract
-from .storage import LocalStore, StorageError, store
+from .storage import LocalStore, StorageError, store, summary
 
 logging.basicConfig(level=logging.INFO)
 
@@ -30,7 +31,7 @@ app = FastAPI(title="Ignatius at Home API", version="0.2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.ALLOWED_ORIGINS,
-    allow_methods=["GET", "POST", "DELETE"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
@@ -94,6 +95,40 @@ async def my_retreat(retreat_id: str, user: User = Depends(current_user)) -> dic
     if not retreat or retreat["user_id"] != user.id:
         raise HTTPException(404, "Retreat not found.")
     return retreat
+
+
+async def readable_retreat(retreat_id: str, user: User = Depends(current_user)) -> dict:
+    """The person's own retreat, or a demo retreat seen with their own progress laid
+    over it (marked read_only; save changes with save_retreat)."""
+    retreat = await pipeline.get(retreat_id)
+    if retreat and retreat["user_id"] == user.id:
+        return retreat
+    meta = (await demos.registry()).get(retreat_id)
+    if not retreat or not meta:
+        raise HTTPException(404, "Retreat not found.")
+    mine = (await demos.load_state(user.id)).get(retreat_id)
+    view = demos.personal(retreat, mine, meta)
+    view["_viewer"] = user.id
+    return view
+
+
+async def save_retreat(retreat: dict) -> None:
+    """Owners save the retreat; for a demo only the person's own progress is kept."""
+    if not retreat.get("read_only"):
+        await pipeline.save(retreat)
+        return
+    everything = await demos.load_state(retreat["_viewer"])
+    everything[retreat["id"]] = {
+        "start_date": retreat.get("start_date"),
+        "days": {n: {k: d.get(k) for k in ("prayed_at", "journal", "listening")} for n, d in retreat["days"].items()},
+    }
+    await demos.save_state(retreat["_viewer"], everything)
+
+
+async def view_of(retreat: dict) -> dict:
+    view = await pipeline.public_view(retreat)
+    view.pop("_viewer", None)
+    return view
 
 
 @app.get("/")
@@ -197,9 +232,7 @@ async def talk_session(body: TalkRequest, user: User = Depends(current_user)):
     retreat (and which days they've listened to) as its context."""
     retreat = None
     if body.retreat_id:
-        retreat = await pipeline.get(body.retreat_id)
-        if not retreat or retreat["user_id"] != user.id:
-            raise HTTPException(404, "Retreat not found.")
+        retreat = await readable_retreat(body.retreat_id, user)
     p = await profile.load(user.id)
     provider = body.provider or talk.options()["default_provider"]
     try:
@@ -275,7 +308,19 @@ async def upload_profile(file: UploadFile = File(...), user: User = Depends(curr
 
 @app.get("/api/retreats")
 async def list_retreats(user: User = Depends(current_user)):
-    return {"retreats": await store.list_for(user.id)}
+    mine = await store.list_for(user.id)
+    own_ids = {r["id"] for r in mine}
+    examples = []
+    registered = await demos.registry()
+    state = await demos.load_state(user.id) if registered else {}
+    for rid, meta in registered.items():
+        retreat = None if rid in own_ids else await pipeline.get(rid)
+        if retreat and retreat.get("status") == "ready":
+            first = next((d.get("image_index", -1) for d in retreat["plan"]["days"] if d.get("image_index", -1) >= 0), -1)
+            cover = retreat["images"][first]["path"] if 0 <= first < len(retreat["images"]) else None
+            examples.append({**summary(demos.personal(retreat, state.get(rid), meta)), "demo": meta, "read_only": True,
+                             "cover": (await store.urls([cover])).get(cover) if cover else None})
+    return {"retreats": mine, "examples": examples}
 
 
 @app.post("/api/retreats", status_code=202)
@@ -321,13 +366,37 @@ async def create_retreat(
 
 
 @app.get("/api/retreats/{retreat_id}")
-async def read_retreat(retreat: dict = Depends(my_retreat)):
-    return await pipeline.public_view(retreat)
+async def read_retreat(retreat: dict = Depends(readable_retreat)):
+    return await view_of(retreat)
+
+
+@app.get("/api/retreats/{retreat_id}/research")
+async def research(retreat: dict = Depends(readable_retreat)):
+    """Research done for this retreat: for each day, the passage and notes it was made
+    from, the searches run for the deep dive, every result, and which were cited."""
+    days = []
+    for d in (retreat.get("plan") or {}).get("days", []):
+        state = retreat["days"].get(str(d["day"]), {})
+        deep = state.get("tracks", {}).get("deep", {})
+        found = None
+        if deep.get("research_path"):
+            try:
+                found = json.loads(await store.get_file(deep["research_path"]))
+            except (StorageError, ValueError):
+                found = None
+        days.append({
+            "day": d["day"], "title": d.get("title"), "source_ref": d.get("source_ref"),
+            "passage_text": d.get("passage_text"), "notes": {k: d.get(k) for k in ("theme", "grace", "image_description") if d.get(k)},
+            "status": state.get("status"), "web_search": deep.get("web_search"), "research_service": deep.get("research"),
+            "cited": deep.get("sources", []), "research": found,
+        })
+    return {"id": retreat["id"], "title": (retreat.get("plan") or {}).get("title"), "model": retreat.get("model"),
+            "source_filename": retreat.get("filename"), "days": days}
 
 
 @app.get("/api/retreats/{retreat_id}/script.pdf")
 async def script(
-    retreat: dict = Depends(my_retreat),
+    retreat: dict = Depends(readable_retreat),
     day: int | None = None,
     order: str = "lectio",
     grace_silence: int = 15,
@@ -371,17 +440,19 @@ class RetreatPatch(BaseModel):
 
 
 @app.patch("/api/retreats/{retreat_id}")
-async def update_retreat(body: RetreatPatch, retreat: dict = Depends(my_retreat)):
+async def update_retreat(body: RetreatPatch, retreat: dict = Depends(readable_retreat)):
     """Change the start date (which day is 'today') or the title."""
     if body.start_date is not None:
         retreat["start_date"] = check_date(body.start_date)
+    if body.title is not None and retreat.get("read_only"):
+        raise HTTPException(403, "Example retreats can't be renamed.")
     if body.title is not None and retreat.get("plan"):
         title = body.title.strip()
         if not 1 <= len(title) <= 200:
             raise HTTPException(400, "The title must be 1 to 200 characters.")
         retreat["plan"]["title"] = title
-    await pipeline.save(retreat)
-    return await pipeline.public_view(retreat)
+    await save_retreat(retreat)
+    return await view_of(retreat)
 
 
 def _day_state(retreat: dict, day: int) -> dict:
@@ -402,7 +473,7 @@ class PrayedRequest(BaseModel):
 
 
 @app.post("/api/retreats/{retreat_id}/days/{day}/prayed")
-async def mark_prayed(day: int, body: PrayedRequest, retreat: dict = Depends(my_retreat)):
+async def mark_prayed(day: int, body: PrayedRequest, retreat: dict = Depends(readable_retreat)):
     """Mark a day prayed (or not), and keep the word that stayed and a short note."""
     state = _day_state(retreat, day)
     word, note = (body.word or "").strip(), (body.note or "").strip()
@@ -415,8 +486,8 @@ async def mark_prayed(day: int, body: PrayedRequest, retreat: dict = Depends(my_
         state["journal"] = {"word": word, "note": note, "at": _now()}
     elif body.word is not None or body.note is not None:
         state["journal"] = None  # both cleared
-    await pipeline.save(retreat)
-    return await pipeline.public_view(retreat)
+    await save_retreat(retreat)
+    return await view_of(retreat)
 
 
 class ProgressRequest(BaseModel):
@@ -428,7 +499,7 @@ class ProgressRequest(BaseModel):
 
 
 @app.post("/api/retreats/{retreat_id}/days/{day}/progress")
-async def listening_progress(day: int, body: ProgressRequest, retreat: dict = Depends(my_retreat)):
+async def listening_progress(day: int, body: ProgressRequest, retreat: dict = Depends(readable_retreat)):
     """What has been played of a day, so a missed or interrupted day is known later and
     can be continued on any device. Finishing the prayer marks the day prayed."""
     state = _day_state(retreat, day)
@@ -441,7 +512,7 @@ async def listening_progress(day: int, body: ProgressRequest, retreat: dict = De
         listening["finished_at"] = now
         state["prayed_at"] = state.get("prayed_at") or now
     state["listening"] = listening
-    await pipeline.save(retreat)
+    await save_retreat(retreat)
     return {"listening": listening, "prayed_at": state.get("prayed_at")}
 
 
@@ -527,6 +598,18 @@ async def build_day(
                                        opts["guide"], body.keep_scripts, opts["write_model"], opts["search_provider"])
     except tts.TTSError as exc:
         raise HTTPException(400, str(exc)) from exc
+    return await pipeline.public_view(retreat)
+
+
+@app.post("/api/retreats/{retreat_id}/days/{day}/retry", status_code=202)
+async def retry_day(day: int, retreat: dict = Depends(my_retreat), user: User = Depends(current_user)):
+    """Try again after a failure: record only the parts that failed, from their saved
+    scripts, with the day's own options. Nothing is written again."""
+    state = _day_state(retreat, day)
+    if not pipeline.can_retry(state):
+        raise HTTPException(409, f"Day {day} can't be finished from its scripts; rewrite it instead.")
+    llm_log.tag(email=user.email or ("guest" if user.anonymous else None))
+    await pipeline.retry_failed(retreat, day)
     return await pipeline.public_view(retreat)
 
 

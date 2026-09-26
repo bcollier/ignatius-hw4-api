@@ -40,6 +40,7 @@ QUERY_TIMEOUT = 20  # seconds per query
 STATUS_PATH = "system/search_status.json"
 
 PROVIDERS = {
+    "all": "All services, combined",
     "brave": "Brave Search",
     "exa": "Exa",
     "tavily": "Tavily",
@@ -48,6 +49,11 @@ PROVIDERS = {
     "linkup_deep": "Linkup Deep Research (slower, sourced answers)",
     "brave_answers": "Brave Answers (cited summaries)",
 }
+# "all" runs every configured service at once and merges the results; deep research
+# is left out because it takes about 20 seconds a question.
+COMBINED_SKIP = {"all", "linkup_deep"}
+MAX_RESULTS_COMBINED = 20
+
 # Services that share one account (and so one credit balance) pause together.
 ACCOUNT = {"linkup_deep": "linkup"}
 # Seconds per query; deep research runs several searches itself.
@@ -78,16 +84,22 @@ def _keys() -> dict[str, str]:
         "firecrawl": config.FIRECRAWL_API_KEY,
         "linkup": config.LINKUP_API_KEY,
         "linkup_deep": config.LINKUP_API_KEY,
+        "all": "",
     }
 
 
 def configured() -> dict[str, str]:
-    """Services with a key, whether or not they're paused."""
+    """Services with a key, whether or not they're paused. "all" is offered when two or more are."""
     keys = _keys()
-    return {k: label for k, label in PROVIDERS.items() if keys[k]}
+    services = {k: label for k, label in PROVIDERS.items() if k != "all" and keys[k]}
+    if sum(1 for k in services if k not in COMBINED_SKIP) >= 2:
+        return {"all": PROVIDERS["all"], **services}
+    return services
 
 
 def paused(provider: str) -> dict | None:
+    if provider == "all":
+        return None
     s = _status.get(ACCOUNT.get(provider, provider))
     return s if s and s.get("until", 0) > time.time() else None
 
@@ -110,6 +122,26 @@ def status() -> dict[str, dict]:
 def default_provider() -> str | None:
     options = configured()
     return config.SEARCH_PROVIDER if config.SEARCH_PROVIDER in options else next(iter(options), None)
+
+
+async def _combined(http: httpx.AsyncClient, queries: list[str], research: "Research") -> bool:
+    """Run the queries through every available service at once and interleave the
+    results (one from each service in turn), so the sources are varied."""
+    names = [n for n in configured() if n not in COMBINED_SKIP and not paused(n)]
+    parts = {n: Research() for n in names}
+    found = await asyncio.gather(*(_run_provider(http, n, queries, parts[n]) for n in names), return_exceptions=True)
+    lists = [parts[n].results for n in names]
+    for i in range(max((len(x) for x in lists), default=0)):
+        for results in lists:
+            if i < len(results) and len(research.results) < MAX_RESULTS_COMBINED:
+                research.add(**{k: results[i][k] for k in ("title", "url", "content")}, limit=MAX_RESULTS_COMBINED,
+                             service=results[i].get("service"))
+    for n in names:
+        research.queries += parts[n].queries
+        research.usd += parts[n].usd
+        research.skipped += parts[n].skipped
+    research.contributors = [n for n, ok in zip(names, found) if ok is True and parts[n].results]
+    return bool(research.results)
 
 
 def enabled() -> bool:
@@ -190,11 +222,15 @@ class Research:
         self.usd = 0.0
         self.provider: str | None = None
         self.skipped: list[str] = []  # services dropped during this run, with why
+        self.query_texts: list[str] = []
+        self.contributors: list[str] = []  # with "all": the services that returned results
 
-    def add(self, title: str | None, url: str | None, content: str | None) -> bool:
-        if not url or url in {r["url"] for r in self.results} or len(self.results) >= MAX_RESULTS_TOTAL:
+    def add(self, title: str | None, url: str | None, content: str | None, limit: int = MAX_RESULTS_TOTAL,
+            service: str | None = None) -> bool:
+        if not url or url in {r["url"] for r in self.results} or len(self.results) >= limit:
             return False
-        self.results.append({"title": title or url, "url": url, "content": (content or "")[:SNIPPET_CHARS]})
+        self.results.append({"title": title or url, "url": url, "content": (content or "")[:SNIPPET_CHARS],
+                             "service": service})
         return True
 
 
@@ -203,9 +239,13 @@ async def search(queries: list[str], provider: str | None = None) -> Research:
     research = Research()
     try:
         await _load_status()
-        order = [provider] if provider in configured() else []
-        order += [p for p in configured() if p not in order]
         async with httpx.AsyncClient(timeout=QUERY_TIMEOUT) as http:
+            if provider == "all":
+                if await _combined(http, queries, research):
+                    research.provider = "all"
+                return research
+            order = [provider] if provider in configured() else []
+            order += [p for p in configured() if p not in order and p != "all"]
             for name in order:
                 if paused(name):
                     research.skipped.append(f"{name}: {paused(name)['reason']}")
@@ -231,7 +271,7 @@ async def _run_provider(http: httpx.AsyncClient, name: str, queries: list[str], 
         added, meta, error = [], {}, None
         try:
             items, meta = await asyncio.wait_for(run(http, query), timeout + 5)
-            added = [r for r in items if research.add(r["title"], r["url"], r["content"])]
+            added = [r for r in items if research.add(r["title"], r["url"], r["content"], service=name)]
             research.queries += 1
             research.usd += meta.get("usd", 0.0)
             found = found or bool(added)

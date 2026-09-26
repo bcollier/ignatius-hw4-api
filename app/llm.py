@@ -47,6 +47,7 @@ async def _call(meter: pricing.Meter, **params) -> anthropic.types.Message:
     timer = llm_log.Timer()
     before = meter.summary()
     searches: list = []
+    blocks: list = []  # content from every round, for the research log
     message = None
     error: str | None = None
     try:
@@ -58,6 +59,7 @@ async def _call(meter: pricing.Meter, **params) -> anthropic.types.Message:
                     message = await stream.get_final_message()
                 meter.add(message.usage)
                 searches += [b.input for b in message.content if b.type == "server_tool_use"]
+                blocks += list(message.content)
                 if message.stop_reason != "pause_turn":
                     break
                 messages.append({"role": "assistant", "content": message.content})
@@ -67,6 +69,7 @@ async def _call(meter: pricing.Meter, **params) -> anthropic.types.Message:
             raise LLMError("The model provider is rate limiting requests. Try again in a minute.") from exc
         except anthropic.APIConnectionError as exc:
             raise LLMError("Couldn't reach the model provider.") from exc
+        meter.blocks = blocks
         if message.stop_reason == "refusal":
             raise LLMError("The model declined to write this section.")
         if message.stop_reason == "max_tokens":
@@ -164,7 +167,7 @@ async def plan_retreat(
     content.append({"type": "text", "text": f"Source file: {filename}\n\n<source>\n{source.text}\n</source>"})
 
     system = _system(instructions + "\n\n" + prompts.PLAN_FIXED.format(max_days=config.MAX_DAYS), series_text)
-    params = dict(system=system, max_tokens=32000, messages=[{"role": "user", "content": content}])
+    params = dict(system=system, max_tokens=64000, messages=[{"role": "user", "content": content}])
     try:
         message = await _call(
             meter,
@@ -277,9 +280,10 @@ async def _deep_jetstream(
         if provider and config.WEB_SEARCH:
             llm_log.tag(purpose="search_queries")
             reply = await jetstream.complete(model, prompts.SEARCH_QUERIES, context, meter, max_tokens=16000)
-            queries = [q.strip(" -*0123456789.\"'\t") for q in reply.splitlines() if q.strip()][:3]
+            queries = _queries(reply)
             llm_log.tag(purpose="research")
             research = await search.search(queries or [context.splitlines()[2]], provider)
+            research.query_texts = queries or [context.splitlines()[2]]
             results = research.results
             meter.searches += research.queries
             meter.usd += research.usd
@@ -294,6 +298,11 @@ async def _deep_jetstream(
     if results:
         urls = {r["url"] for r in results}
         sources = [line for line in sources if any(u in line for u in urls)]  # drop anything not from the results
+    if research is not None:
+        meter.research = {
+            "how": "server search", "service": research.provider or None, "queries": research.query_texts,
+            "contributors": research.contributors, "skipped": research.skipped, "results": results,
+        }
     return script, sources, (research.provider or False) if results else False  # the service that answered
 
 
@@ -311,10 +320,10 @@ async def tailor_guide(context: str, heart: str, deep: str, lines: dict, meter: 
             reply = await jetstream.complete(pricing.api_model(meter.model), prompts.GUIDE_TAILOR, user, meter)
         else:
             try:
-                message = await _call(meter, system=prompts.GUIDE_TAILOR, max_tokens=8000, messages=[{"role": "user", "content": user}],
+                message = await _call(meter, system=prompts.GUIDE_TAILOR, max_tokens=16000, messages=[{"role": "user", "content": user}],
                                       output_config={"format": {"type": "json_schema", "schema": schema}})
             except anthropic.BadRequestError:
-                message = await _call(meter, system=prompts.GUIDE_TAILOR, max_tokens=8000, messages=[{"role": "user", "content": user}])
+                message = await _call(meter, system=prompts.GUIDE_TAILOR, max_tokens=16000, messages=[{"role": "user", "content": user}])
             reply = _text(message)
         tailored = _parse_json(reply)
     except Exception:  # LLMError, JetstreamError, bad JSON: keep the defaults
@@ -360,7 +369,7 @@ async def write_heart(context: str, instructions: str, words: int, meter: pricin
             raise LLMError(str(exc)) from exc
         return _split_script(reply)[0]
     try:
-        message = await _call(meter, system=_system(system, series_text), max_tokens=16000,
+        message = await _call(meter, system=_system(system, series_text), max_tokens=32000,
                               messages=[{"role": "user", "content": context}])
     except anthropic.BadRequestError as exc:
         raise LLMError(f"The model provider rejected the request: {exc.message}") from exc
@@ -375,14 +384,24 @@ async def write_deep(
     if config.LLM_MODE == "stub":
         return f"Stub deep dive on the passage. {context[:400]}", [], False
 
-    async def attempt(search: bool):
-        system = instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=prompts.SEARCH_ON if search else prompts.SEARCH_OFF, words=words)
-        extra = {"tools": [pricing.web_search_tool(meter.model)]} if search else {}
-        return await _call(meter, system=_system(system, series_text), max_tokens=16000,
-                           messages=[{"role": "user", "content": context}], **extra)
-
     if pricing.is_jetstream(meter.model):
         return await _deep_jetstream(context, instructions, words, meter, search_provider, series_text)
+
+    # The free search services go first as a head start; Claude still searches as much
+    # as it needs (its full allowance), so weak free results never limit the deep dive.
+    research = await _free_research(context, meter, search_provider) if config.WEB_SEARCH else None
+    results = research.results if research else []
+
+    async def attempt(search_on: bool):
+        if results:
+            note = prompts.SEARCH_BOTH if search_on else prompts.SEARCH_RESULTS
+        else:
+            note = prompts.SEARCH_ON if search_on else prompts.SEARCH_OFF
+        system = instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=note, words=words)
+        extra = {"tools": [pricing.web_search_tool(meter.model)]} if search_on else {}
+        user = context + ("\n\n" + search.as_prompt(results) if results else "")
+        return await _call(meter, system=_system(system, series_text), max_tokens=32000,
+                           messages=[{"role": "user", "content": user}], **extra)
 
     searched = config.WEB_SEARCH
     try:
@@ -399,4 +418,74 @@ async def write_deep(
     # With web search the reply is split into many text blocks around the search
     # results; the <script> tags mark the part to read aloud.
     script, sources = _split_script(_text(message))
+    own = _web_search_log(getattr(meter, "blocks", None) or message.content) if searched else None
+    if research is not None:
+        meter.research = {
+            "how": "server search" + (" + model web search" if own and own["queries"] else ""),
+            "service": research.provider or None, "queries": research.query_texts + (own["queries"] if own else []),
+            "contributors": research.contributors + (["Claude web search"] if own and own["results"] else []),
+            "skipped": research.skipped, "results": results + (own["results"] if own else []),
+        }
+    elif own:
+        meter.research = own
+    if results:
+        return script, sources, research.provider or True  # names the free service(s) for the page
     return script, sources, searched
+
+
+def _queries(reply: str) -> list[str]:
+    """Up to three queries, one per line, without list numbering, bullets or quotes."""
+    lines = [re.sub(r"^\s*(?:[-*•]|\d+[.)])\s*", "", q).strip(" \"'\t") for q in reply.splitlines()]
+    return [q for q in lines if q][:3]
+
+
+async def _free_research(context: str, meter: pricing.Meter, provider: str | None):
+    """Queries written by the model, run through the free search services. None when
+    no service is chosen or configured; never fails the day."""
+    if not provider or provider == "none" or not search.available():
+        return None
+    try:
+        llm_log.tag(purpose="search_queries")
+        message = await _call(meter, system=prompts.SEARCH_QUERIES, max_tokens=1000,
+                              messages=[{"role": "user", "content": context}])
+        queries = _queries(_text(message))
+        llm_log.tag(purpose="research")
+        research = await search.search(queries or [context.splitlines()[2]], provider)
+        research.query_texts = queries
+        meter.searches += research.queries
+        meter.usd += research.usd
+        return research
+    except Exception:
+        log.warning("free research failed; the model will search on its own", exc_info=True)
+        return None
+    finally:
+        llm_log.tag(purpose="deep")
+
+
+def _web_search_log(blocks) -> dict:
+    """The searches Claude ran with the web search tool and the pages it drew on."""
+    queries, results = [], []
+
+    def add(url, title, text):
+        seen = next((x for x in results if x["url"] == url), None)
+        if seen:
+            if text and text[:300] not in seen["content"]:
+                seen["content"] = (seen["content"] + " … " + text).strip(" …")[:search.SNIPPET_CHARS]
+        elif url:
+            results.append({"title": title or url, "url": url, "content": text[:search.SNIPPET_CHARS],
+                            "service": "Claude web search"})
+    for block in blocks:
+        kind = getattr(block, "type", "")
+        if kind == "server_tool_use":
+            q = (getattr(block, "input", None) or {}).get("query")
+            if q:
+                queries.append(q)
+        elif kind == "web_search_tool_result" and isinstance(getattr(block, "content", None), list):
+            for r in block.content:
+                add(getattr(r, "url", None), getattr(r, "title", None), "")
+        elif kind == "text":
+            # Through OpenRouter the results arrive only as citations on the text.
+            for c in getattr(block, "citations", None) or []:
+                add(getattr(c, "url", None), getattr(c, "title", None), getattr(c, "cited_text", None) or "")
+    return {"how": "model web search", "service": "Claude web search", "queries": queries, "results": results,
+            "contributors": [], "skipped": []}

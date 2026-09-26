@@ -64,10 +64,10 @@ BRAVE_SEARCH_API_KEY = os.environ.get("BRAVE_SEARCH_API_KEY", "").strip()  # Bra
 BRAVE_ANSWERS_API_KEY = os.environ.get("BRAVE_ANSWERS_API_KEY", "").strip()  # Brave "Answers" plan (separate key)
 FIRECRAWL_API_KEY = os.environ.get("FIRECRAWL_API_KEY", "").strip()
 LINKUP_API_KEY = os.environ.get("LINKUP_API_KEY", "").strip()  # Linkup search and deep research
-# Default research service for free mode: brave, exa, tavily, firecrawl, linkup,
-# linkup_deep or brave_answers
+# Default research for free mode: "all" (every service at once, results merged), or one
+# of brave, exa, tavily, firecrawl, linkup, linkup_deep, brave_answers
 # (falls back to the first one with a key). Users can pick another on the page.
-SEARCH_PROVIDER = os.environ.get("SEARCH_PROVIDER", "brave")
+SEARCH_PROVIDER = os.environ.get("SEARCH_PROVIDER", "all")
 
 # Who gets the full app (Claude, web search, ElevenLabs). Empty means everyone.
 ALLOWED_EMAILS = [e.lower() for e in _list("ALLOWED_EMAILS", "")]
