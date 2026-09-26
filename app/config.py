@@ -72,10 +72,9 @@ SEARCH_PROVIDER = os.environ.get("SEARCH_PROVIDER", "brave")
 # Who gets the full app (Claude, web search, ElevenLabs). Empty means everyone.
 ALLOWED_EMAILS = [e.lower() for e in _list("ALLOWED_EMAILS", "")]
 # Everyone else, including anonymous "try it" sessions, gets free mode: Jetstream
-# models and free voices only, with a cap on retreats. Off when there is no
-# Jetstream key, in which case people not on ALLOWED_EMAILS are refused.
+# models and free voices only. Off when there is no Jetstream key, in which case
+# people not on ALLOWED_EMAILS are refused.
 FREE_MODE = os.environ.get("FREE_MODE", "1") == "1" and bool(JETSTREAM_API_KEY)
-FREE_MAX_RETREATS = _int("FREE_MAX_RETREATS", 3)
 
 ALLOWED_ORIGINS = _list(
     "ALLOWED_ORIGINS",

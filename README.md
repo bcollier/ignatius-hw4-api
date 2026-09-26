@@ -80,7 +80,7 @@ cp .env.example .env        # then fill in keys; all are optional for a first ru
 | Models | Claude on OpenRouter (Opus 5 default; Opus 5.5, Fable 5.1, Sonnet 5, Haiku 4.5) | Jetstream2 open models: Muse Glimmer (default) or Llama 4 Scout |
 | Deep dive research | Claude's own web search | Research run by the server with the user's choice of Brave Search, Exa, Tavily, Firecrawl, Linkup (search or deep research) or Brave Answers (whichever have keys), falling back to the next if one is out of credits or failing; the model may cite only returned URLs |
 | Voices | Free Microsoft voices and ElevenLabs | Free Microsoft voices |
-| Limits | Upload and length caps | Also at most `FREE_MAX_RETREATS` (3) retreats |
+| Limits | Upload and length caps | The same |
 | Cost to the site owner | Model and ElevenLabs charges | None (Jetstream is an academic allocation) |
 
 Free mode is on whenever `JETSTREAM_API_KEY` is set. It reaches Jetstream through its Open WebUI proxy at `https://llm.jetstream-cloud.org/api`, which is OpenAI-compatible and reachable from Render; the direct model endpoints only work from inside Jetstream's network. Guests need **Allow anonymous sign-ins** turned on in Supabase (Authentication → Sign In / Providers).

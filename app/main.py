@@ -134,7 +134,6 @@ async def options():
         "free_mode": {
             "enabled": config.FREE_MODE,
             "models": [m for m, _ in pricing.jetstream_models()],
-            "max_retreats": config.FREE_MAX_RETREATS,
         },
         "auth": {"url": config.SUPABASE_URL, "publishable_key": config.SUPABASE_PUBLISHABLE_KEY}
         if auth.enabled()
@@ -167,7 +166,6 @@ def me(user: User = Depends(current_user)):
         "email": user.email,
         "anonymous": user.anonymous,
         "mode": "full" if user.full else "free",
-        "max_retreats": None if user.full else config.FREE_MAX_RETREATS,
     }
 
 
@@ -186,10 +184,6 @@ async def create_retreat(
 ):
     plan_prompt = check_prompt(plan_prompt, prompts.PLAN_INSTRUCTIONS, "planning")
     model = check_model(model, user)
-    if not user.full and len(await store.list_for(user.id)) >= config.FREE_MAX_RETREATS:
-        raise HTTPException(
-            403, f"Free mode keeps up to {config.FREE_MAX_RETREATS} retreats. Delete one to make another."
-        )
     data = await file.read(config.MAX_UPLOAD_MB * 1024 * 1024 + 1)
     if len(data) > config.MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(413, f"File is larger than {config.MAX_UPLOAD_MB} MB.")

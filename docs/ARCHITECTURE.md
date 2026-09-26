@@ -420,7 +420,7 @@ flowchart TD
     E -- no --> FM{Free mode on?<br/>JETSTREAM_API_KEY set}
     FM -- yes --> F
     FM -- no --> X["403: not on the allowed list"]
-    F --> FL["Jetstream models · Tavily search · free voices · up to 3 retreats"]
+    F --> FL["Jetstream models · web research · free voices"]
 ```
 
 **Rules the API applies**
@@ -431,7 +431,6 @@ flowchart TD
 | Token rejected by Supabase (expired, revoked) | 401 "Your sign-in has expired. Sign in again." The page shows the sign-in form. |
 | Valid token, email not on `ALLOWED_EMAILS` (or a guest) | Free mode if Jetstream is configured; otherwise 403 "This account isn't on the list of allowed users for this demo." |
 | Free-mode user asks for Claude or an ElevenLabs voice | 403 "Free mode uses the Jetstream models…" / "…the free Microsoft voices." |
-| Free-mode user already has 3 retreats | 403 "Free mode keeps up to 3 retreats. Delete one to make another." |
 | Valid token for another user's retreat | 404 "Retreat not found." (same answer as a missing retreat) |
 | Supabase Auth unreachable | 503 "Couldn't reach the sign-in service." |
 
@@ -949,7 +948,7 @@ flowchart LR
 | Database access | Row level security is enabled with no policies, so the publishable key can't read or write `retreats`. The API filters every read by the caller's user id. |
 | Other users' retreats | Answered with 404, the same as a missing retreat. |
 | Files | Private bucket; the browser gets signed URLs that expire after 24 hours. Paths start with the owner's user id. |
-| Spending | Only `ALLOWED_EMAILS` get Claude and ElevenLabs; everyone else is in free mode on Jetstream with a retreat cap; upload size, page count, text length, prompt length and track length are capped. |
+| Spending | Only `ALLOWED_EMAILS` get Claude and ElevenLabs; everyone else is in free mode on Jetstream; upload size, page count, text length, prompt length and track length are capped. |
 | Cross-site calls | CORS only for the origins in `ALLOWED_ORIGINS`. |
 | Local file route | `/api/files/…` exists only without Supabase and refuses paths outside `DATA_DIR`. |
 | Copyright | Users upload only material they own or may use; each retreat is private to its owner and nothing is shared between users. The public demo uses public-domain material. |
@@ -1027,7 +1026,7 @@ flowchart LR
 | `JETSTREAM_API_KEY` | | Turns on free mode |
 | `JETSTREAM_BASE_URL` | `https://llm.jetstream-cloud.org/api` | Jetstream Open WebUI proxy |
 | `JETSTREAM_MODELS` | `muse-glimmer,llama-4-scout` | Free-mode models; the first is the default |
-| `FREE_MODE` / `FREE_MAX_RETREATS` | `1` / 3 | Free mode switch and retreat cap |
+| `FREE_MODE` | `1` | Free mode switch |
 | `LOCAL_USER_MODE` | | `free` previews free mode locally |
 | `TAVILY_API_KEY` / `TAVILY_SEARCH_DEPTH` | / `basic` | Tavily research |
 | `EXA_API_KEY` | | Exa research |
