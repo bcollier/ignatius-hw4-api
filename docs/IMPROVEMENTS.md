@@ -158,6 +158,10 @@ These came in while the run was under way and are part of the definition of done
 18. **ElevenLabs reliability and Try again.** At most 2 ElevenLabs requests at once with 429 retries (the plan limits simultaneous requests; this, not credits, caused the premium example's failed clips), and **Try again** on a failed day (`POST /days/{n}/retry`, `tools/retry_days.py`) re-records only the failed clips from saved scripts.
 19. **Keep building until everything above and in sections 1–9 is done**, testing continuously with free builds (Jetstream models, Microsoft voices) on the Mac mini, not only at the end.
 
+## To do (Ben, not code)
+
+- [ ] **Branded sign-in emails.** Supabase only allows editing email templates with custom SMTP. Set up Resend on `collier.phd` (Domains → add the DNS records → verify; API key with sending access), then in Supabase **Authentication → Emails → SMTP Settings**: sender `retreats@collier.phd`, name `Ignatius at Home`, host `smtp.resend.com`, port `465`, user `resend`, password = the API key. Then paste the branded Confirm signup, Magic Link and Change Email Address templates (in PROMPT_LOG.md, prompt 82) and raise **Authentication → Rate Limits → emails per hour** to about 30. A Gmail app password works instead if DNS is a hassle. Until then, sign-in emails come from "Supabase Auth" and Supabase's built-in sender allows only a few emails an hour.
+
 ## Out of scope for this run
 
 Payments, a native app, offline audio, a shared or public gallery, changing the pipeline or prompts, changing the research services, redesigning the PDF, replacing the Microsoft or ElevenLabs voices.
