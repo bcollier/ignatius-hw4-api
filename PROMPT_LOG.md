@@ -732,6 +732,24 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Ideas only, with no changes: what reads as AI-generated in the current design, and a recommended direction (a modern book of hours with color taken from each day's painting), with specific moves.
 
+### 117. 2026-09-27, 00:40 UTC
+
+> How many minutes of content? Voices seem really expensive
+
+**What was done:** Measured the new premium example: 47 minutes of recorded speech (about 10 minutes of prayer a day, since the reading plays four times). ElevenLabs charged about 21,600 characters for 43,307 characters of speech, so the app's $12.99 estimate at $0.30 per 1,000 characters overstates the real cost. Suggested setting the real rate, and options to cut voice cost.
+
+### 118. 2026-09-27, 00:50 UTC
+
+> Are the transitions the same for every day and every retreat or are they custom? Should we cache the premium transitions if they are the same?
+
+**What was done:** Checked the premium example: 39 of 49 guidance clips are unique, because the guidance is tailored to each day. Recommended caching recordings by exact text and voice (a small saving, safe) and offered it with the larger voice-cost options.
+
+### 119. 2026-09-27, 01:05 UTC
+
+> Give me mockups of the visual redesign you would do based on our prior discussion here . Use all of the things you suggested to improve visual design and animations
+
+**What was done:** Made a design canvas of the "modern book of hours" direction with live animations: Today at dawn and at night, the prayer screen (the painting zooms to the detail being discussed, a string of beads keeps your place, the spoken word gilds), silence as a candle that burns down to the bell, a prayed day's gilded initial, a day as a two-page spread on a computer, and retreats as a shelf of books.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
