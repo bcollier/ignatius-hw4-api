@@ -164,7 +164,8 @@ These came in while the run was under way and are part of the definition of done
 2. **Each day knows the rest of the retreat.** The heart and deep writers get the earlier days' reflections and deep dives (newest first, within a budget) and the coming days' readings only. They're told not to re-explain what was already covered, to connect to earlier days where it helps, and not to preview what's coming.
 3. **What it cost.** On a computer, a finished retreat has a collapsed "What it cost to make" section. "Try again" keeps the day's writing cost instead of resetting it.
 4. **Research notes, always there.** No setting to turn on: on a computer, each day has a "Research notes" link and the retreat page a "Research notes for this retreat" link at its foot. The research service picker now shows for Claude models too, since they get the free results first.
-5. **Conversation voices you can hear.** Samples of all 28 xAI voices and OpenAI's Marin and Cedar, a "▶ Hear this voice" button in the settings, the voice's gender in the picker, and a player grid on the About page.
+5. **Talk it over, refined.** The voice choice moved from the new-retreat form to the Talk it over page ("Change voice", any time). "What you've told it about yourself" links to About me. The orb follows the sound: it swells with your voice, glows warm and shimmers while the companion speaks, and breathes slowly between turns (a still glow for reduced motion).
+6. **Conversation voices you can hear.** Samples of all 28 xAI voices and OpenAI's Marin and Cedar, a "▶ Hear this voice" button in the settings, the voice's gender in the picker, and a player grid on the About page.
 
 ## To do (Ben, not code)
 

@@ -578,6 +578,20 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Removed the checkbox. On a computer, each day now has a "Research notes" link next to the printable script, and the retreat page has "Research notes for this retreat" at its foot; both are hidden on phones. The research service picker now shows for Claude models too, since they get the free results first.
 
+### 92. 2026-09-26, 20:45 UTC
+
+> link to the About me when you say what you've told it about yourself in the talk it over.
+>
+> how do I change the "talk it over" voice after generating the retreat, for some reason teh voice options fro talk it over are stuck in the generate retreat menu. bury these somewhere, but I hould be able to change anytime
+
+**What was done:** Linked "what you've told it about yourself" to About me. Moved the voice service and voice picker from the new-retreat form to the Talk it over page, under a "Change voice" link, usable any time with the "▶ Hear this voice" samples. A voice changed there is used for the very next conversation.
+
+### 93. 2026-09-26, 20:50 UTC
+
+> for the brown circle, I want an animation playing when it is hearing me talk or when it is talking . something glowing or bouncing similar to how chatgpt does voice mode *(with a screenshot of a live conversation)*
+
+**What was done:** The orb now follows the actual sound through Web Audio analysers: it swells in a pale tone with your microphone, glows warm with a slow shimmer while the companion speaks (OpenAI's WebRTC track or Grok's audio), and breathes slowly in between. Reduced-motion settings get the glow without movement.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

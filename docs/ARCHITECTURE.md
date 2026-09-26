@@ -778,7 +778,7 @@ sequenceDiagram
     API->>API: fold older transcripts into the memory summary once they're long
 ```
 
-- **Providers and voices** are chosen in Advanced → Conversation: OpenAI (GPT-Live, `gpt-live-1`, $0.05/min, voices such as marin, cedar, vesper) and xAI (Grok voice, `grok-voice-latest`, $0.08/min, voices from xAI's list). OpenRouter can't carry live voice, so these use `OPENAI_API_KEY` and `XAI_API_KEY` directly; the keys never reach the browser.
+- **Providers and voices** are chosen on the Talk it over page, under "Change voice" (any time, remembered per device): OpenAI (GPT-Live, `gpt-live-1`, $0.05/min, voices such as marin, cedar, vesper) and xAI (Grok voice, `grok-voice-latest`, $0.08/min, voices from xAI's list). OpenRouter can't carry live voice, so these use `OPENAI_API_KEY` and `XAI_API_KEY` directly; the keys never reach the browser.
 - **Limits:** free users get 60 seconds a day (`FREE_TALK_SECONDS`), checked by the server before a session starts and enforced in the browser; OpenAI sessions are also hung up by the server. Premium users get up to 30 minutes a call.
 - **Memory** lives in the person's storage folder (Supabase Storage in production). The page lists past conversations with their transcripts and has **Forget all our conversations**. Transcripts are also logged in `llm_calls`.
 
