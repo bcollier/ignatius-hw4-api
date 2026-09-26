@@ -142,3 +142,12 @@ def test_a_psalm_that_ends_with_its_first_line_is_copied_whole():
     stop = text.index("Day 2")
     got = passage_between(text, "O LORD, our Lord, How majestic is Your name", "How majestic is Your name in all the earth!", stop)
     assert "What is man" in got and got.count("How majestic") == 2 and "Bless" not in got
+
+
+def test_a_retreats_files_include_its_guidance_recordings():
+    from app.storage import file_paths
+
+    retreat = {"images": [{"path": "u/r/image0.jpg"}], "days": {"1": {
+        "tracks": {"heart": {"path": "u/r/day1_heart.mp3", "research_path": None}},
+        "guide": {"opening": {"path": "u/r/day1_opening.mp3"}, "closing": {"status": "failed"}}}}}
+    assert set(file_paths(retreat)) == {"u/r/image0.jpg", "u/r/day1_heart.mp3", "u/r/day1_opening.mp3"}

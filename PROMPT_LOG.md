@@ -814,6 +814,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** The prayer screen now shows the scripture reference: in the player's line ("Day 3 · John 4:7–15 · 10:20 left") and above the reading in the text view. The reference is shown in its clean form ("Psalm 8", not "Psalm 8, Preparation Days Prayer Unit 2 Day 1") there, on the day page and on the Today card. The planner now writes source references that way from the start. It is never read aloud.
 
+### 130. 2026-09-26, 23:18 UTC
+
+> The breaks between sections are too long are they all 5 full seconds?
+
+**What was done:** Yes. Every break was a 5-second silence, about 6 seconds with each recording's own silence. Breaks are now shorter by default: a breath of about 1.5 seconds after a guidance line, and about 3 seconds after a reading, the reflection or the deep dive. A new "Pause between parts" setting offers Short, Medium or Long (the old five seconds). Also fixed a bug found while checking: deleting a retreat left its guidance recordings in storage.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

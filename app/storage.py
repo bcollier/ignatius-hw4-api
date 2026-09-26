@@ -77,6 +77,7 @@ def file_paths(retreat: dict) -> list[str]:
     paths = [img["path"] for img in retreat.get("images", [])]
     for day in retreat.get("days", {}).values():
         paths += [t["path"] for t in day.get("tracks", {}).values() if t.get("path")]
+        paths += [c["path"] for c in day.get("guide", {}).values() if c.get("path")]
         paths += [t["research_path"] for t in day.get("tracks", {}).values() if t.get("research_path")]
     return paths
 
