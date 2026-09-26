@@ -27,6 +27,10 @@ class StorageError(RuntimeError):
     """Saving or loading failed; the message is safe to show to the user."""
 
 
+USAGE_FIELDS = ("created_at", "retreat_id", "day", "purpose", "provider", "model", "usd", "web_searches",
+                "input_tokens", "output_tokens", "duration_ms")
+
+
 def _iso(epoch: float) -> str:
     return datetime.fromtimestamp(epoch, timezone.utc).isoformat()
 
@@ -118,6 +122,14 @@ class LocalStore:
         with open(self.rows.parent / "llm_calls.jsonl", "a") as f:
             f.write(json.dumps(row) + "\n")
 
+    async def usage_rows(self, user_id: str) -> list[dict]:
+        """This person's logged model, search and conversation calls (for the Costs page)."""
+        path = self.rows.parent / "llm_calls.jsonl"
+        if not path.exists():
+            return []
+        rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+        return [{k: r.get(k) for k in USAGE_FIELDS} for r in rows if r.get("user_id") == user_id]
+
     async def urls(self, paths: list[str]) -> dict[str, str]:
         return {p: f"/api/files/{p}?v={int(self.local_path(p).stat().st_mtime)}" for p in paths if self.local_path(p).exists()}
 
@@ -208,6 +220,20 @@ class SupabaseStore:
 
     async def log_llm_call(self, row: dict) -> None:
         await self._request("POST", "/rest/v1/llm_calls", json=row, headers={"Prefer": "return=minimal"})
+
+    async def usage_rows(self, user_id: str) -> list[dict]:
+        """This person's logged model, search and conversation calls (for the Costs page)."""
+        rows: list[dict] = []
+        while True:
+            response = await self._request(
+                "GET", "/rest/v1/llm_calls",
+                params={"user_id": f"eq.{user_id}", "select": ",".join(USAGE_FIELDS), "order": "id.asc",
+                        "offset": str(len(rows)), "limit": "1000"},
+            )
+            page = response.json()
+            rows += page
+            if len(page) < 1000:
+                return rows
 
     async def urls(self, paths: list[str]) -> dict[str, str]:
         now = time.time()

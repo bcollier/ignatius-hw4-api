@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import auth, config, demos, llm_log, pipeline, pricing, profile, prompts, script_pdf, search, series, talk, tts
+from . import auth, config, costs, demos, llm_log, pipeline, pricing, profile, prompts, script_pdf, search, series, talk, tts
 from .auth import User, current_user
 from .extract import ExtractError, extract
 from .storage import LocalStore, StorageError, store, summary
@@ -324,6 +324,23 @@ async def list_retreats(user: User = Depends(current_user)):
     for r in everything:
         r["cover"] = urls.get(r.pop("cover_path", None))
     return {"retreats": mine, "examples": examples}
+
+
+@app.get("/api/costs")
+async def cost_report(user: User = Depends(current_user)):
+    """What each of your retreats cost, by part and by company, and the prices used."""
+    retreats = [r for r in [await pipeline.get(x["id"]) for x in await store.list_for(user.id)] if r]
+    registered = await demos.registry()
+    report = costs.report(retreats, await store.usage_rows(user.id))
+    for r in report["retreats"]:
+        r["example"] = r["id"] in registered  # examples built under this account are listed too
+    report["prices"] = {
+        "models": [m for m in await model_options() if not m.get("free")],
+        "elevenlabs_usd_per_1k_chars": config.ELEVENLABS_USD_PER_1K_CHARS,
+        "elevenlabs_balance": await pricing.elevenlabs_balance() if config.ELEVENLABS_API_KEY and user.full else None,
+        "talk_usd_per_minute": {"openai": 0.05, "xai": config.XAI_USD_PER_MINUTE},
+    }
+    return report
 
 
 @app.post("/api/retreats", status_code=202)

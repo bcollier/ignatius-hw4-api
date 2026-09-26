@@ -592,6 +592,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** The orb now follows the actual sound through Web Audio analysers: it swells in a pale tone with your microphone, glows warm with a slow shimmer while the companion speaks (OpenAI's WebRTC track or Grok's audio), and breathes slowly in between. Reduced-motion settings get the glow without movement.
 
+### 94. 2026-09-26, 21:00 UTC
+
+> I don't want costs shown in the regular app, there should be a settings or log page tucked away somewhere that just says how much each retreat costs broken down by section/vendor. *(with a screenshot of the New retreat page showing "About $4.24 for a seven-day retreat")*
+
+**What was done:** Removed every cost from the regular app (the estimate, prices in the model menus, the ElevenLabs balance, the cost section on a retreat). Added a Costs page reached from a small footer link: each retreat by part and by company, a total by company, calls not tied to a retreat, and the prices used. It's built from a new `GET /api/costs` that adds up the llm_calls log and the recorded voices.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

@@ -442,6 +442,7 @@ Every error has the shape `{"error": {"status": 400, "message": "..."}}`, with a
 | `GET /api/retreats/{id}` | 🔒 readable | | The retreat with signed URLs: plan, days, tracks and guidance clips with scripts, sources, lengths; listening and journal; costs (owners only) |
 | `GET /api/retreats/{id}/script.pdf` | 🔒 readable | `day`, `order` (`lectio`/`simple`), `grace_silence`, `pause` | Printable script in prayer order, with images, guidance, silences, sources, journal; the whole retreat adds a cover and series titles |
 | `GET /api/retreats/{id}/research` | 🔒 readable | | Each day's passage, notes, searches, every result with its service, citations |
+| `GET /api/costs` | 🔒 | | Each of your retreats by part and by company, from the llm_calls log and the recorded voices; totals by company; prices used |
 | `PATCH /api/retreats/{id}` | 🔒 readable | `start_date`, `title` | The retreat; renaming an example is 403; an example's start date is saved per person |
 | `POST /api/retreats/{id}/days/{n}/prayed` | 🔒 readable | `prayed`, `word` (≤100), `note` (≤2,000) | The retreat |
 | `POST /api/retreats/{id}/days/{n}/progress` | 🔒 readable | `step`, `part`, `seconds`, `parts_played`, `finished` | `{listening, prayed_at}`; finishing marks the day prayed |
