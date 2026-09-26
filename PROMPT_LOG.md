@@ -512,73 +512,73 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Added every prompt, including these, to this log in both repositories.
 
-### 81. 2026-09-26, 19:10 UTC
+### 81. 2026-09-26, 19:02 UTC
 
 > i don't see a user table in supabase *(with a screenshot of the ER diagram and the Table Editor)*
 
 **What was done:** Explained that accounts live in Supabase Auth's own `auth.users` table (the `auth` schema, or Authentication → Users), which the Table Editor hides by default, and added that note under both ER diagrams. The screenshot run also found that the API's CORS settings didn't allow `PATCH`, so changing a start date failed from the live site; fixed.
 
-### 82. 2026-09-26, 19:20 UTC
+### 82. 2026-09-26, 19:11 UTC
 
 > right now the sign in email comes from supabase, is there a way to customize this so users know it is for the retreat app *(with a screenshot of the default "Confirm your email address" email)*
 
 **What was done:** Wrote branded subjects and bodies for the Confirm signup, Magic Link and Change Email Address templates, and explained that the sender name and "powered by Supabase" footer need custom SMTP.
 
-### 83. 2026-09-26, 19:25 UTC
+### 83. 2026-09-26, 19:14 UTC
 
 > *(screenshot of Supabase's Emails page: "Set up custom SMTP to edit templates")*
 
 **What was done:** Corrected the earlier answer: Supabase now requires custom SMTP before templates can be edited. Gave step-by-step setup with Resend on the collier.phd domain (host smtp.resend.com, port 465, user resend, API key as password), a Gmail app-password alternative, and raising the email rate limit.
 
-### 84. 2026-09-26, 19:30 UTC
+### 84. 2026-09-26, 19:24 UTC
 
 > ok, mark the smtp thing as a todo item, I don't have time now
 
 **What was done:** Added a "To do" section to docs/IMPROVEMENTS.md with the SMTP steps. Saved the three branded templates in docs/email-templates.md so they're ready to paste.
 
-### 85. 2026-09-26, 19:40 UTC
+### 85. 2026-09-26, 19:27 UTC
 
 > my premium user page look not as good as teh new user, where are the example guides *(with a screenshot of the library signed in as ben@collier.phd)*
 
 **What was done:** The examples were built under Ben's account, so they were listed as his own retreats, with a Delete link that would have removed them for everyone. Examples are now always listed as examples, even for the account that built them, and can't be deleted from the site. Your own retreats now show a cover painting, and a single retreat is one clean card.
 
-### 86. 2026-09-26, 19:45 UTC
+### 86. 2026-09-26, 19:30 UTC
 
 > *(screenshot of the sign-in page: "Couldn't send the link: email rate limit exceeded")*
 
 **What was done:** Explained that Supabase's built-in sender allows only a couple of sign-in emails an hour (fixed by the SMTP to-do). The sign-in page now says so plainly and points to "Try it without an account".
 
-### 87. 2026-09-26, 20:00 UTC
+### 87. 2026-09-26, 19:34 UTC
 
 > somehow the text should still be available to be shown on screen, right now it is only the image, maybe have options to do image, scripture, or scripture + image? if possible there should be an animation that hovers over each word in the reading as it is being spoken etc. if not we can skip the animatino
 
 **What was done:** Added Image and text, Image only and Text only views on the prayer screen, with the spoken word highlighted and kept in view. New recordings save exact word timings from both voice services; older ones estimate the position.
 
-### 88. 2026-09-26, 20:05 UTC
+### 88. 2026-09-26, 19:36 UTC
 
 > how do i see the cost to produce the retreat? what was the total cost breakdown for the example?
 
 **What was done:** Gave the premium example's breakdown: about $0.47 planning, $6.71 writing (the deep dives with web search were $5.57 of it) and 46,245 ElevenLabs characters (about $13.87 at list price), about $21 in all. The free example cost $0.15 (Exa searches). Added a "What it cost to make" section to finished retreats on a computer, and fixed "Try again" resetting a day's writing cost.
 
-### 89. 2026-09-26, 20:10 UTC
+### 89. 2026-09-26, 19:41 UTC
 
 > the deep dive  and heart reflection prompt doesn't say anythign about how this could be part of a larger retreat. that should somehow be in the text since we are passing past days text and they don't ahve to explain something they just explained yesterday. they can comment on how this relates to something yesterday, or even upcoming readings (give them just the readings for the future days, not the analysis)
 
 **What was done:** The heart and deep writers now get the earlier days' reflections and deep dives (newest first) and the coming days' readings only, with instructions not to re-explain, to connect back where it helps, and not to preview what's ahead.
 
-### 90. 2026-09-26, 20:15 UTC
+### 90. 2026-09-26, 19:42 UTC
 
 > give details for the conversation voices as to what they sounds like *(with screenshots of the OpenAI and Grok voice pickers)*
 
 **What was done:** Recorded a sample of all 28 xAI voices and OpenAI's Marin and Cedar (the only two of OpenAI's live voices it offers outside live conversation). Added a "▶ Hear this voice" button and each voice's gender to the picker, a player grid on the About page, and a table of samples in the web README.
 
-### 91. 2026-09-26, 20:30 UTC
+### 91. 2026-09-26, 19:46 UTC
 
 > i don't like how this show research option is handled, users should be able to show reserach anytime, not just decide once when building the retreat. put in a way for users typically on web to show the research on a page, either in settings turned on or on a tucked away show reserach notes link that goes to the details. *(with a screenshot of the Advanced models section)*
 
 **What was done:** Removed the checkbox. On a computer, each day now has a "Research notes" link next to the printable script, and the retreat page has "Research notes for this retreat" at its foot; both are hidden on phones. The research service picker now shows for Claude models too, since they get the free results first.
 
-### 92. 2026-09-26, 20:45 UTC
+### 92. 2026-09-26, 19:53 UTC
 
 > link to the About me when you say what you've told it about yourself in the talk it over.
 >
@@ -586,121 +586,121 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Linked "what you've told it about yourself" to About me. Moved the voice service and voice picker from the new-retreat form to the Talk it over page, under a "Change voice" link, usable any time with the "▶ Hear this voice" samples. A voice changed there is used for the very next conversation.
 
-### 93. 2026-09-26, 20:50 UTC
+### 93. 2026-09-26, 19:54 UTC
 
 > for the brown circle, I want an animation playing when it is hearing me talk or when it is talking . something glowing or bouncing similar to how chatgpt does voice mode *(with a screenshot of a live conversation)*
 
 **What was done:** The orb now follows the actual sound through Web Audio analysers: it swells in a pale tone with your microphone, glows warm with a slow shimmer while the companion speaks (OpenAI's WebRTC track or Grok's audio), and breathes slowly in between. Reduced-motion settings get the glow without movement.
 
-### 94. 2026-09-26, 21:00 UTC
+### 94. 2026-09-26, 19:59 UTC
 
 > I don't want costs shown in the regular app, there should be a settings or log page tucked away somewhere that just says how much each retreat costs broken down by section/vendor. *(with a screenshot of the New retreat page showing "About $4.24 for a seven-day retreat")*
 
 **What was done:** Removed every cost from the regular app (the estimate, prices in the model menus, the ElevenLabs balance, the cost section on a retreat). Added a Costs page reached from a small footer link: each retreat by part and by company, a total by company, calls not tied to a retreat, and the prices used. It's built from a new `GET /api/costs` that adds up the llm_calls log and the recorded voices.
 
-### 95. 2026-09-26, 21:10 UTC
+### 95. 2026-09-26, 20:08 UTC
 
 > there should be an option when making a retreat something like "watch the technical details of this retreat being built" and it should have a box that look slike a terminal window or something that shows you the details of every call to an API, what the response is, and what the next step in the process is as the build is happening live. this call/response API log should be stored in a sql table when complete  if it is not already along with the retreat so we can follow every step and in theory recreate it in the future if needed. the new retreat page should allow users to build a retreat using an example PDF. so below where it would be uploaded say use an example. make this example PDF different than the two examples that are already made. make them look very premium with verses and images etc., store them on the server. a user should be able to build the retreat and get a sense of the process (also look at the source PDF) so they can understand how to make a retreat from a PDF. also it sohudl allow a txt. file as well. also there should be more guidance as people make their first retreat, with expectations on what is going to be done once they upload and hit make my retreat.
 
 **What was done:** Added "Watch the technical details as it's made", which opens a terminal-style build log on the retreat page. It shows each step ("Next: …") and every call to a model, search service and voice (what was sent, what came back, timing and tokens), live, with a full JSON download. Everything is stored in the llm_calls table with the retreat id: steps and recordings are now logged there too, alongside the model and search calls that already were. Also added two new example source documents on the server ("Be Still", five Psalms of trust; "Blessed", the Beatitudes over six days), each with public-domain paintings, that can be opened as a PDF or used to make a retreat. Also: .txt uploads, and a "What happens when you press Make my retreat" guide, open for a first retreat.
 
-### 96. 2026-09-26, 21:12 UTC
+### 96. 2026-09-26, 20:08 UTC
 
 > remove this check box I own this material or have permission to use it.
 
 **What was done:** Removed the checkbox. A short "Use material you have the right to use" stays in the upload box's hint.
 
-### 97. 2026-09-26, 21:15 UTC
+### 97. 2026-09-26, 20:12 UTC
 
 > users should be allowed to just paste a bunch of text in to make a retreat as well.
 
 **What was done:** Added "or paste text instead" under the upload box. Pasted text is sent as a text file and planned like any other document.
 
-### 98. 2026-09-26, 21:30 UTC
+### 98. 2026-09-26, 20:16 UTC
 
 > do a complete audit of code reability. make sure all code is broken down to be human readable. break down large blocks of code into smaller onces, write useful comments, and generally follow "Clean Code" principles in all code written fro this .  make a markdown file when you are done noting everything you cleaned up and put it in the documentation folder
 
 **What was done:** A readability pass over both repositories, recorded in docs/CODE_CLEANUP.md.
 
-### 99. 2026-09-26, 21:32 UTC
+### 99. 2026-09-26, 20:21 UTC
 
 > why does it say this retreat would cost 4.24 but it actually costed $21.13 *(with a screenshot of the Costs page)*
 
 **What was done:** Explained that the estimate described the current settings (Claude Opus 5 with free voices), while the example was made with Claude Fable 5.1 (twice the price) and ElevenLabs voices ($13.87, two-thirds of its cost). Recalibrated the estimate on that real build and made it follow the choices on screen; with Fable and ElevenLabs it now comes to $21.00, against the actual $21.13.
 
-### 100. 2026-09-26, 21:35 UTC
+### 100. 2026-09-26, 20:23 UTC
 
 > default new retreats to opus 5.5, show estimated rates / cost when choosing the models
 
 **What was done:** New retreats default to Claude Opus 5.5 (a saved choice that was still the old default follows it). In Advanced, the model menus show their rates, and an estimate for seven days with the chosen model and voices appears under Voices. The Simple tab still shows no prices.
 
-### 101. 2026-09-26, 21:37 UTC
+### 101. 2026-09-26, 20:24 UTC
 
 > by default the advanced one should have different voices for the reading and the heart , add a woman's voice for one of them *(with a screenshot of the Voices settings)*
 
 **What was done:** The default voices are now Ava (guide), Andrew (reading), Emma (for the heart) and Christopher (deep dive).
 
-### 102. 2026-09-26, 21:40 UTC
+### 102. 2026-09-26, 20:25 UTC
 
 > by default both free and premium should default to different voices. rebuild the current free one to use three different free voices if you haven't already
 
 **What was done:** Re-recorded every day of the free example with Ava, Andrew, Emma and Christopher, keeping its words exactly (new recordings also have exact word timing). The premium example already used four different ElevenLabs voices. Added one-click "Use the free voices" and "Use the ElevenLabs voices" (Sarah, George, Brian, Alice) sets in Advanced.
 
-### 103. 2026-09-26, 21:42 UTC
+### 103. 2026-09-26, 20:26 UTC
 
 > is fable much better than opus 5.5 for this kind of work?
 
 **What was done:** Answered that there's no side-by-side comparison on this app's writing yet, gave the price difference (Fable $10/$50 per million tokens against Opus 5.5 $4/$20), and offered to rewrite one day both ways to compare.
 
-### 104. 2026-09-26, 22:10 UTC
+### 104. 2026-09-26, 20:30 UTC
 
 > once code review is done do a full pass for design, visuals, and animations. right now its all brown theme and looks blah. it's not fun. make movement be animated, make the visuals look compelling and beautiful. it doesn't have to look "old" or boring, but use your best judgement on how to redesign the visuals for the app.
 
 **What was done:** A visual redesign after the code review merged: a new palette, type, image-led cards and motion throughout, with calm reduced-motion fallbacks.
 
-### 105. 2026-09-26, 22:15 UTC
+### 105. 2026-09-26, 20:38 UTC
 
 > the deep dive prompt still doesn't mention that this could be part of a larger retreat, and it's pretty light as a prompt. use fable if possible to generate better default prompts for planning, reflection, and deep dive. I want to be able to see the prompt for the ai companion as well and to tweek it in the app somewhere (tucked away superuser settings or something) . the important thing is to have a deep and robust prompt for all of these given the overall functionality of the app. make sure they are all integrated as a wholistic experience not just a little prompt stub. it can be very long, use prompting best practices from claude guides on prompt design. I expect these prompts to be extensive and world class.
 
 **What was done:** Wrote a brief describing the whole app (what each part receives, where it sits in the listener's day, what the others do) and had Claude Fable 5.1 write every default prompt from it: the shared background, the house style, planning, both heart presets, the deep dive, the guidance tailoring and the companion (13,000 to 26,000 characters each). They now live as plain files in app/prompt_texts/, with the brief and script in docs/prompt-design/. The editable-prompt limit went from 8,000 to 60,000 characters. The companion's instructions are editable per person on the Talk page, and the background and house style are shown read only under Advanced.
 
-### 106. 2026-09-26, 22:16 UTC
+### 106. 2026-09-26, 20:38 UTC
 
 > make the ai companion prompt also great, using same principles
 
 **What was done:** Included the companion in the same Fable pass, from the same brief (see 105).
 
-### 107. 2026-09-26, 22:20 UTC
+### 107. 2026-09-26, 20:41 UTC
 
 > in the technical details I want to see the real details, like the exact prompts going up to muse/claude and the exact response that comes back. these should be SUPER VERBOSE for a technical person to troubleshoot any issues. for example do an audit that all of the previous days of the retreat were sent up as context when planning
 
 **What was done:** The build log now shows each call in full: the whole system prompt, every message exactly as sent, the whole response and its metadata, with "Copy this call as JSON". An audit of the live "Be Still" build found each day received the earlier days' full reflections and deep dives, and the coming days' readings only, and the deep dive received the day's reflection.
 
-### 108. 2026-09-26, 22:22 UTC
+### 108. 2026-09-26, 20:45 UTC
 
 > it should be clear what the talk it over button does, right now it is kind of hidden and i'm not sure what's going to happen when I push the button. find a clever way to let users know what it does, perhaps an animated entrance, and a tool tip that says "have a conversation with a realistic sounding voice to prompt your reflection or something like that I don't know i'm not a writer do something good
 
 **What was done:** "Talk it over" is now a warm pill button with a moving sound-wave icon. It arrives with a glow, and has an explanation card: "Say out loud what's stirring. A conversation, in a natural voice, with a companion that knows this retreat…". The card shows on hover and focus, and opens by itself the first time.
 
-### 109. 2026-09-26, 22:24 UTC
+### 109. 2026-09-26, 20:47 UTC
 
 > why show the "whole retreat pdf" button if it doesn't work yet, just hide until complete *(with a screenshot of "The retreat plan isn't ready yet")*
 
 **What was done:** The whole-retreat PDF button stays hidden until the retreat is finished.
 
-### 110. 2026-09-26, 23:10 UTC
+### 110. 2026-09-26, 21:17 UTC
 
 > remove whole retreat PDF from the top, it is already at the bottom of the page
 
 **What was done:** Removed the button from the top of the retreat page. The link at the bottom of each day prints only that day, so the whole-retreat PDF moved to the quiet links at the foot of the page ("The whole retreat as a printable PDF"), shown once the retreat is finished.
 
-### 111. 2026-09-26, 23:20 UTC
+### 111. 2026-09-26, 21:20 UTC
 
 > how about hide build log and costs links unless the user is in a debug=TRUE mode in the browser. there are two research notes links at the bottom. remove the verbose one that is plain every search results etc. *(with a screenshot of the foot of a retreat page)*
 
 **What was done:** Added a debug mode, turned on by opening the site with ?debug=true (?debug=false turns it off) and remembered in the browser. Without it, the build log link, "Show the technical details", "Watch the technical details" on New retreat and the Costs link are hidden. Removed the long "Research notes for this retreat" link at the foot; each day's short "Research notes" link stays.
 
-### 112. 2026-09-26, 23:30 UTC
+### 112. 2026-09-26, 21:23 UTC
 
 > don't do the exact same retreat for the premium and the free examples, have one be come and see and the other be Blessed retreat. build another example to suggest when doing new retreat (instead of blessed since that will already be done).
 >
@@ -708,79 +708,79 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** The premium example stays "Come and See" (Claude Fable with ElevenLabs), rebuilt with the new prompts and the free research as a head start. The free example is now "Blessed" (Muse with every free search service, four Microsoft voices). A third example document, "I Am" (six of the "I am" sayings in John), replaces Blessed on the New retreat page. The build tool now takes each example from its own document, re-records failed clips, and replaces the old example only when the new one is ready.
 
-### 113. 2026-09-26, 23:40 UTC
+### 113. 2026-09-26, 21:24 UTC
 
 > after clicking into the examples add a way to dismiss each example from the home page
 
 **What was done:** An example's page now has "Remove it from my home page". It's saved to the person's account with their progress, so it holds across devices. The home page shows "Show … again" when any are hidden. New endpoint: POST /api/retreats/{id}/hidden.
 
-### 114. 2026-09-27, 00:00 UTC
+### 114. 2026-09-26, 21:29 UTC
 
 > Remove all references to JetStream and remove reference to this being homework project
 
 **What was done:** Began a cleanup across both repositories, then narrowed it at the next prompt.
 
-### 115. 2026-09-27, 00:05 UTC
+### 115. 2026-09-26, 21:32 UTC
 
 > Just remove references in the app to homework and jetstream the code and repo is fine
 
 **What was done:** Changed only what the app shows. The About page no longer says it was built for a course, model names read "Muse Glimmer (free)" and "Llama 4 Scout (free)", the cost report and build log say "Open models", and error messages say "the open-model service". The code, repositories and documentation are unchanged.
 
-### 116. 2026-09-27, 00:10 UTC
+### 116. 2026-09-26, 21:33 UTC
 
 > The visual design of the app is still pretty blah and ai generated looking what would take it to the next level? Don't change anything just give me ideas
 
 **What was done:** Ideas only, with no changes: what reads as AI-generated in the current design, and a recommended direction (a modern book of hours with color taken from each day's painting), with specific moves.
 
-### 117. 2026-09-27, 00:40 UTC
+### 117. 2026-09-26, 21:48 UTC
 
 > How many minutes of content? Voices seem really expensive
 
 **What was done:** Measured the new premium example: 47 minutes of recorded speech (about 10 minutes of prayer a day, since the reading plays four times). ElevenLabs charged about 21,600 characters for 43,307 characters of speech, so the app's $12.99 estimate at $0.30 per 1,000 characters overstates the real cost. Suggested setting the real rate, and options to cut voice cost.
 
-### 118. 2026-09-27, 00:50 UTC
+### 118. 2026-09-26, 21:51 UTC
 
 > Are the transitions the same for every day and every retreat or are they custom? Should we cache the premium transitions if they are the same?
 
 **What was done:** Checked the premium example: 39 of 49 guidance clips are unique, because the guidance is tailored to each day. Recommended caching recordings by exact text and voice (a small saving, safe) and offered it with the larger voice-cost options.
 
-### 119. 2026-09-27, 01:05 UTC
+### 119. 2026-09-26, 21:53 UTC
 
 > Give me mockups of the visual redesign you would do based on our prior discussion here . Use all of the things you suggested to improve visual design and animations
 
 **What was done:** Made a design canvas of the "modern book of hours" direction with live animations: Today at dawn and at night, the prayer screen (the painting zooms to the detail being discussed, a string of beads keeps your place, the spoken word gilds), silence as a candle that burns down to the bell, a prayed day's gilded initial, a day as a two-page spread on a computer, and retreats as a shelf of books.
 
-### 120. 2026-09-27, 01:15 UTC
+### 120. 2026-09-26, 22:01 UTC
 
 > I like the visual redesign except that tou call things books and that will be confusing for users unless it's explained. Make an animated intro to books or change the language
 
 **What was done:** Changed the language in the mockups: "My books" became "My retreats" and "Begin a new book" became "Make a new retreat". The book-like covers stay as a look, with no new word to explain.
 
-### 121. 2026-09-27, 01:17 UTC
+### 121. 2026-09-26, 22:02 UTC
 
 > I really like the slow animated images
 
 **What was done:** Noted for the real redesign: keep the slow drift and zoom on every painting, and build the "look closer" zoom to the detail each part is about.
 
-### 122. 2026-09-27, 01:30 UTC
+### 122. 2026-09-26, 22:08 UTC
 
 > I'm listening to the premium and it spends a lot of time verbally describing the images. That seems really bad, the focus shouldn't be on the image but the words. Why the long description. They can see it. Have a meaningful personal lesson from the heart ones, what does god want people to know in their heart about this scripture
 
 **What was done:** The prompts told every writer to bring in the painting and describe it so someone with closed eyes could see it. They now say the opposite: the listener can see the painting, so don't describe it; mention it at most once, in a few words, and only to point back to the text. The heart reflection (both voices) now has a clear center: one true, personal thing God wants this person to know in their heart through this passage, said plainly once. Tested on the prodigal son day with Claude Opus 5.5: one brief mention of the painting, and a center ("You do not have to finish the apology to be held").
 
-### 123. 2026-09-26, 22:10 UTC
+### 123. 2026-09-26, 22:17 UTC
 
 > Do free
 
 **What was done:** The free Blessed example is being brought up to the new prompts: its reflections for the heart and its spoken guidance are rewritten and re-recorded with `tools/rewrite_parts.py`, which keeps each day's deep dive as it was.
 
-### 124. 2026-09-26, 22:15 UTC
+### 124. 2026-09-26, 22:18 UTC
 
 > Do the full visual redesign push to main
 
 **What was done:** Built the "modern book of hours" redesign into the web app. Type is Cormorant Garamond and EB Garamond on warm paper with deep ink; rubrics (red small capitals) mark labels and the grace; gold leaf marks what's prayed. Colors are read from each day's painting in the browser (`js/look.js`) and color the Today card, the day page, the retreat covers and the prayer screen, with "today's colors" shown as four dots. The home screen leads with a Today card (the painting, a greeting for the hour, the grace, a gold Pray button); My retreats is a shelf of covers with the painting in an arched window and a gold square per prayed day. A day is a two-page spread on a computer (painting and caption on the left; running head, title, grace, fleuron and a drop-capped passage on the right). The prayer screen has beads on a thread, a gold play button, a candle that burns down through a silence to the bell, and after a day is prayed its first letter is gilded in an illuminated frame beside the week's initials. Paintings drift slowly everywhere. Icons are SVG line drawings instead of symbol characters; Talk it over is restyled to match. Everything is still for reduced motion, focus rings are visible, and the beads and icon buttons have labels. Screenshots in the README were retaken.
 
-### 125. 2026-09-26, 22:20 UTC
+### 125. 2026-09-26, 22:27 UTC
 
 > Add a progress bar to the build like have a certain number of sections and progress it every step so I can see progress
 
@@ -788,13 +788,7 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** The progress card has a segmented bar: one segment for planning, then one per day, each day filling in eight steps (reading recorded, heart written and recorded, deep dive researched, written and recorded, guidance written and recorded). Under it a small-caps line says "Step 13 of 17 · Day 2 · researching and writing the deep dive · 79%". Done segments are gold, the current one has a slow shimmer (none with reduced motion), a failed day is red, and it updates on every poll; the library's "being made" card shows a compact version. While planning, the page says "Your new retreat" with the file name as a small line, and shows no painting banner until the plan and an image exist. The phone header is one line, and the "Signed in as" line moved to About me.
 
-### 126. 2026-09-26, 22:35 UTC
-
-> If a day is an exercise just say so and say go do the exercise today and have a mark as complete button
-
-**What was done:** Server: the planner marks activity days (worksheets, review or repetition days) as kind "exercise" and copies the handout's instruction word for word; the build writes and records nothing for them. App: an exercise day shows "Today's exercise", its title, the instruction, "Go and do this exercise today, then mark it complete." and a Mark as complete button (then "Completed · date" with a Mark as not complete link), with no Pray button, length or parts. On the home screen the Today card says "Today's exercise" with Mark as complete instead of Pray this day. A completed exercise counts as a prayed day (gold) in the day strip and on the covers, the prayer screen never opens for one, and the build bar counts it done once it's ready.
-
-### 127. 2026-09-26, 22:40 UTC
+### 126. 2026-09-26, 22:29 UTC
 
 > Make sure we are logging errors
 
@@ -802,6 +796,11 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** A reply from the free model that was cut off is now logged as an error with its token and character counts. Planning failures say why and are written to the server log. Long handouts on the free model are planned compactly: the model marks the first and last words of each passage and the app copies the passage from the document, so the plan no longer runs out of room. The "2-PrepDays" handout was planned again and succeeded with all seven days.
 
+### 127. 2026-09-26, 22:40 UTC
+
+> If a day is an exercise just say so and say go do the exercise today and have a mark as complete button
+
+**What was done:** Server: the planner marks activity days (worksheets, review or repetition days) as kind "exercise" and copies the handout's instruction word for word; the build writes and records nothing for them. App: an exercise day shows "Today's exercise", its title, the instruction, "Go and do this exercise today, then mark it complete." and a Mark as complete button (then "Completed · date" with a Mark as not complete link), with no Pray button, length or parts. On the home screen the Today card says "Today's exercise" with Mark as complete instead of Pray this day. A completed exercise counts as a prayed day (gold) in the day strip and on the covers, the prayer screen never opens for one, and the build bar counts it done once it's ready.
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
