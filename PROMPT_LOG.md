@@ -688,6 +688,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** The whole-retreat PDF button stays hidden until the retreat is finished.
 
+### 110. 2026-09-26, 23:10 UTC
+
+> remove whole retreat PDF from the top, it is already at the bottom of the page
+
+**What was done:** Removed the button from the top of the retreat page. The link at the bottom of each day prints only that day, so the whole-retreat PDF moved to the quiet links at the foot of the page ("The whole retreat as a printable PDF"), shown once the retreat is finished.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
