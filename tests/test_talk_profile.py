@@ -11,7 +11,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app import config, llm, main, profile, prompts, talk, tts
+from app import config, llm, main, profile, talk, tts
 from app.auth import User, current_user
 
 VOICES = {"guide": "en-US-AvaMultilingualNeural", "reading": "en-US-AndrewMultilingualNeural",

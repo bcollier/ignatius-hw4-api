@@ -54,43 +54,22 @@ async def complete(model: str, system: str, text: str, meter, images: list[tuple
         )
 
 
+REQUEST_TIMEOUT = 300  # reasoning models can think for minutes
+LOGGED_ERROR_CHARS = 300
+
+
 async def _complete(model, system, text, meter, images, max_tokens, result: dict) -> str:
-    content: list[dict] | str = text
-    if images:
-        content = [{"type": "text", "text": text}] + [
-            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{base64.b64encode(data).decode()}"}}
-            for data, mime in images
-        ]
+    """One chat completion. Fills `result` for the log (content, reasoning, finish
+    reason) and returns the reply text."""
     body = {
         "model": model,
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": content}],
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": _user_content(text, images)}],
         "max_tokens": max_tokens,
         "stream": False,
     }
-    try:
-        async with httpx.AsyncClient(timeout=300) as http:
-            response = await http.post(
-                f"{config.JETSTREAM_BASE_URL}/chat/completions",
-                headers={"Authorization": f"Bearer {config.JETSTREAM_API_KEY}"},
-                json=body,
-            )
-    except httpx.HTTPError as exc:
-        raise JetstreamError("Couldn't reach the Jetstream model service.") from exc
-    if response.status_code in (401, 403):
-        raise JetstreamError("Jetstream rejected the API token.")
-    if response.status_code == 429:
-        raise JetstreamError("Jetstream is rate limiting requests. Try again in a minute.")
-    if response.status_code >= 400:
-        log.warning("jetstream %s: %s", response.status_code, response.text[:300])
-        if images and response.status_code in (400, 413, 415, 422):
-            raise ImagesRejected("images not accepted")
-        raise JetstreamError(f"Jetstream returned an error ({response.status_code}).")
-    try:
-        data = response.json()
-        choice = data["choices"][0]
-        message = choice["message"]["content"] or ""
-    except (ValueError, KeyError, IndexError) as exc:
-        raise JetstreamError("Jetstream returned a response that couldn't be read.") from exc
+    response = await _post(body)
+    _check_status(response, bool(images))
+    data, choice, message = _read_reply(response)
     result.update(
         content=message,
         reasoning=choice["message"].get("reasoning_content"),  # reasoning models such as Muse Glimmer
@@ -101,3 +80,48 @@ async def _complete(model, system, text, meter, images, max_tokens, result: dict
     if not message.strip():
         raise JetstreamError("Jetstream returned an empty response.")
     return message
+
+
+def _user_content(text: str, images) -> list[dict] | str:
+    """The text, with any images attached as data URLs (OpenAI message format)."""
+    if not images:
+        return text
+    return [{"type": "text", "text": text}] + [
+        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{base64.b64encode(data).decode()}"}}
+        for data, mime in images
+    ]
+
+
+async def _post(body: dict) -> httpx.Response:
+    try:
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as http:
+            return await http.post(
+                f"{config.JETSTREAM_BASE_URL}/chat/completions",
+                headers={"Authorization": f"Bearer {config.JETSTREAM_API_KEY}"},
+                json=body,
+            )
+    except httpx.HTTPError as exc:
+        raise JetstreamError("Couldn't reach the Jetstream model service.") from exc
+
+
+def _check_status(response: httpx.Response, sent_images: bool) -> None:
+    status = response.status_code
+    if status in (401, 403):
+        raise JetstreamError("Jetstream rejected the API token.")
+    if status == 429:
+        raise JetstreamError("Jetstream is rate limiting requests. Try again in a minute.")
+    if status >= 400:
+        log.warning("jetstream %s: %s", status, response.text[:LOGGED_ERROR_CHARS])
+        # A model that can't take images says so with one of these; the caller retries without them.
+        if sent_images and status in (400, 413, 415, 422):
+            raise ImagesRejected("images not accepted")
+        raise JetstreamError(f"Jetstream returned an error ({status}).")
+
+
+def _read_reply(response: httpx.Response) -> tuple[dict, dict, str]:
+    try:
+        data = response.json()
+        choice = data["choices"][0]
+        return data, choice, choice["message"]["content"] or ""
+    except (ValueError, KeyError, IndexError) as exc:
+        raise JetstreamError("Jetstream returned a response that couldn't be read.") from exc

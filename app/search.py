@@ -259,47 +259,59 @@ async def search(queries: list[str], provider: str | None = None) -> Research:
     return research
 
 
+ERROR_CHARS = 300  # how much of an unexpected error is kept in the log
+WAIT_GRACE_SECONDS = 5  # beyond a service's own timeout, before giving up on it
+
+
 async def _run_provider(http: httpx.AsyncClient, name: str, queries: list[str], research: Research) -> bool:
-    run = {
-        "tavily": _tavily, "exa": _exa, "brave": _brave, "brave_answers": _brave_answers,
-        "firecrawl": _firecrawl, "linkup": _linkup, "linkup_deep": _linkup_deep,
-    }[name]
-    timeout = TIMEOUTS.get(name, QUERY_TIMEOUT)
+    """Run each query through one service, logging each. Stops early if the service is
+    paused along the way (out of credits, rate limited). Returns whether it found anything."""
     found = False
     for query in queries:
-        timer = llm_log.Timer()
-        added, meta, error = [], {}, None
-        try:
-            items, meta = await asyncio.wait_for(run(http, query), timeout + 5)
-            added = [r for r in items if research.add(r["title"], r["url"], r["content"], service=name)]
-            research.queries += 1
-            research.usd += meta.get("usd", 0.0)
-            found = found or bool(added)
-            _ok(name)
-        except OutOfCredits as exc:
-            error = str(exc)
-            await _pause(name, "out of monthly credits", _next_month())
-        except Paused as exc:
-            error = exc.reason
-            await _pause(name, exc.reason, time.time() + exc.seconds)
-        except Exception as exc:  # timeouts, network errors, unexpected response shapes
-            error = f"{type(exc).__name__}: {exc}"[:300]
-            await _failed(name)
-        await llm_log.record(
-            provider=name,
-            model=meta.get("endpoint", name),
-            system="",
-            messages=[{"role": "user", "content": query}],
-            response_text="\n\n".join(f"{r['title']}\n{r['url']}\n{r['content']}" for r in added) or meta.get("answer"),
-            response_extra={"results": added, **{k: v for k, v in meta.items() if k not in ("answer", "endpoint")}},
-            usage={"web_searches": 1, "usd": meta.get("usd", 0.0)},
-            duration_ms=timer.ms,
-            error=error,
-        )
+        added, error = await _run_query(http, name, query, research)
+        found = found or bool(added)
         if error and paused(name):
             research.skipped.append(f"{name}: {paused(name)['reason']}")
             break  # try the next service
     return found
+
+
+async def _run_query(http: httpx.AsyncClient, name: str, query: str, research: Research) -> tuple[list[dict], str | None]:
+    """One query through one service. Failures pause the service as needed and never
+    raise: research is optional. Returns (results added, error or None)."""
+    timer = llm_log.Timer()
+    added, meta, error = [], {}, None
+    try:
+        items, meta = await asyncio.wait_for(SERVICES[name](http, query), TIMEOUTS.get(name, QUERY_TIMEOUT) + WAIT_GRACE_SECONDS)
+        added = [r for r in items if research.add(r["title"], r["url"], r["content"], service=name)]
+        research.queries += 1
+        research.usd += meta.get("usd", 0.0)
+        _ok(name)
+    except OutOfCredits as exc:
+        error = str(exc)
+        await _pause(name, "out of monthly credits", _next_month())
+    except Paused as exc:
+        error = exc.reason
+        await _pause(name, exc.reason, time.time() + exc.seconds)
+    except Exception as exc:  # timeouts, network errors, unexpected response shapes
+        error = f"{type(exc).__name__}: {exc}"[:ERROR_CHARS]
+        await _failed(name)
+    await _log_query(name, query, added, meta, timer, error)
+    return added, error
+
+
+async def _log_query(name: str, query: str, added: list[dict], meta: dict, timer: llm_log.Timer, error: str | None) -> None:
+    await llm_log.record(
+        provider=name,
+        model=meta.get("endpoint", name),
+        system="",
+        messages=[{"role": "user", "content": query}],
+        response_text="\n\n".join(f"{r['title']}\n{r['url']}\n{r['content']}" for r in added) or meta.get("answer"),
+        response_extra={"results": added, **{k: v for k, v in meta.items() if k not in ("answer", "endpoint")}},
+        usage={"web_searches": 1, "usd": meta.get("usd", 0.0)},
+        duration_ms=timer.ms,
+        error=error,
+    )
 
 
 def _item(title, url, content) -> dict:
@@ -444,3 +456,10 @@ def _strip_tags(text: str | None) -> str:
 def as_prompt(results: list[dict]) -> str:
     blocks = [f"[{i}] {r['title']}\n{r['url']}\n{r['content']}" for i, r in enumerate(results, start=1)]
     return "<search_results>\n" + "\n\n".join(blocks) + "\n</search_results>"
+
+
+# Each service's search function, by key (the keys of PROVIDERS, except "all").
+SERVICES = {
+    "tavily": _tavily, "exa": _exa, "brave": _brave, "brave_answers": _brave_answers,
+    "firecrawl": _firecrawl, "linkup": _linkup, "linkup_deep": _linkup_deep,
+}

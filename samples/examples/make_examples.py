@@ -420,7 +420,6 @@ def build(ex: dict, font_bytes: dict) -> tuple[Path, list[dict]]:
     for name, data in font_bytes.items():
         archive.add(data, f"{name}.ttf")
     pg = Page(archive, style)
-    ndays = len(ex["days"])
 
     buf = io.BytesIO()
     writer = pymupdf.DocumentWriter(buf)
@@ -469,8 +468,8 @@ def build(ex: dict, font_bytes: dict) -> tuple[Path, list[dict]]:
         for i, d in enumerate(ex["days"])
     )
     how = (
-        f'<p class="kicker">BEFORE YOU BEGIN</p><h1>How to Pray These Days</h1>'
-        f'<p class="orn">&#x2766;</p>'
+        '<p class="kicker">BEFORE YOU BEGIN</p><h1>How to Pray These Days</h1>'
+        '<p class="orn">&#x2766;</p>'
         + "".join(f'<p class="intro">{esc(t)}</p>' for t in ex["intro"])
         + f'<p class="label" style="margin-top: 8pt;">EACH DAY</p>{steps}'
         + f'<p class="intro" style="font-style: italic; margin-top: 6pt;">{esc(ex["closing"])}</p>'

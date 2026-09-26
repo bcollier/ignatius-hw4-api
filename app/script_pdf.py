@@ -44,13 +44,7 @@ def day_html(retreat: dict, day: dict, state: dict, order: str, grace_silence: i
     """One day, in prayer order. Mirrors buildSequence() in the web app's app.js."""
     guide = {k: c for k, c in (state or {}).get("guide", {}).items() if c.get("status") == "ready"}
     tracks = {k: t for k, t in (state or {}).get("tracks", {}).items() if t.get("status") == "ready"}
-    out = [f"<h2>Day {day['day']}: {html.escape(day['title'])}</h2>"]
-    if day.get("source_ref"):
-        out.append(f'<p class="meta">{html.escape(day["source_ref"])}</p>')
-    if image_name:
-        out.append(f'<p><img src="{image_name}" width="220"/></p>')
-    if day.get("grace"):
-        out.append(f'<p class="grace">Grace: {html.escape(day["grace"])}</p>')
+    out = _day_header(day, image_name)
 
     passage = tracks.get("reading", {}).get("script") or day["passage_text"]
 
@@ -70,9 +64,7 @@ def day_html(retreat: dict, day: dict, state: dict, order: str, grace_silence: i
         out.append(f"<h3>{label}</h3>")
         out.append(_paragraphs(track["script"]))
         if track.get("sources"):
-            note = "Sources checked with web search" if track.get("web_search") else "Sources suggested by the model (not checked)"
-            items = "".join(f"<li>{html.escape(s)}</li>" for s in track["sources"])
-            out.append(f'<div class="sources"><p>{note}:</p><ul>{items}</ul></div>')
+            out.append(_sources(track))
 
     if not state or state.get("status") == "idle":
         # Not built yet: the passage and grace are still useful for prayer.
@@ -102,16 +94,43 @@ def day_html(retreat: dict, day: dict, state: dict, order: str, grace_silence: i
         cue("last")
         reading("Last reading")
     cue("closing")
-    journal = (state or {}).get("journal") or {}
-    if (state or {}).get("prayed_at") or journal:
-        out.append("<h3>After praying</h3>")
-        if state.get("prayed_at"):
-            out.append(f'<p class="meta">Prayed {html.escape(_date(state["prayed_at"]))}</p>')
-        if journal.get("word"):
-            out.append(f'<p class="grace">The word that stayed: {html.escape(journal["word"])}</p>')
-        if journal.get("note"):
-            out.append(_paragraphs(journal["note"]))
+    out += _after_praying(state)
     return "".join(out)
+
+
+IMAGE_WIDTH = 220  # points, about a third of the page
+
+
+def _day_header(day: dict, image_name: str | None) -> list[str]:
+    out = [f"<h2>Day {day['day']}: {html.escape(day['title'])}</h2>"]
+    if day.get("source_ref"):
+        out.append(f'<p class="meta">{html.escape(day["source_ref"])}</p>')
+    if image_name:
+        out.append(f'<p><img src="{image_name}" width="{IMAGE_WIDTH}"/></p>')
+    if day.get("grace"):
+        out.append(f'<p class="grace">Grace: {html.escape(day["grace"])}</p>')
+    return out
+
+
+def _sources(track: dict) -> str:
+    note = "Sources checked with web search" if track.get("web_search") else "Sources suggested by the model (not checked)"
+    items = "".join(f"<li>{html.escape(s)}</li>" for s in track["sources"])
+    return f'<div class="sources"><p>{note}:</p><ul>{items}</ul></div>'
+
+
+def _after_praying(state: dict | None) -> list[str]:
+    """When the day was prayed, and the word and note kept afterwards."""
+    journal = (state or {}).get("journal") or {}
+    if not ((state or {}).get("prayed_at") or journal):
+        return []
+    out = ["<h3>After praying</h3>"]
+    if state.get("prayed_at"):
+        out.append(f'<p class="meta">Prayed {html.escape(_date(state["prayed_at"]))}</p>')
+    if journal.get("word"):
+        out.append(f'<p class="grace">The word that stayed: {html.escape(journal["word"])}</p>')
+    if journal.get("note"):
+        out.append(_paragraphs(journal["note"]))
+    return out
 
 
 def _date(iso: str) -> str:

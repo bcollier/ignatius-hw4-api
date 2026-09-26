@@ -1,16 +1,14 @@
 """Watching a retreat being made: steps, calls and recordings in order, and .txt uploads."""
 
-import asyncio
 import json
 import time
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app import demos, main, tts
+from app import main, tts
 from app.auth import User, current_user
 from app.routes.build_log import log_row
-from app.storage import store
 
 VOICES = {"guide": "en-US-AvaMultilingualNeural", "reading": "en-US-AndrewMultilingualNeural",
           "heart": "en-US-AndrewMultilingualNeural", "deep": "en-US-ChristopherNeural"}

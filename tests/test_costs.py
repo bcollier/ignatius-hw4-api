@@ -9,7 +9,6 @@ from fastapi.testclient import TestClient
 
 from app import costs, main, tts
 from app.auth import User, current_user
-from app.storage import store
 
 DOCX = Path(__file__).parent.parent / "samples" / "three-days-called-by-name-web.docx"
 VOICES = {"guide": "en-US-AvaMultilingualNeural", "reading": "en-US-AndrewMultilingualNeural",

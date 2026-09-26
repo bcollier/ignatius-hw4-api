@@ -57,13 +57,6 @@ async def save_state(user_id: str, state: dict) -> None:
     await store.put_file(_state_path(user_id), json.dumps(state).encode(), "application/json")
 
 
-async def day_state(user_id: str, retreat_id: str, day: int) -> tuple[dict, dict]:
-    """(everything, this day's own state) for writing; the caller saves with save_state."""
-    state = await load_state(user_id)
-    mine = state.setdefault(retreat_id, {"start_date": date.today().isoformat(), "days": {}})
-    return state, mine["days"].setdefault(str(day), {})
-
-
 def personal(retreat: dict, mine: dict | None, meta: dict) -> dict:
     """The demo as this person sees it: their start date and their progress."""
     view = copy.deepcopy(retreat)

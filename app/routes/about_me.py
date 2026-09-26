@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from .. import config, llm_log, profile
+from .. import llm_log, profile
 from ..auth import User, current_user
 from ..extract import ExtractError, extract
 from .uploads import read_upload
