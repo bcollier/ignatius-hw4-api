@@ -101,9 +101,9 @@ MAX_CONCURRENT_JOBS = _int("MAX_CONCURRENT_JOBS", 2)
 # Talk it over: live voice conversation. OpenAI GPT-Live and/or xAI Grok voice.
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "").strip()
-XAI_VOICE_MODEL = os.environ.get("XAI_VOICE_MODEL", "grok-voice")
-XAI_DEFAULT_VOICE = os.environ.get("XAI_DEFAULT_VOICE", "Ara")
-XAI_USD_PER_MINUTE = float(os.environ.get("XAI_USD_PER_MINUTE", "0.05"))
+XAI_VOICE_MODEL = os.environ.get("XAI_VOICE_MODEL", "grok-voice-latest")
+XAI_DEFAULT_VOICE = os.environ.get("XAI_DEFAULT_VOICE", "eve")
+XAI_USD_PER_MINUTE = float(os.environ.get("XAI_USD_PER_MINUTE", "0.08"))
 FREE_TALK_SECONDS = _int("FREE_TALK_SECONDS", 60)  # per day, for free users
 TALK_MAX_SECONDS = _int("TALK_MAX_SECONDS", 30 * 60)  # per conversation, for premium users
 

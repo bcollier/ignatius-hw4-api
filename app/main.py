@@ -141,7 +141,7 @@ async def options():
             "usd_per_1k_chars": config.ELEVENLABS_USD_PER_1K_CHARS,
             "balance": await pricing.elevenlabs_balance(),
         },
-        "talk": talk.options(),
+        "talk": {**talk.options(), "xai_voices": await talk.xai_voices() if config.XAI_API_KEY else {}},
         "search_providers": search.configured(),
         "search_status": search.status(),
         "default_search_provider": search.default_provider(),
@@ -188,6 +188,7 @@ class TalkRequest(BaseModel):
     voice: str | None = None
     sdp: str | None = None  # the browser's WebRTC offer (OpenAI)
     retreat_id: str | None = None
+    local_time: str | None = None  # the browser's local time with its offset, e.g. 2026-09-26T21:30:00-04:00
 
 
 @app.post("/api/talk/session")
@@ -202,7 +203,8 @@ async def talk_session(body: TalkRequest, user: User = Depends(current_user)):
     p = await profile.load(user.id)
     provider = body.provider or talk.options()["default_provider"]
     try:
-        return await talk.start(user, retreat, p["about"], p["companion_notes"], provider or "", body.voice or "", body.sdp)
+        return await talk.start(user, retreat, p["about"], p["companion_notes"], provider or "", body.voice or "", body.sdp,
+                                body.local_time)
     except talk.TalkError as exc:
         raise HTTPException(exc.status, str(exc)) from exc
 
@@ -217,6 +219,19 @@ class TalkEnd(BaseModel):
 async def talk_end(body: TalkEnd, user: User = Depends(current_user)):
     """The browser reports the end of a conversation: counts free minutes, logs the transcript."""
     await talk.end(user, body.session_id, body.seconds, body.transcript)
+    return {"ok": True}
+
+
+@app.get("/api/talk/history")
+async def talk_history(user: User = Depends(current_user)):
+    """Past conversations (dates, retreat, length, transcript when kept) and the memory summary."""
+    return await talk.load_history(user.id)
+
+
+@app.delete("/api/talk/history")
+async def forget_talks(user: User = Depends(current_user)):
+    """Forget every past conversation and the memory summary."""
+    await talk.clear_history(user.id)
     return {"ok": True}
 
 
