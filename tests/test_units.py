@@ -61,3 +61,10 @@ def test_meter_prices_tokens_cache_and_searches():
     # 10k in at $5/M + 2k out at $25/M + 3 searches at $0.01
     assert meter.summary()["usd"] == round(0.05 + 0.05 + 0.03, 4)
     assert meter.summary()["web_searches"] == 3
+
+
+def test_title_that_is_only_the_day_number():
+    from app.prompts import GUIDE_DEFAULTS, guide_text
+
+    text = guide_text(GUIDE_DEFAULTS["opening"], {"day": 5, "title": "Day 5", "grace": ""})
+    assert text.startswith("Day 5. Settle yourself")

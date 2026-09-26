@@ -142,7 +142,7 @@ async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
             retreat["images"][note["index"]]["description"] = note["description"]
     retreat["plan"] = plan
     retreat["days"] = {
-        str(d["day"]): {"status": "idle", "error": None, "tier": None, "voice": None, "tracks": {}} for d in plan["days"]
+        str(d["day"]): {"status": "idle", "error": None, "tracks": {}, "guide": {}, "cost": None} for d in plan["days"]
     }
     retreat["status"] = "ready"
     retreat["costs"] = {"plan": meter.summary()}

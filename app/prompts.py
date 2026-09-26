@@ -144,7 +144,9 @@ def grace_request(grace: str) -> str:
 
 def guide_text(template: str, day: dict) -> str:
     text = template
-    title = re.sub(r"^\s*day\s+\d+\s*[:.\-]\s*", "", day["title"], flags=re.I)  # "Day 1: Isaiah 43" -> "Isaiah 43"
+    title = re.sub(r"^\s*day\s+\d+\s*([:.\-]\s*|$)", "", day["title"], flags=re.I)  # "Day 1: Isaiah 43" -> "Isaiah 43"
+    if not title.strip():
+        text = text.replace("{title}.", "").replace("{title}", "")  # the title was only "Day N"
     for key, value in {"{day}": str(day["day"]), "{title}": title, "{grace}": grace_request(day.get("grace", ""))}.items():
         text = text.replace(key, value)
     return " ".join(text.split())

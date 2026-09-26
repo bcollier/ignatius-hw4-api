@@ -12,6 +12,8 @@ Built with FastAPI and deployed on Render. Claude (Opus 5, through OpenRouter) p
 
 ## How it works
 
+**Full documentation with diagrams:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). It covers the system and hosting diagrams, the database ERD, sign-in and job sequence diagrams, the prayer player, status lifecycles, the complete API reference, costs, security, and failure handling.
+
 ```
 browser ── POST /api/retreats (PDF or .docx) ──▶ extract text, images, scanned pages (PyMuPDF, python-docx)
         ◀── 202 {id, status: "planning"} ─────── background job: Claude plans the days (structured JSON)
