@@ -160,7 +160,7 @@ These came in while the run was under way and are part of the definition of done
 
 ## To do (Ben, not code)
 
-- [ ] **Branded sign-in emails.** Supabase only allows editing email templates with custom SMTP. Set up Resend on `collier.phd` (Domains → add the DNS records → verify; API key with sending access), then in Supabase **Authentication → Emails → SMTP Settings**: sender `retreats@collier.phd`, name `Ignatius at Home`, host `smtp.resend.com`, port `465`, user `resend`, password = the API key. Then paste the branded Confirm signup, Magic Link and Change Email Address templates (in PROMPT_LOG.md, prompt 82) and raise **Authentication → Rate Limits → emails per hour** to about 30. A Gmail app password works instead if DNS is a hassle. Until then, sign-in emails come from "Supabase Auth" and Supabase's built-in sender allows only a few emails an hour.
+- [ ] **Branded sign-in emails.** Supabase only allows editing email templates with custom SMTP. Set up Resend on `collier.phd` (Domains → add the DNS records → verify; API key with sending access), then in Supabase **Authentication → Emails → SMTP Settings**: sender `retreats@collier.phd`, name `Ignatius at Home`, host `smtp.resend.com`, port `465`, user `resend`, password = the API key. Then paste the branded Confirm signup, Magic Link and Change Email Address templates (in [email-templates.md](email-templates.md)) and raise **Authentication → Rate Limits → emails per hour** to about 30. A Gmail app password works instead if DNS is a hassle. Until then, sign-in emails come from "Supabase Auth" and Supabase's built-in sender allows only a few emails an hour.
 
 ## Out of scope for this run
 
