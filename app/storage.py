@@ -171,7 +171,13 @@ class SupabaseStore:
         self._signed.pop(path, None)
 
     async def get_file(self, path: str) -> bytes:
-        return (await self._request("GET", f"/storage/v1/object/{self.bucket}/{path}")).content
+        try:
+            response = await self.http.get(f"/storage/v1/object/{self.bucket}/{path}")
+        except httpx.HTTPError as exc:
+            raise StorageError("Couldn't reach file storage.") from exc
+        if response.status_code >= 400:  # a missing file is normal (e.g. first run); not worth an error log
+            raise StorageError("File not found.")
+        return response.content
 
     async def log_llm_call(self, row: dict) -> None:
         await self._request("POST", "/rest/v1/llm_calls", json=row, headers={"Prefer": "return=minimal"})

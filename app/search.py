@@ -20,6 +20,7 @@ is written without search. Every call, successful or not, is logged in llm_calls
 """
 
 import asyncio
+import html
 import json
 import logging
 import re
@@ -397,7 +398,7 @@ async def _brave_answers(http: httpx.AsyncClient, query: str):
 
 
 def _strip_tags(text: str | None) -> str:
-    return re.sub(r"<[^>]+>", "", text or "")
+    return html.unescape(re.sub(r"<[^>]+>", "", text or ""))  # Brave returns &quot; and <strong>
 
 
 def as_prompt(results: list[dict]) -> str:
