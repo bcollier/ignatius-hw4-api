@@ -6,11 +6,11 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import auth, config, pipeline, pricing, prompts, tts
+from . import auth, config, pipeline, pricing, prompts, script_pdf, tts
 from .auth import User, current_user
 from .extract import ExtractError, extract
 from .storage import LocalStore, StorageError, store
@@ -185,6 +185,41 @@ async def create_retreat(
 @app.get("/api/retreats/{retreat_id}")
 async def read_retreat(retreat: dict = Depends(my_retreat)):
     return await pipeline.public_view(retreat)
+
+
+@app.get("/api/retreats/{retreat_id}/script.pdf")
+async def script(
+    retreat: dict = Depends(my_retreat),
+    day: int | None = None,
+    order: str = "lectio",
+    grace_silence: int = 15,
+    pause: int = 30,
+):
+    """The printable script: one day (?day=n) or the whole retreat, in the same order
+    and with the same silences the player uses."""
+    if retreat["status"] != "ready":
+        raise HTTPException(409, "The retreat plan isn't ready yet.")
+    if order not in ("lectio", "simple"):
+        raise HTTPException(400, "order must be 'lectio' or 'simple'.")
+    days = retreat["plan"]["days"]
+    if day is not None:
+        days = [d for d in days if d["day"] == day]
+        if not days:
+            raise HTTPException(404, f"This retreat has no day {day}.")
+    images: dict[str, bytes] = {}
+    sections = [] if day is not None else [script_pdf.cover_html(retreat, days)]
+    for d in days:
+        name = None
+        if d["image_index"] >= 0:
+            name = f"image{d['image_index']}.jpg"
+            if name not in images:
+                images[name] = await store.get_file(retreat["images"][d["image_index"]]["path"])
+        state = retreat["days"].get(str(d["day"]))
+        sections.append(script_pdf.day_html(retreat, d, state, order, grace_silence, pause, name))
+    pdf = script_pdf.render(sections, images)
+    slug = "".join(c if c.isalnum() else "-" for c in retreat["plan"]["title"].lower()).strip("-")[:60] or "retreat"
+    filename = f"{slug}-day-{day}.pdf" if day is not None else f"{slug}.pdf"
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{filename}"'})
 
 
 @app.delete("/api/retreats/{retreat_id}")

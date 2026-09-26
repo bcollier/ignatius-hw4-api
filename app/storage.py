@@ -83,6 +83,9 @@ class LocalStore:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
 
+    async def get_file(self, path: str) -> bytes:
+        return self.local_path(path).read_bytes()
+
     async def urls(self, paths: list[str]) -> dict[str, str]:
         return {p: f"/api/files/{p}?v={int(self.local_path(p).stat().st_mtime)}" for p in paths if self.local_path(p).exists()}
 
@@ -161,6 +164,9 @@ class SupabaseStore:
             headers={"Content-Type": mime, "x-upsert": "true"},
         )
         self._signed.pop(path, None)
+
+    async def get_file(self, path: str) -> bytes:
+        return (await self._request("GET", f"/storage/v1/object/{self.bucket}/{path}")).content
 
     async def urls(self, paths: list[str]) -> dict[str, str]:
         now = time.time()

@@ -314,6 +314,7 @@ flowchart TD
     M -- "some sections failed" --> M1["Reasons shown, rebuild"]
     M --> N["Day shows total length,<br/>last build cost, track players"]
     N --> O["Pray this day"]
+    N --> PDF["Printable script (PDF)<br/>for paper or iPad"]
     N --> P["Re-record with other voices<br/>(keeps the scripts)"] --> N
     N --> Q["Rewrite and record"] --> M
     O --> R["Guided sequence plays,<br/>Back · Skip · Stop"]
@@ -746,6 +747,19 @@ The whole retreat, with signed URLs. A trimmed example of a built day; the token
 }
 ```
 
+### `GET /api/retreats/{id}/script.pdf` 🔒
+
+A printable script to follow along on paper or a tablet, laid out in the same order and with the same silences as the player (see section 8).
+
+| Query | Default | Notes |
+| --- | --- | --- |
+| `day` | whole retreat | One day, or omit for all days with a cover page and contents |
+| `order` | `lectio` | `lectio` or `simple` |
+| `grace_silence` | 15 | Seconds of silence after asking for the grace |
+| `pause` | 30 | Seconds of silence between the bells |
+
+Each day starts on a new page: title, source, the day's image, the grace, then each part with its label: guidance in italics, readings indented, the reflection and deep dive in full with their sources, and the silences marked. Days not built yet show the passage and grace. Built on the server with PyMuPDF's HTML layout (`app/script_pdf.py`); the web app fetches it with the sign-in token and opens it from a blob URL.
+
 ### `DELETE /api/retreats/{id}` 🔒
 
 Deletes the row and all its files. **409** while a job is running for it.
@@ -873,6 +887,7 @@ flowchart LR
 | `app/jetstream.py` | Jetstream2 client (OpenAI-style chat completions) |
 | `app/prompts.py` | Default prompts, house style, spoken guidance templates |
 | `app/tts.py` | Voices, tiers, chunking, Microsoft and ElevenLabs recording, lengths |
+| `app/script_pdf.py` | The printable script PDF |
 | `app/pricing.py` | Model list, live prices, cost meter, ElevenLabs balance |
 | `app/config.py` | Environment settings |
 | `tests/` | API flow, errors, storage and auth against a fake Supabase, cost math, text helpers |

@@ -157,3 +157,25 @@ def test_delete_removes_retreat(client):
     wait_for(client, url, lambda b: b["status"] != "planning")
     assert client.delete(url).status_code == 200
     assert client.get(url).status_code == 404
+
+
+def test_script_pdf_follows_the_prayer(client):
+    retreat = upload(client, "loose-passages-web.pdf").json()
+    url = f"/api/retreats/{retreat['id']}"
+    wait_for(client, url, lambda b: b["status"] != "planning")
+    client.post(f"{url}/days/1/build", json={"voice": "en-US-AvaMultilingualNeural"})
+    wait_for(client, url, lambda b: b["days"]["1"]["status"] != "building")
+
+    r = client.get(f"{url}/script.pdf", params={"day": 1, "pause": 60, "grace_silence": 20})
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+    text = "".join(page.get_text() for page in pymupdf.open(stream=r.content, filetype="pdf"))
+    order = ["Opening", "Silence, 20 seconds", "First reading", "For the heart", "Second reading",
+             "Deep dive", "Third reading", "silence, 1 minute", "Last reading", "Closing"]
+    positions = [text.find(label) for label in order]
+    assert all(p >= 0 for p in positions) and positions == sorted(positions), list(zip(order, positions))
+
+    whole = client.get(f"{url}/script.pdf")
+    doc = pymupdf.open(stream=whole.content, filetype="pdf")
+    assert doc.page_count >= 8  # cover + one page or more per day
+    assert "haven't been written yet" in "".join(p.get_text() for p in doc)  # unbuilt days still appear
+    assert client.get(f"{url}/script.pdf", params={"day": 99}).status_code == 404
