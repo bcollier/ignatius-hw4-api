@@ -800,7 +800,7 @@ flowchart TD
     OVER --> BLOCK["Build, delete: 404<br/>Rename: 403"]
 ```
 
-- `readable_retreat` (in `app/main.py`) returns either the owner's retreat or the personal view (`demos.personal`); `save_retreat` writes the owner's retreat, or for an example only the person's own fields to `{user_id}/demo_state.json`. Build and delete keep the owner-only `my_retreat` check.
+- `readable_retreat` (in `app/access.py`) returns either the owner's retreat or the personal view (`demos.personal`); `save_retreat` writes the owner's retreat, or for an example only the person's own fields to `{user_id}/demo_state.json`. Build and delete keep the owner-only `my_retreat` check.
 - `GET /api/retreats` returns `examples` beside `retreats`: each a summary with the person's own progress, `demo: {label, kind}`, `read_only: true` and a signed `cover` image URL.
 - The web page shows examples as cards with the first day's painting, notes on the retreat view that it's an example and that progress is personal, and hides Rewrite, Re-record and Delete.
 - To make one: `python tools/build_demo.py free|premium OWNER_USER_ID` makes the retreat with that kind's models and voices, waits for every day, then registers it. `demos.unregister` removes it from the list.
@@ -1205,10 +1205,13 @@ flowchart LR
 
 | File | Responsibility |
 | --- | --- |
-| `app/main.py` | Routes, request validation, error format, CORS, startup |
+| `app/main.py` | The app: CORS, error format, storage at start-up, and the list of routers |
+| `app/routes/` | One module per area: `meta` (health, options, me), `retreats` (library, make, read, research, PDF, rename, delete), `days` (prayed, progress, rebuild, retry), `build_log`, `cost_report`, `conversation` (Talk it over), `about_me`, `example_documents`, `local_files` (development only), and `uploads` (reading an upload within the size limit) |
+| `app/checks.py` | Checking a request before work starts: prompts, dates, titles, models, series, and the build options shared by making a retreat and rebuilding a day |
+| `app/access.py` | Who may read and change a retreat: your own, or an example with your progress laid over it |
 | `app/auth.py` | Token check with Supabase Auth, allowlist, local user |
 | `app/storage.py` | `SupabaseStore` (Postgres rows, Storage files, signed URLs) and `LocalStore` |
-| `app/pipeline.py` | Background jobs: planning, building a day, saving progress, recovery after restart, costs |
+| `app/pipeline.py` | Background jobs: planning, building a day (the `_DayBuild` class: reading, heart, deep dive, guidance, recording), saving progress, recovery after restart, costs |
 | `app/extract.py` | PDF and Word extraction: text, images, scanned pages |
 | `app/llm.py` | Model calls: Claude through OpenRouter (streaming, structured output with fallback, web search with fallback), or Jetstream for free mode |
 | `app/jetstream.py` | Jetstream2 client (OpenAI-style chat completions) |
@@ -1221,7 +1224,10 @@ flowchart LR
 | `app/talk.py` | Talk it over: companion instructions and context, GPT-Live and Grok sessions, memory, free allowance |
 | `app/search.py` | Research services for free-mode deep dives, alone or all combined |
 | `app/demos.py` | Example retreats: the registry, each person's own progress laid over the shared retreat |
+| `app/examples.py` | Example source documents (`samples/examples/`) to look at and build from |
+| `app/costs.py` | The Costs page: each retreat by part and by company, from the call log and the recordings |
 | `tools/retry_days.py` | Finishes a retreat's failed days by re-recording only the failed clips |
+| `tools/rerecord.py` | Re-records every day of a retreat with new voices, keeping the words |
 | `tools/build_demo.py` | Builds and registers an example retreat (free or premium) from `samples/demo/come-and-see.pdf` |
 | `samples/demo/` | The "Come and See" demo package: `make_demo.py`, the PDF, WEB passages and public-domain paintings |
 | `app/pricing.py` | Model list, live prices, cost meter, ElevenLabs balance |
@@ -1233,8 +1239,20 @@ flowchart LR
 
 | File | Responsibility |
 | --- | --- |
-| `index.html` | The seven views, the full-screen prayer screen and the settings dialog |
-| `app.js` | Router, API helper, settings (Advanced), library with series and Continue, new retreat, retreat view with day strip and progress, prayer player with images and listening progress, about me, talk it over (WebRTC and WebSocket audio), PDF, costs |
+| `index.html` | Every view, the full-screen prayer screen and the settings dialog; loads the scripts in `js/` in order |
+| `js/core.js` | Constants, DOM and date helpers, the API client, shared state |
+| `js/settings.js` | The Advanced tab (models, voices and voice sets, research, prayer settings, prompts, guidance) and the estimate |
+| `js/router.js` | The URL decides the view; sign-in and guests |
+| `js/library.js` | The library: Continue card, series groups, examples |
+| `js/new-retreat.js` | New retreat: upload, paste, example documents, the request |
+| `js/retreat.js` | A retreat: progress, day strip, the day panel, rebuild and retry, prayer settings, the printable PDF |
+| `js/build-log.js` | The terminal-style build log |
+| `js/research.js` | Research notes |
+| `js/pray.js` | The prayer player: the sequence, images, text on screen with word following, progress, lock screen |
+| `js/about-me.js` | About me |
+| `js/talk.js` | Talk it over: choosing the voice, WebRTC (OpenAI) and WebSocket (Grok) audio, the orb, transcripts |
+| `js/costs.js` | The Costs page |
+| `js/start.js` | Wiring the forms, start-up (loaded last) |
 | `manifest.webmanifest`, `icons/` | Installing on a phone's home screen (icons drawn by `tools/make_icons.py`) |
 | `config.js` | API address |
 | `style.css` | Layout, light and dark colors |
