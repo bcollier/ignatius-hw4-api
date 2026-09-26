@@ -750,6 +750,18 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Made a design canvas of the "modern book of hours" direction with live animations: Today at dawn and at night, the prayer screen (the painting zooms to the detail being discussed, a string of beads keeps your place, the spoken word gilds), silence as a candle that burns down to the bell, a prayed day's gilded initial, a day as a two-page spread on a computer, and retreats as a shelf of books.
 
+### 120. 2026-09-27, 01:15 UTC
+
+> I like the visual redesign except that tou call things books and that will be confusing for users unless it's explained. Make an animated intro to books or change the language
+
+**What was done:** Changed the language in the mockups: "My books" became "My retreats" and "Begin a new book" became "Make a new retreat". The book-like covers stay as a look, with no new word to explain.
+
+### 121. 2026-09-27, 01:17 UTC
+
+> I really like the slow animated images
+
+**What was done:** Noted for the real redesign: keep the slow drift and zoom on every painting, and build the "look closer" zoom to the detail each part is about.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
