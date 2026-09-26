@@ -59,8 +59,10 @@ def _to_web_image(pix: pymupdf.Pixmap, page: int | None, fmt: str = "jpeg") -> I
         return None
     if pix.alpha or pix.colorspace is None or pix.colorspace.n not in (1, 3):
         pix = pymupdf.Pixmap(pymupdf.csRGB, pix)  # drop alpha, convert CMYK and others to RGB
-    while max(pix.width, pix.height) > MAX_IMAGE_SIDE:
-        pix.shrink(1)  # halves each side
+    longest = max(pix.width, pix.height)
+    if longest > MAX_IMAGE_SIDE:  # scale down just enough, keeping as much detail as allowed
+        scale = MAX_IMAGE_SIDE / longest
+        pix = pymupdf.Pixmap(pix, max(1, round(pix.width * scale)), max(1, round(pix.height * scale)))
     data = pix.tobytes("jpeg", jpg_quality=85) if fmt == "jpeg" else pix.tobytes("png")
     return Image(data=data, mime=f"image/{fmt}", width=pix.width, height=pix.height, page=page)
 

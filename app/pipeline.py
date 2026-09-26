@@ -133,6 +133,21 @@ async def _resume(retreat: dict) -> None:
                                       p.get("search_provider")))
 
 
+async def _save_research(retreat: dict, day_no: int, day: dict, meter, cited: list[str]) -> str | None:
+    """Keep what the deep dive's research found (queries, every result, which were cited)
+    for the research page. Never fails the build."""
+    if not meter.research:
+        return None
+    path = _source_path(retreat, f"day{day_no}_research.json")
+    record = {**meter.research, "cited": cited, "model": meter.model, "made_at": time.time()}
+    try:
+        await store.put_file(path, json.dumps(record).encode(), "application/json")
+        return path
+    except Exception:
+        log.exception("could not save research for day %s", day_no)
+        return None
+
+
 def _source_path(retreat: dict, name: str) -> str:
     return f"{retreat['user_id']}/{retreat['id']}/{name}"
 
@@ -394,8 +409,15 @@ async def _build_day(
     title = retreat["plan"]["title"]
     tailor = retreat.get("build_options", {}).get("tailor_guide", True) if retreat.get("build_options") else True
 
+    # A build can size its scripts independently of the voices (demos written at
+    # ElevenLabs length but recorded with free voices first).
+    script_cap = (retreat.get("build_options") or {}).get("script_chars")
+
     def words_for(section: str) -> int:
-        return int(tts.max_chars(voices[section]) / 6 * 0.85)  # about six characters per word with spaces
+        cap = tts.max_chars(voices[section])
+        if script_cap:
+            cap = min(cap, script_cap)
+        return int(cap / 6 * 0.85)  # about six characters per word with spaces
 
     def ready(group: str, name: str) -> dict | None:
         clip = state[group].get(name) or {}
@@ -451,15 +473,19 @@ async def _build_day(
             if done:
                 deep_script = done["script"]
                 start_recording("tracks", "deep", deep_script, voices["deep"], sources=done.get("sources", []),
-                                web_search=done.get("web_search"), research=done.get("research"))
+                                web_search=done.get("web_search"), research=done.get("research"),
+                                research_path=done.get("research_path"))
             else:
                 state["tracks"]["deep"]["status"] = "writing"
                 context = prompts.day_context(title, day, image, heart=heart_script)
                 deep_script, sources, searched = await llm.write_deep(context, deep_prompt, words_for("deep"), meter,
                                                                       search_provider, series_text)
+                research_path = await _save_research(retreat, day_no, day, meter, sources)
                 # For Jetstream models `searched` names the research service that answered.
+                label = ("several services, combined" if searched == "all" else search.PROVIDERS.get(searched)) \
+                    if isinstance(searched, str) else None
                 start_recording("tracks", "deep", deep_script, voices["deep"], sources=sources, web_search=bool(searched),
-                                research=search.PROVIDERS.get(searched) if isinstance(searched, str) else None)
+                                research=label, research_path=research_path)
         except Exception as exc:
             errors[("tracks", "deep")] = exc
 

@@ -26,7 +26,7 @@ def mock(monkeypatch, handler):
 
 
 def test_available_follows_keys(monkeypatch, keys):
-    assert set(search.available()) == {"tavily", "exa", "brave", "brave_answers", "firecrawl", "linkup", "linkup_deep"}
+    assert set(search.available()) == {"all", "tavily", "exa", "brave", "brave_answers", "firecrawl", "linkup", "linkup_deep"}
     monkeypatch.setattr(config, "EXA_API_KEY", "")
     assert "exa" not in search.available()
 
@@ -40,7 +40,7 @@ def test_exa(monkeypatch, keys):
 
     mock(monkeypatch, handler)
     r = asyncio.run(search.search(["q"], "exa"))
-    assert r.results == [{"title": "T", "url": "https://a", "content": "one … two"}] and r.usd == 0.005 and r.queries == 1
+    assert r.results == [{"title": "T", "url": "https://a", "content": "one … two", "service": "exa"}] and r.usd == 0.005 and r.queries == 1
 
 
 def test_brave_search(monkeypatch, keys):
@@ -52,7 +52,7 @@ def test_brave_search(monkeypatch, keys):
 
     mock(monkeypatch, handler)
     r = asyncio.run(search.search(["q"], "brave"))
-    assert r.results == [{"title": "Luke 15", "url": "https://b", "content": "desc more"}]
+    assert r.results == [{"title": "Luke 15", "url": "https://b", "content": "desc more", "service": "brave"}]
 
 
 def test_brave_answers_parses_stream_and_citations(monkeypatch, keys):
@@ -68,7 +68,7 @@ def test_brave_answers_parses_stream_and_citations(monkeypatch, keys):
 
     mock(monkeypatch, handler)
     r = asyncio.run(search.search(["why did he run"], "brave_answers"))
-    assert r.results[0] == {"title": "Brave answer: why did he run", "url": "https://c", "content": "The father ran."}
+    assert r.results[0] == {"title": "Brave answer: why did he run", "url": "https://c", "content": "The father ran.", "service": "brave_answers"}
 
 
 def log_rows():
@@ -91,7 +91,7 @@ def test_firecrawl(monkeypatch, keys):
     mock(monkeypatch, handler)
     before = len(log_rows())
     r = asyncio.run(search.search(["q"], "firecrawl"))
-    assert r.results == [{"title": "F", "url": "https://f", "content": "fd"}] and r.provider == "firecrawl"
+    assert r.results == [{"title": "F", "url": "https://f", "content": "fd", "service": "firecrawl"}] and r.provider == "firecrawl"
     row = log_rows()[before]
     assert row["provider"] == "firecrawl" and row["purpose"] in ("research", "unknown") and row["status"] == "ok"
     assert row["response"]["results"][0]["url"] == "https://f" and row["response"]["credits"] == 2
@@ -170,9 +170,9 @@ def test_linkup_search_and_deep_research(monkeypatch, keys):
 
     mock(monkeypatch, handler)
     r = asyncio.run(search.search(["q"], "linkup"))
-    assert r.results == [{"title": "L", "url": "https://l/1", "content": "c"}]
+    assert r.results == [{"title": "L", "url": "https://l/1", "content": "c", "service": "linkup"}]
     r = asyncio.run(search.search(["q"], "linkup_deep"))
-    assert r.results[0] == {"title": "Linkup answer: q", "url": "https://l/deep", "content": "The father ran."}
+    assert r.results[0] == {"title": "Linkup answer: q", "url": "https://l/deep", "content": "The father ran.", "service": "linkup_deep"}
 
 
 def test_linkup_out_of_credits_pauses_both_linkup_options(monkeypatch, keys):
@@ -180,3 +180,23 @@ def test_linkup_out_of_credits_pauses_both_linkup_options(monkeypatch, keys):
     r = asyncio.run(search.search(["q"], "linkup_deep"))
     assert r.provider == "brave"
     assert search.paused("linkup")["reason"] == "out of monthly credits" and search.paused("linkup_deep")
+
+
+def test_all_services_combined(monkeypatch, keys):
+    """"all" asks every service at once (not deep research) and interleaves the results."""
+    def handler(request):
+        host = request.url.host
+        if "exa" in host:
+            return httpx.Response(200, json={"results": [{"title": "E1", "url": "https://e/1", "highlights": ["e"]},
+                                                         {"title": "E2", "url": "https://e/2", "highlights": ["e"]}]})
+        if "tavily" in host:
+            return httpx.Response(200, json={"results": [{"title": "T1", "url": "https://t/1", "content": "t"}]})
+        return httpx.Response(500, json={})  # everyone else is down today
+
+    mock(monkeypatch, handler)
+    assert search.default_provider() == "all"
+    r = asyncio.run(search.search(["q"], "all"))
+    urls = [x["url"] for x in r.results]
+    assert set(urls) == {"https://e/1", "https://e/2", "https://t/1"} and urls[-1] == "https://e/2"  # one of each first
+    assert r.provider == "all" and set(r.contributors) == {"exa", "tavily"}
+    assert not any("linkup/deep" in x["url"] for x in r.results)

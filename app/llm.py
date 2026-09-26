@@ -164,7 +164,7 @@ async def plan_retreat(
     content.append({"type": "text", "text": f"Source file: {filename}\n\n<source>\n{source.text}\n</source>"})
 
     system = _system(instructions + "\n\n" + prompts.PLAN_FIXED.format(max_days=config.MAX_DAYS), series_text)
-    params = dict(system=system, max_tokens=32000, messages=[{"role": "user", "content": content}])
+    params = dict(system=system, max_tokens=64000, messages=[{"role": "user", "content": content}])
     try:
         message = await _call(
             meter,
@@ -280,6 +280,7 @@ async def _deep_jetstream(
             queries = [q.strip(" -*0123456789.\"'\t") for q in reply.splitlines() if q.strip()][:3]
             llm_log.tag(purpose="research")
             research = await search.search(queries or [context.splitlines()[2]], provider)
+            research.query_texts = queries or [context.splitlines()[2]]
             results = research.results
             meter.searches += research.queries
             meter.usd += research.usd
@@ -294,6 +295,11 @@ async def _deep_jetstream(
     if results:
         urls = {r["url"] for r in results}
         sources = [line for line in sources if any(u in line for u in urls)]  # drop anything not from the results
+    if research is not None:
+        meter.research = {
+            "how": "server search", "service": research.provider or None, "queries": research.query_texts,
+            "contributors": research.contributors, "skipped": research.skipped, "results": results,
+        }
     return script, sources, (research.provider or False) if results else False  # the service that answered
 
 
@@ -311,10 +317,10 @@ async def tailor_guide(context: str, heart: str, deep: str, lines: dict, meter: 
             reply = await jetstream.complete(pricing.api_model(meter.model), prompts.GUIDE_TAILOR, user, meter)
         else:
             try:
-                message = await _call(meter, system=prompts.GUIDE_TAILOR, max_tokens=8000, messages=[{"role": "user", "content": user}],
+                message = await _call(meter, system=prompts.GUIDE_TAILOR, max_tokens=16000, messages=[{"role": "user", "content": user}],
                                       output_config={"format": {"type": "json_schema", "schema": schema}})
             except anthropic.BadRequestError:
-                message = await _call(meter, system=prompts.GUIDE_TAILOR, max_tokens=8000, messages=[{"role": "user", "content": user}])
+                message = await _call(meter, system=prompts.GUIDE_TAILOR, max_tokens=16000, messages=[{"role": "user", "content": user}])
             reply = _text(message)
         tailored = _parse_json(reply)
     except Exception:  # LLMError, JetstreamError, bad JSON: keep the defaults
@@ -360,7 +366,7 @@ async def write_heart(context: str, instructions: str, words: int, meter: pricin
             raise LLMError(str(exc)) from exc
         return _split_script(reply)[0]
     try:
-        message = await _call(meter, system=_system(system, series_text), max_tokens=16000,
+        message = await _call(meter, system=_system(system, series_text), max_tokens=32000,
                               messages=[{"role": "user", "content": context}])
     except anthropic.BadRequestError as exc:
         raise LLMError(f"The model provider rejected the request: {exc.message}") from exc
@@ -378,7 +384,7 @@ async def write_deep(
     async def attempt(search: bool):
         system = instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=prompts.SEARCH_ON if search else prompts.SEARCH_OFF, words=words)
         extra = {"tools": [pricing.web_search_tool(meter.model)]} if search else {}
-        return await _call(meter, system=_system(system, series_text), max_tokens=16000,
+        return await _call(meter, system=_system(system, series_text), max_tokens=32000,
                            messages=[{"role": "user", "content": context}], **extra)
 
     if pricing.is_jetstream(meter.model):
@@ -399,4 +405,25 @@ async def write_deep(
     # With web search the reply is split into many text blocks around the search
     # results; the <script> tags mark the part to read aloud.
     script, sources = _split_script(_text(message))
+    if searched:
+        meter.research = _web_search_log(message)
     return script, sources, searched
+
+
+def _web_search_log(message) -> dict:
+    """The searches Claude ran with the web search tool and the pages each returned."""
+    queries, results = [], []
+    for block in message.content:
+        kind = getattr(block, "type", "")
+        if kind == "server_tool_use":
+            q = (getattr(block, "input", None) or {}).get("query")
+            if q:
+                queries.append(q)
+        elif kind == "web_search_tool_result" and isinstance(getattr(block, "content", None), list):
+            for r in block.content:
+                url = getattr(r, "url", None)
+                if url and url not in {x["url"] for x in results}:
+                    results.append({"title": getattr(r, "title", None) or url, "url": url,
+                                    "content": getattr(r, "page_age", None) or "", "service": "Claude web search"})
+    return {"how": "model web search", "service": "Claude web search", "queries": queries, "results": results,
+            "contributors": [], "skipped": []}

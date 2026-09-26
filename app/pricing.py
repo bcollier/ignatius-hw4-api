@@ -115,6 +115,7 @@ class Meter:
         self.price = {} if is_jetstream(model) else (table.get(model) or FALLBACK_PRICES.get(model, {}))
         self.input_tokens = self.output_tokens = self.searches = 0
         self.usd = 0.0
+        self.research: dict | None = None  # what the deep dive's research found, for the research page
 
     def add(self, usage) -> None:
         if usage is None:
