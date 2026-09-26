@@ -63,7 +63,9 @@ EXA_API_KEY = os.environ.get("EXA_API_KEY", "").strip()
 BRAVE_SEARCH_API_KEY = os.environ.get("BRAVE_SEARCH_API_KEY", "").strip()  # Brave "Search" plan
 BRAVE_ANSWERS_API_KEY = os.environ.get("BRAVE_ANSWERS_API_KEY", "").strip()  # Brave "Answers" plan (separate key)
 FIRECRAWL_API_KEY = os.environ.get("FIRECRAWL_API_KEY", "").strip()
-# Default research service for free mode: brave, exa, tavily, firecrawl or brave_answers
+LINKUP_API_KEY = os.environ.get("LINKUP_API_KEY", "").strip()  # Linkup search and deep research
+# Default research service for free mode: brave, exa, tavily, firecrawl, linkup,
+# linkup_deep or brave_answers
 # (falls back to the first one with a key). Users can pick another on the page.
 SEARCH_PROVIDER = os.environ.get("SEARCH_PROVIDER", "brave")
 

@@ -8,6 +8,8 @@ Services (each on when its key is set):
   brave          Brave Search API, web results          BRAVE_SEARCH_API_KEY
   brave_answers  Brave Answers: a cited written answer  BRAVE_ANSWERS_API_KEY
   firecrawl      Firecrawl search                       FIRECRAWL_API_KEY
+  linkup         Linkup search (standard depth)         LINKUP_API_KEY
+  linkup_deep    Linkup deep research: sourced answer   LINKUP_API_KEY (same account)
 
 Research must never break a build. Every call has a timeout and every error is
 caught. A service that reports it is out of credits is skipped until the start of
@@ -41,8 +43,14 @@ PROVIDERS = {
     "exa": "Exa",
     "tavily": "Tavily",
     "firecrawl": "Firecrawl",
+    "linkup": "Linkup Search",
+    "linkup_deep": "Linkup Deep Research (slower, sourced answers)",
     "brave_answers": "Brave Answers (cited summaries)",
 }
+# Services that share one account (and so one credit balance) pause together.
+ACCOUNT = {"linkup_deep": "linkup"}
+# Seconds per query; deep research runs several searches itself.
+TIMEOUTS = {"linkup_deep": 120, "brave_answers": 60}
 
 # provider -> {"until": unix time, "reason": str, "failures": int}
 _status: dict[str, dict] = {}
@@ -67,6 +75,8 @@ def _keys() -> dict[str, str]:
         "brave": config.BRAVE_SEARCH_API_KEY,
         "brave_answers": config.BRAVE_ANSWERS_API_KEY,
         "firecrawl": config.FIRECRAWL_API_KEY,
+        "linkup": config.LINKUP_API_KEY,
+        "linkup_deep": config.LINKUP_API_KEY,
     }
 
 
@@ -77,7 +87,7 @@ def configured() -> dict[str, str]:
 
 
 def paused(provider: str) -> dict | None:
-    s = _status.get(provider)
+    s = _status.get(ACCOUNT.get(provider, provider))
     return s if s and s.get("until", 0) > time.time() else None
 
 
@@ -134,6 +144,7 @@ async def _save_status() -> None:
 
 
 async def _pause(provider: str, reason: str, until: float) -> None:
+    provider = ACCOUNT.get(provider, provider)
     async with _status_lock:
         _status[provider] = {"until": until, "reason": reason, "failures": 0}
         log.warning("search service %s paused until %s: %s", provider, datetime.fromtimestamp(until, timezone.utc), reason)
@@ -141,6 +152,7 @@ async def _pause(provider: str, reason: str, until: float) -> None:
 
 
 async def _failed(provider: str) -> None:
+    provider = ACCOUNT.get(provider, provider)
     s = _status.setdefault(provider, {"until": 0, "reason": None, "failures": 0})
     s["failures"] = s.get("failures", 0) + 1
     if s["failures"] >= 3:
@@ -148,6 +160,7 @@ async def _failed(provider: str) -> None:
 
 
 def _ok(provider: str) -> None:
+    provider = ACCOUNT.get(provider, provider)
     if provider in _status and not paused(provider):
         _status[provider]["failures"] = 0
 
@@ -206,13 +219,17 @@ async def search(queries: list[str], provider: str | None = None) -> Research:
 
 
 async def _run_provider(http: httpx.AsyncClient, name: str, queries: list[str], research: Research) -> bool:
-    run = {"tavily": _tavily, "exa": _exa, "brave": _brave, "brave_answers": _brave_answers, "firecrawl": _firecrawl}[name]
+    run = {
+        "tavily": _tavily, "exa": _exa, "brave": _brave, "brave_answers": _brave_answers,
+        "firecrawl": _firecrawl, "linkup": _linkup, "linkup_deep": _linkup_deep,
+    }[name]
+    timeout = TIMEOUTS.get(name, QUERY_TIMEOUT)
     found = False
     for query in queries:
         timer = llm_log.Timer()
         added, meta, error = [], {}, None
         try:
-            items, meta = await asyncio.wait_for(run(http, query), QUERY_TIMEOUT + 5)
+            items, meta = await asyncio.wait_for(run(http, query), timeout + 5)
             added = [r for r in items if research.add(r["title"], r["url"], r["content"])]
             research.queries += 1
             research.usd += meta.get("usd", 0.0)
@@ -307,6 +324,38 @@ async def _firecrawl(http: httpx.AsyncClient, query: str):
     web = web.get("web", []) if isinstance(web, dict) else web  # v2 nests results under data.web
     items = [_item(i.get("title"), i.get("url"), i.get("description") or i.get("markdown")) for i in web]
     return items, {"endpoint": "firecrawl/v2/search", "credits": data.get("creditsUsed")}
+
+
+async def _linkup_request(http: httpx.AsyncClient, body: dict, timeout: int) -> dict:
+    r = await http.post(
+        "https://api.linkup.so/v1/search",
+        headers={"Authorization": f"Bearer {config.LINKUP_API_KEY}"},
+        json=body,
+        timeout=timeout,
+    )
+    _check(r)  # Linkup uses 429 for both rate limits and "insufficient credits"; the body tells them apart
+    return r.json()
+
+
+async def _linkup(http: httpx.AsyncClient, query: str):
+    data = await _linkup_request(
+        http, {"q": query, "depth": "standard", "outputType": "searchResults", "maxResults": MAX_RESULTS_PER_QUERY}, QUERY_TIMEOUT
+    )
+    items = [_item(i.get("name"), i.get("url"), i.get("content")) for i in data.get("results", []) if i.get("type", "text") == "text"]
+    return items, {"endpoint": "linkup/search standard"}
+
+
+async def _linkup_deep(http: httpx.AsyncClient, query: str):
+    """Deep research: Linkup searches several times and writes a sourced answer. The
+    answer becomes one result (under its first source) and each source another."""
+    data = await _linkup_request(http, {"q": query, "depth": "deep", "outputType": "sourcedAnswer"}, TIMEOUTS["linkup_deep"])
+    answer = (data.get("answer") or "").strip()
+    sources = data.get("sources") or []
+    items = []
+    if answer and sources:
+        items.append({"title": f"Linkup answer: {query}", "url": sources[0].get("url"), "content": answer})
+    items += [_item(src.get("name"), src.get("url"), src.get("snippet")) for src in sources]
+    return items, {"endpoint": "linkup/search deep", "answer": answer}
 
 
 CITATION = re.compile(r"<citation>(.*?)</citation>", re.S)

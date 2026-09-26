@@ -12,7 +12,7 @@ from app import config, search
 
 @pytest.fixture
 def keys(monkeypatch):
-    for name in ("TAVILY_API_KEY", "EXA_API_KEY", "BRAVE_SEARCH_API_KEY", "BRAVE_ANSWERS_API_KEY", "FIRECRAWL_API_KEY"):
+    for name in ("TAVILY_API_KEY", "EXA_API_KEY", "BRAVE_SEARCH_API_KEY", "BRAVE_ANSWERS_API_KEY", "FIRECRAWL_API_KEY", "LINKUP_API_KEY"):
         monkeypatch.setattr(config, name, "k-" + name)
     search._status.clear()  # each test starts with every service healthy
     monkeypatch.setattr(search, "_status_loaded", True)
@@ -26,7 +26,7 @@ def mock(monkeypatch, handler):
 
 
 def test_available_follows_keys(monkeypatch, keys):
-    assert set(search.available()) == {"tavily", "exa", "brave", "brave_answers", "firecrawl"}
+    assert set(search.available()) == {"tavily", "exa", "brave", "brave_answers", "firecrawl", "linkup", "linkup_deep"}
     monkeypatch.setattr(config, "EXA_API_KEY", "")
     assert "exa" not in search.available()
 
@@ -156,3 +156,27 @@ def test_failed_query_is_skipped(monkeypatch, keys):
     mock(monkeypatch, lambda request: httpx.Response(500))
     r = asyncio.run(search.search(["q1", "q2"], "tavily"))
     assert r.results == [] and r.queries == 0
+
+
+def test_linkup_search_and_deep_research(monkeypatch, keys):
+    def handler(request):
+        body = json.loads(request.content)
+        assert request.headers["authorization"] == "Bearer k-LINKUP_API_KEY" and request.url.path == "/v1/search"
+        if body["depth"] == "deep":
+            assert body["outputType"] == "sourcedAnswer"
+            return httpx.Response(200, json={"answer": "The father ran.", "sources": [
+                {"name": "Commentary", "url": "https://l/deep", "snippet": "ran to meet him"}]})
+        return httpx.Response(200, json={"results": [{"type": "text", "name": "L", "url": "https://l/1", "content": "c"}]})
+
+    mock(monkeypatch, handler)
+    r = asyncio.run(search.search(["q"], "linkup"))
+    assert r.results == [{"title": "L", "url": "https://l/1", "content": "c"}]
+    r = asyncio.run(search.search(["q"], "linkup_deep"))
+    assert r.results[0] == {"title": "Linkup answer: q", "url": "https://l/deep", "content": "The father ran."}
+
+
+def test_linkup_out_of_credits_pauses_both_linkup_options(monkeypatch, keys):
+    mock(monkeypatch, lambda request: httpx.Response(429, json={"error": "Insufficient credits"}) if request.url.host == "api.linkup.so" else brave_ok(request))
+    r = asyncio.run(search.search(["q"], "linkup_deep"))
+    assert r.provider == "brave"
+    assert search.paused("linkup")["reason"] == "out of monthly credits" and search.paused("linkup_deep")

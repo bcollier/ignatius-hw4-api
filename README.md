@@ -78,7 +78,7 @@ cp .env.example .env        # then fill in keys; all are optional for a first ru
 | --- | --- | --- |
 | Sign-in | Email link | Email link, or **Try it without an account** (anonymous Supabase session, this browser only) |
 | Models | Claude on OpenRouter (Opus 5 default; Opus 5.5, Fable 5.1, Sonnet 5, Haiku 4.5) | Jetstream2 open models: Llama 4 Scout, Muse Glimmer |
-| Deep dive research | Claude's own web search | Research run by the server with the user's choice of Brave Search, Exa, Tavily, Firecrawl or Brave Answers (whichever have keys), falling back to the next if one is out of credits or failing; the model may cite only returned URLs |
+| Deep dive research | Claude's own web search | Research run by the server with the user's choice of Brave Search, Exa, Tavily, Firecrawl, Linkup (search or deep research) or Brave Answers (whichever have keys), falling back to the next if one is out of credits or failing; the model may cite only returned URLs |
 | Voices | Free Microsoft voices and ElevenLabs | Free Microsoft voices |
 | Limits | Upload and length caps | Also at most `FREE_MAX_RETREATS` (3) retreats |
 | Cost to the site owner | Model and ElevenLabs charges | None (Jetstream is an academic allocation) |

@@ -52,7 +52,7 @@ flowchart LR
     subgraph AI["Model and voice services"]
         OR["OpenRouter<br/>Anthropic-compatible API"]
         JS["Jetstream2 inference<br/>(Open WebUI proxy, OpenAI-compatible)<br/>free mode"]
-        TV["Research services<br/>Brave Search · Exa · Tavily · Firecrawl · Brave Answers<br/>free mode"]
+        TV["Research services<br/>Brave Search · Exa · Tavily · Firecrawl<br/>Linkup · Brave Answers<br/>free mode"]
         CLAUDE["Claude<br/>(Opus 5 by default)<br/>+ web search"]
         EDGE["Microsoft neural voices<br/>(edge-tts, free)"]
         ELEVEN["ElevenLabs<br/>(premium voices)"]
@@ -84,7 +84,7 @@ flowchart LR
 | File storage | Supabase Storage | Extracted images and every MP3, in a private bucket. |
 | Claude | Anthropic, reached through OpenRouter | Plans the retreat, writes the reflection and deep dive, searches the web for the deep dive (full mode). |
 | Open models | Jetstream2 inference service (Llama 4 Scout, Muse Glimmer) | The same writing jobs for free-mode users. |
-| Research services | Brave Search, Exa, Tavily, Firecrawl, Brave Answers | Web research for free-mode deep dives, run by the server; the user picks one, others are fallbacks. |
+| Research services | Brave Search, Exa, Tavily, Firecrawl, Linkup, Brave Answers | Web research for free-mode deep dives, run by the server; the user picks one, others are fallbacks. |
 | Voices | Microsoft (free), ElevenLabs (premium) | Turn scripts into MP3. |
 
 ---
@@ -164,7 +164,7 @@ erDiagram
         uuid retreat_id FK
         int day
         text purpose "plan | heart | deep | search_queries | research"
-        text provider "openrouter | anthropic | jetstream | brave | exa | tavily | firecrawl | brave_answers"
+        text provider "openrouter | anthropic | jetstream | brave | exa | tavily | firecrawl | linkup | linkup_deep | brave_answers"
         text model
         jsonb request "system + messages, images as placeholders"
         text response_text
@@ -553,7 +553,11 @@ Both services produce constant-bitrate MP3, so pieces can be joined byte for byt
 | Exa | `POST api.exa.ai/search` (`x-api-key`), type auto, 4 results with highlights | title, URL, highlights; Exa's reported cost is added to the day's cost |
 | Brave Search | `GET api.search.brave.com/res/v1/web/search` (`X-Subscription-Token`), 4 results with extra snippets | title, URL, description and extra snippets |
 | Firecrawl | `POST api.firecrawl.dev/v2/search` (Bearer key), 4 results | title, URL, description; credits used are logged |
+| Linkup Search | `POST api.linkup.so/v1/search` (Bearer key), depth `standard`, `searchResults`, 4 results | name, URL, content |
+| Linkup Deep Research | same endpoint and key, depth `deep`, `sourcedAnswer`, 2-minute timeout | the sourced answer (under its first source) and each source's snippet |
 | Brave Answers | `POST api.search.brave.com/res/v1/chat/completions` (its own key), model `brave`, streamed, citations on | the written answer (under its first cited URL) and each citation's snippet |
+
+Linkup Search and Deep Research share one account, so if either runs out of credits both are paused. Linkup reports running out of credits as a 429, which the credit-word check tells apart from an ordinary rate limit.
 
 **Keeping research from breaking a build.** Research is optional, so it's written to fail softly:
 
@@ -883,7 +887,7 @@ Serves files from `DATA_DIR` when Supabase isn't configured. In production, file
 | Supabase Storage | `GET/POST /storage/v1/bucket` | Startup: create the bucket if missing |
 | OpenRouter | `POST /api/v1/messages` (Anthropic Messages format, streamed) | Planning, reflection, deep dive |
 | OpenRouter | `GET /api/v1/models` | Prices, cached 6 hours |
-| Brave Search / Exa / Tavily / Firecrawl / Brave Answers | See section 7 | Free-mode deep dives: three queries with the chosen service, falling back to the others |
+| Brave Search / Exa / Tavily / Firecrawl / Linkup / Brave Answers | See section 7 | Free-mode deep dives: three queries with the chosen service, falling back to the others |
 | Jetstream2 | `POST /api/chat/completions` (OpenAI format, `Authorization: Bearer <token>`) | Free-mode planning and writing; images are offered for planning and dropped if refused |
 | Microsoft (edge-tts) | WebSocket speech synthesis | Free voices |
 | ElevenLabs | `POST /v1/text-to-speech/{voice}` | Premium voices |
@@ -1008,6 +1012,7 @@ flowchart LR
 | `BRAVE_SEARCH_API_KEY` | | Brave Search research |
 | `BRAVE_ANSWERS_API_KEY` | | Brave Answers research (a separate Brave plan and key) |
 | `FIRECRAWL_API_KEY` | | Firecrawl research |
+| `LINKUP_API_KEY` | | Linkup search and deep research |
 | `SEARCH_PROVIDER` | `brave` | Default research service |
 | `ALLOWED_ORIGINS` | localhost ports | CORS origins |
 | `DATA_DIR` | `/tmp/ignatius` | Local storage when Supabase is off |
