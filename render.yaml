@@ -40,3 +40,7 @@ services:
         sync: false
       - key: LINKUP_API_KEY
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false

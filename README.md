@@ -6,15 +6,16 @@
 >
 > **Live app:** https://bcollier.github.io/ignatius-hw4-web/ · **Frontend repo:** [ignatius-hw4-web](https://github.com/bcollier/ignatius-hw4-web)
 
-Backend for **Ignatius at Home**, which turns material you have rights to (a prayer handout, a few scripture passages, a reading, with images) into a guided audio retreat. For each day it produces three MP3 tracks:
+Backend for **Ignatius at Home**, which turns material you have rights to (a prayer handout, scripture passages, a reading, with images) into a guided audio retreat you pray at home, day by day. Upload a document and press **Make my retreat**: the server plans the days and, for each one, writes and records:
 
 1. **The reading**: the day's passage, word for word from your document.
-2. **For the heart**: a short reflection addressed to the listener.
-3. **Deep dive**: the theology, history and hermeneutics of the passage, researched with web search, with sources listed on screen.
+2. **For the heart**: a reflection addressed to the listener.
+3. **Deep dive**: the theology, history and hermeneutics of the passage, researched on the web, building on the reflection.
+4. **Spoken guidance**: the request for the day's grace and a line before each reading and the silence, tailored to that day's reflection and deep dive.
 
-The frontend (GitHub Pages) is in [ignatius-hw4-web](https://github.com/bcollier/ignatius-hw4-web). It plays each day in a lectio sequence with a bell-framed pause to reflect.
+The frontend ([ignatius-hw4-web](https://github.com/bcollier/ignatius-hw4-web), GitHub Pages) plays each day as a lectio divina sequence, with the day's images filling the screen, remembers what you've listened to and prayed, and offers **Talk it over**: a live spoken conversation with an AI prayer companion (OpenAI GPT-Live or xAI Grok voice) that knows the retreat, what you've told it about yourself (`user info.md`), and your past conversations.
 
-Built with FastAPI and deployed on Render. Claude (Opus 5, through OpenRouter) plans the retreat and writes the scripts; Microsoft neural voices (free, via `edge-tts`) or ElevenLabs (premium) record them; Supabase handles sign-in, saved retreats and file storage.
+Built with FastAPI on Render. Claude (through OpenRouter) or free Jetstream models write; Microsoft voices (free) or ElevenLabs (premium) record; Supabase handles sign-in, saved retreats, files and the call log.
 
 ## How it works
 
@@ -47,9 +48,15 @@ When Supabase is configured, the endpoints marked 🔒 need `Authorization: Bear
 | `GET /api/options` | none | Voice tiers and voices, default prompts and guidance, upload limits, the Claude models with live OpenRouter prices, the ElevenLabs balance, and the public Supabase URL and publishable key for the sign-in form |
 | `GET /api/me` 🔒 | none | `{id, email}` |
 | `GET /api/retreats` 🔒 | none | `{retreats: [{id, title, filename, created_at, status, days, days_built}]}`, newest first |
-| `POST /api/retreats` 🔒 | multipart: `file` (.pdf or .docx, up to 15 MB and 40 pages), optional `plan_prompt`, `model`, and `series` (comma-separated ids of earlier retreats this one continues) | **202** with the retreat, `status: "planning"`. 400 for unreadable or empty files, 413 if too large |
+| `POST /api/retreats` 🔒 | multipart: `file` (.pdf or .docx, up to 15 MB and 40 pages), optional `plan_prompt`, `model`, `series` (earlier retreats this one continues), `start_date`, and `options` (JSON build settings; with it every day is made after planning) | **202** with the retreat, `status: "planning"`. 400 for unreadable or empty files, 413 if too large |
 | `GET /api/retreats/{id}` 🔒 | none | The retreat: `status` (`planning`, `ready`, `failed`), `source` stats, `images` (with signed `url`), `plan` (title, summary, mode, days with passage, grace, image), and `days` (build state per day, tracks with `status`, `script`, `url`, `sources`) |
 | `GET /api/retreats/{id}/script.pdf` 🔒 | query: `day` (omit for the whole retreat), `order` (`lectio` or `simple`), `grace_silence`, `pause` (seconds) | A printable PDF of the script in prayer order, with images, guidance, silences and sources. The whole retreat adds a cover and contents; unbuilt days show their passage and grace |
+| `PATCH /api/retreats/{id}` 🔒 | JSON `start_date`, `title` | Changes the start date or title |
+| `POST /api/retreats/{id}/days/{n}/prayed` 🔒 | JSON `prayed`, `word`, `note` | Marks a day prayed and saves the word and note |
+| `POST /api/retreats/{id}/days/{n}/progress` 🔒 | JSON `step`, `part`, `seconds`, `parts_played`, `finished` | Listening progress; finishing marks the day prayed |
+| `GET`/`PUT /api/profile`, `POST /api/profile/upload` 🔒 | `about`, `companion_notes`, or a .txt/.md/.docx/.pdf | About me (`user info.md`), condensed if long |
+| `POST /api/talk/session` 🔒 | JSON `provider`, `voice`, `retreat_id`, `local_time`, `sdp` (OpenAI) | Starts a live conversation; returns the WebRTC answer or a Grok token |
+| `POST /api/talk/end`, `GET`/`DELETE /api/talk/history` 🔒 | `session_id`, `seconds`, `transcript` | Saves the conversation to memory; lists or forgets past conversations |
 | `DELETE /api/retreats/{id}` 🔒 | none | `{deleted: id}`; removes the row and its files. 409 while a job is running |
 | `POST /api/retreats/{id}/days/{n}/build` 🔒 | JSON: `voices` (a voice id from `/api/options` for each of `guide`, `reading`, `heart`, `deep`; free and premium can be mixed), optional `heart_prompt`, `deep_prompt`, `guide` (spoken guidance text by name; empty skips a clip), `keep_scripts` (re-record with new voices without rewriting), `model` | **202** with the retreat, that day `status: "building"`. 400 for an unknown voice or overlong text, 404 for a missing day, 409 if the plan isn't ready or the day is already building |
 

@@ -144,8 +144,10 @@ These came in while the run was under way and are part of the definition of done
    - Free users: 60 seconds a day (enforced by the server's daily allowance and, for OpenAI, a server hangup); premium: up to 30 minutes a call.
    - **Memory:** every conversation's transcript is saved to Supabase (the user's storage folder) and the companion is given the recent ones, with older ones condensed into a memory summary, so it remembers past conversations. The person can clear this memory. Transcripts are also in `llm_calls`.
 6. **About me ("user info.md").** Upload a text, Markdown, Word or PDF file about yourself, or type it; it's saved as `user info.md` and informs every model call made for you: planning, writing, tailoring and the conversation. Over 6,000 characters, a model condenses it and the page warns that a summary is being used. A separate box for what you want from the conversation companion.
-7. **Robustness found by testing:** free-voice requests are retried with backoff (a real build lost two guidance clips to dropped connections).
-8. **Keep building until everything above and in sections 1–9 is done**, testing continuously with free builds (Jetstream models, Microsoft voices) on the Mac mini, not only at the end.
+7. **A reasonably aware companion.** The conversation companion also knows how many days have passed since the last conversation, which days were listened to or prayed since then, and the person's local date, time and part of the day (morning, evening, night), sent by the browser.
+8. **Costs only while making.** Cost estimates and totals appear when a retreat (or a day) is being made, on larger screens; never while praying, and never on a phone.
+9. **Robustness found by testing:** free-voice requests are retried with backoff (a real build lost two guidance clips to dropped connections).
+10. **Keep building until everything above and in sections 1–9 is done**, testing continuously with free builds (Jetstream models, Microsoft voices) on the Mac mini, not only at the end.
 
 ## Out of scope for this run
 

@@ -49,6 +49,11 @@ flowchart LR
         ST[("Storage<br/>private bucket 'retreats'")]
     end
 
+    subgraph LIVE["Live conversation"]
+        GPTLIVE["OpenAI GPT-Live<br/>(WebRTC)"]
+        GROK["xAI Grok voice<br/>(WebSocket)"]
+    end
+
     subgraph AI["Model and voice services"]
         OR["OpenRouter<br/>Anthropic-compatible API"]
         JS["Jetstream2 inference<br/>(Open WebUI proxy, OpenAI-compatible)<br/>free mode"]
@@ -72,12 +77,16 @@ flowchart LR
     JOBS -- "free voices" --> EDGE
     JOBS -- "premium voices" --> ELEVEN
     API -- "prices" --> OR
+    API -- "start session, hang up" --> GPTLIVE
+    API -- "short-lived token" --> GROK
+    AUDIO -- "live audio" --> GPTLIVE
+    AUDIO -- "live audio" --> GROK
     API -- "character balance" --> ELEVEN
 ```
 
 | Piece | Runs on | Job |
 | --- | --- | --- |
-| Web app | GitHub Pages (static) | Sign-in, upload, settings, progress, prayer player. Plain HTML, CSS and JavaScript; no build step. |
+| Web app | GitHub Pages (static) | Sign-in, library, making a retreat, progress, the prayer screen, about me, talk it over. Plain HTML, CSS and JavaScript; no build step. Installable on a phone's home screen. |
 | API | Render, Python 3.12, FastAPI + Uvicorn | Checks who is calling, extracts documents, runs background jobs, saves state, returns JSON. |
 | Auth | Supabase Auth | Emails sign-in links, issues and refreshes access tokens. |
 | Database | Supabase Postgres | One row per retreat; the retreat itself is a JSON document. |
@@ -339,6 +348,11 @@ retreats/                                   private bucket
         ├── day1_opening.mp3                spoken guidance clips
         ├── day1_first.mp3 … day1_closing.mp3
         └── day2_…
+    ├── user info.md                        what the person wrote about themselves (maybe a summary)
+    ├── profile.json                        summary flag, original length, what they want from the companion
+    ├── conversations.json                  past conversations with the companion and its memory summary
+    └── talk_usage.json                     seconds of free conversation used today
+system/search_status.json                   research services paused for credits or errors
 ```
 
 Files are never public. The API hands the browser **signed URLs** that expire after 24 hours and caches them for 23 hours, so a page left open longer than a day needs a reload.
@@ -347,32 +361,29 @@ Files are never public. The API hands the browser **signed URLs** that expire af
 
 ## 4. User journey
 
+The web app has seven views, chosen by the URL: the library (`./`), a new retreat (`?new`, with Simple and Advanced tabs), a retreat (`?r=ID`), praying a day full-screen (`?r=ID&pray=N`), talking it over (`?talk&r=ID`), about me (`?me`) and about the tradition (`?about`).
+
 ```mermaid
 flowchart TD
-    A([Open the site]) --> B{Server awake?}
-    B -- "no (Render sleeping)" --> B1["Page: can't reach the server,<br/>may be waking up · Retry"] --> B
-    B -- yes --> C{Signed in on<br/>this device?}
-    C -- no --> D["Enter email · Email me a sign-in link"] --> E["Open the email on this device,<br/>click the link"] --> F
-    C -- yes --> F["My retreats"]
-    F --> G{Open an existing<br/>retreat?}
-    G -- yes --> K
-    G -- no --> H["Upload PDF or .docx<br/>choose model · optional planning prompt<br/>tick 'I have rights'"]
-    H --> I["Planning… (a few minutes)"]
-    I -- failed --> I1["Reason shown, try again"]
-    I --> K["Retreat: plan, gallery, days"]
-    K --> L["Choose voices for guide, reading,<br/>reflection, deep dive · choose model<br/>see estimated cost"]
-    L --> M["Build audio for a day<br/>(a few minutes)"]
-    M -- "some sections failed" --> M1["Reasons shown, rebuild"]
-    M --> N["Day shows total length,<br/>last build cost, track players"]
-    N --> O["Pray this day"]
-    N --> PDF["Printable script (PDF)<br/>for paper or iPad"]
-    N --> P["Re-record with other voices<br/>(keeps the scripts)"] --> N
-    N --> Q["Rewrite and record"] --> M
-    O --> R["Guided sequence plays,<br/>Back · Skip · Stop"]
-    F --> S["Delete a retreat (click twice)"]
+    A([Open the site]) --> B{Signed in on<br/>this device?}
+    B -- no --> SI["Email me a sign-in link<br/>or Try it without an account"] --> L
+    B -- yes --> L["Library: Continue card<br/>(a started, missed or today's day)<br/>and retreats grouped by series"]
+    L --> CONT["Pray this day / Continue praying"] --> PRAY
+    L --> NEW["New retreat: choose a file<br/>Simple, or Advanced for every option"]
+    NEW --> GO["Make my retreat (one request)"]
+    GO --> PROG["Progress: planning, then each day<br/>written and recorded in turn<br/>(fine to close the page)"]
+    PROG --> R["Retreat: day strip (prayed · started ·<br/>missed · today), passage in full"]
+    L --> R
+    R --> PRAY["Praying: the day's images full screen,<br/>small player docked at the bottom"]
+    PRAY --> AFTER["After praying: the word that stayed,<br/>a note, the day marked prayed"]
+    AFTER --> R
+    R --> TALK["Talk it over: live voice companion<br/>that knows the retreat and past talks"]
+    R --> PDF["Printable script (PDF)"]
+    R --> MORE["More…: re-record with other voices,<br/>rewrite a day, edit notes"]
+    L --> ME["About me: user info.md<br/>and what I want from the companion"]
 ```
 
-Laptop and phone are the same flow: the phone signs in with its own link, then finds the same retreats in "My retreats".
+Laptop and phone are the same flow: the phone signs in (or a guest adds an email), then finds the same retreats, listening progress and conversations, because all of it is on the server.
 
 ---
 
@@ -497,9 +508,28 @@ With Claude the series goes in its own system block marked for prompt caching, s
 
 ---
 
-## 7. Building a day
+## 7. Making a retreat and building its days
 
-A build records three sections and up to seven guidance clips, each in the voice chosen for its section. The reflection and deep dive are written by Claude unless the user chose **Re-record with these voices**, which reuses the existing scripts.
+**One request.** `POST /api/retreats` carries the file and every option (models, voices, prompts, guidance, research service, start date) as the `options` field. The server checks the options before touching the upload, plans the retreat, then builds every day one after another in the same background job (`_build_all`), saving progress as it goes. Retreat status runs `planning` → `building` → `ready`; `progress` counts days done and lists any that failed. A failed day doesn't stop the others; it can be retried from the retreat view. If the server restarts, the job resumes from the first unfinished day (see section 13).
+
+**Parts that know about each other.** Within a day the parts are written in the order they're heard, and each sees what came before:
+
+```mermaid
+flowchart LR
+    READ["The reading<br/>(recorded right away)"]
+    HEART["For the heart<br/>written first"] --> DEEP["Deep dive<br/>sees the reflection:<br/>builds on it, doesn't repeat it"]
+    DEEP --> GUIDE["Spoken guidance<br/>default or customized lines,<br/>tailored to the reflection and deep dive"]
+    HEART -. recorded as soon as written .-> REC[("MP3s")]
+    DEEP -. recorded .-> REC
+    GUIDE -. recorded .-> REC
+    READ -.-> REC
+```
+
+Tailoring keeps each line's purpose and length and the opening's request for the grace word for word; lines the model drops or overruns keep their default, and any failure falls back to the plain text. It can be turned off in Advanced. Re-recording with other voices reuses the written reflection, deep dive and tailored guidance.
+
+**Every model call starts with the same background** (`prompts.BACKGROUND`): the Spiritual Exercises (the four weeks, the Principle and Foundation, asking for a grace, imaginative contemplation, colloquy, repetition, consolation and desolation, the Examen, Annotation 15), retreats in daily life (Annotation 19), lectio divina (Guigo II; Verbum Domini 87) and how a day in this app is prayed. It is added where calls go out (`llm._call`, `jetstream.complete`), so no step can miss it; with a series it joins the cached system block. Then comes the person's own notes, if any (section 8b).
+
+A build records three sections and up to seven guidance clips, each in the voice chosen for its section.
 
 ```mermaid
 sequenceDiagram
@@ -673,6 +703,64 @@ stateDiagram-v2
 
 ---
 
+## 8a. Listening progress, prayed days and the journal
+
+The player reports what has been heard (`POST /days/{n}/progress`) when each part starts, every 30 seconds, and when the page is hidden or the prayer stops; finishing the sequence marks the day prayed. Each day keeps `listening` (parts played, last step and part, times) and `prayed_at`, and, after praying, a `journal` with the word or phrase that stayed and an optional note (`POST /days/{n}/prayed`). Because it's on the server, stopping on the phone and opening the laptop shows the same place.
+
+With the retreat's `start_date`, the page works out each day's calendar date, so a day can be **today**, **missed** (its date has passed and it isn't prayed) or **started** (some parts heard, not finished). The library's Continue card and the retreat's default day pick, in order: a started day, a missed day, today, the first unprayed day. A started day offers **Continue praying** from where it stopped, or **Start over**.
+
+## 8b. About me ("user info.md")
+
+A person can type or upload (text, Markdown, Word or PDF) anything they'd like the app to know about them. It's saved as `user info.md` in their storage folder. If it's longer than 6,000 characters a model condenses it (Claude for premium users, the free model otherwise), and the page says plainly that a summary is being used and can be edited. A separate field says what they want from the conversation companion.
+
+The notes are loaded at the start of every job (`profile.use_for_job`) into a context variable, and every model call made in that job, planning, writing, tailoring and search questions, includes them after the background, with an instruction to let them shape examples and tone without quoting them back. Context variables are per task, so two people's jobs running at once never see each other's notes (tested).
+
+## 8c. Talk it over (live conversation)
+
+A spoken conversation about the retreat with an AI prayer companion. The app never calls it spiritual direction, and the companion says it's an AI if asked; but its instructions follow how spiritual directors are taught to accompany someone: listen more than speak, ask open questions, gently probe, help the person notice consolation, desolation and where God may be at work, give very little advice, help them engage with the retreat (including missed days, without scolding), and in a crisis stop exploring and point to 988 or local emergency help.
+
+What the companion is given (`talk.context`):
+
+- the background on the Exercises and lectio divina;
+- the person's notes and what they want from the companion;
+- **the time where they are** (the browser sends its local time with offset): date, time, and part of the day ("early in the morning", "at night");
+- **its memory**: when they last talked ("yesterday", "4 days ago"), a summary of older conversations, and the last three transcripts in full;
+- **the retreat**: each day's title, grace, passage and the start of its reflection; which days are prayed or started and where they stopped; the words and notes saved after praying; which day it is by the calendar; and **which days they've listened to since the last conversation**.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant API as API
+    participant O as OpenAI GPT-Live
+    participant X as xAI Grok voice
+    participant ST as Storage
+
+    B->>API: POST /api/talk/session {provider, voice, retreat_id, local_time, sdp?}
+    API->>ST: user info.md, profile.json, conversations.json, today's free seconds
+    alt OpenAI GPT-Live (WebRTC)
+        API->>O: POST /v1/live/sessions {model gpt-live-1, instructions, voice, sdp offer}
+        O-->>API: session id + sdp answer
+        API-->>B: answer, max_seconds
+        B->>O: audio both ways over WebRTC, events on "oai-events"
+        API->>O: hang up at the limit (server-side)
+    else xAI Grok voice (WebSocket)
+        API->>X: POST /v1/realtime/client_secrets
+        X-->>API: short-lived token
+        API-->>B: token, ws url, session config (instructions, voice, PCM16 24 kHz)
+        B->>X: WebSocket (subprotocol xai-client-secret.TOKEN), session.update, response.create
+        B->>X: microphone as PCM16 (AudioWorklet), plays PCM16 replies
+    end
+    B->>API: POST /api/talk/end {session_id, seconds, transcript}
+    API->>ST: add to conversations.json, count free seconds
+    API->>API: log to llm_calls (purpose talk)
+    API->>API: fold older transcripts into the memory summary once they're long
+```
+
+- **Providers and voices** are chosen in Advanced → Conversation: OpenAI (GPT-Live, `gpt-live-1`, $0.05/min, voices such as marin, cedar, vesper) and xAI (Grok voice, `grok-voice-latest`, $0.08/min, voices from xAI's list). OpenRouter can't carry live voice, so these use `OPENAI_API_KEY` and `XAI_API_KEY` directly; the keys never reach the browser.
+- **Limits:** free users get 60 seconds a day (`FREE_TALK_SECONDS`), checked by the server before a session starts and enforced in the browser; OpenAI sessions are also hung up by the server. Premium users get up to 30 minutes a call.
+- **Memory** lives in the person's storage folder (Supabase Storage in production). The page lists past conversations with their transcripts and has **Forget all our conversations**. Transcripts are also logged in `llm_calls`.
+
 ## 9. Status lifecycles
 
 ```mermaid
@@ -680,7 +768,9 @@ stateDiagram-v2
     direction LR
     state "Retreat" as R {
         [*] --> planning: upload accepted
-        planning --> ready: plan saved
+        planning --> building: plan saved, options given
+        planning --> ready: plan saved, no options (plan only)
+        building --> ready: every day made (some may have failed)
         planning --> planning: server restarted, resumed from saved source
         planning --> failed: model error, or interrupted more than twice
     }
@@ -690,7 +780,9 @@ stateDiagram-v2
 stateDiagram-v2
     direction LR
     state "Day" as D {
-        [*] --> idle: plan saved
+        [*] --> queued: plan saved, retreat being made
+        [*] --> idle: plan saved, plan only
+        queued --> building: its turn
         idle --> building: Build audio
         building --> ready: every section recorded
         building --> building: server restarted, resumed (finished parts kept)
@@ -892,6 +984,38 @@ Deletes the row and all its files. **409** while a job is running for it.
 
 Returns **202** with the retreat. Errors: **400** unknown voice or model, text too long · **404** no such day · **409** plan not ready, or day already building.
 
+### `POST /api/retreats` with options (one request makes everything)
+
+Add to the multipart form: `options` (JSON with the same fields as a day build: `voices`, `model` for writing, `search_provider`, `heart_prompt`, `deep_prompt`, `guide`, `tailor_guide`) and `start_date` (`YYYY-MM-DD`, default today). Bad options fail with 400 or 403 before the file is processed. The retreat comes back `planning`, then `building` with `progress: {done, total, current_day, failed}`, then `ready`.
+
+### `PATCH /api/retreats/{id}` 🔒
+
+`{"start_date": "2026-10-05", "title": "…"}`, either or both. Returns the retreat.
+
+### `POST /api/retreats/{id}/days/{n}/prayed` 🔒
+
+`{"prayed": true, "word": "called by name", "note": "…"}`. Sets or clears `prayed_at`; word ≤ 100 characters, note ≤ 2,000; empty word and note clear the journal. Returns the retreat.
+
+### `POST /api/retreats/{id}/days/{n}/progress` 🔒
+
+`{"step": 6, "part": "For the heart", "seconds": 40.2, "parts_played": ["opening", "first", "reading1"], "finished": false}`. Merges into `days[n].listening`; `finished: true` sets `finished_at` and `prayed_at`. Returns `{listening, prayed_at}`. Sent with `keepalive` so it survives the page closing.
+
+### `GET /api/profile`, `PUT /api/profile`, `POST /api/profile/upload` 🔒
+
+The person's notes (`user info.md`). `GET` returns `{file, about, summarized, original_characters, companion_notes, updated_at, max_characters}`. `PUT {"about": "…", "companion_notes": "…"}` saves either or both; long `about` is condensed and `summarized` is true. `upload` takes a `.txt`, `.md`, `.docx` or `.pdf` and replaces `about` with its text (condensed if long).
+
+### `POST /api/talk/session` 🔒
+
+`{"provider": "openai" | "xai", "voice": "marin", "retreat_id": "…", "local_time": "2026-09-26T21:30:00-04:00", "sdp": "<offer, OpenAI only>"}`. OpenAI returns `{session_id, sdp, provider, voice, max_seconds}`; xAI returns `{session_id, token, ws_url, session, provider, voice, max_seconds}`. 403 when a free user has used today's seconds; 400 when the provider isn't configured.
+
+### `POST /api/talk/end` 🔒
+
+`{"session_id": "…", "seconds": 312, "transcript": "You: …\nCompanion: …"}`. Saves the conversation to memory, counts free seconds, logs it. Reported time is capped at the real elapsed time.
+
+### `GET /api/talk/history`, `DELETE /api/talk/history` 🔒
+
+`GET` returns `{memory, conversations: [{id, started_at, ended_at, retreat_id, retreat_title, provider, voice, seconds, transcript}]}` (older transcripts are `null` once folded into `memory`). `DELETE` forgets everything.
+
 ### `GET /api/files/{path}` (local development only)
 
 Serves files from `DATA_DIR` when Supabase isn't configured. In production, files come from signed Storage URLs and this route doesn't exist.
@@ -908,6 +1032,8 @@ Serves files from `DATA_DIR` when Supabase isn't configured. In production, file
 | OpenRouter | `POST /api/v1/messages` (Anthropic Messages format, streamed) | Planning, reflection, deep dive |
 | OpenRouter | `GET /api/v1/models` | Prices, cached 6 hours |
 | Brave Search / Exa / Tavily / Firecrawl / Linkup / Brave Answers | See section 7 | Free-mode deep dives: three queries with the chosen service, falling back to the others |
+| OpenAI | `POST /v1/live/sessions` (SDK `live.create`), `POST /v1/live/sessions/{id}/hangup` | Talk it over (GPT-Live) |
+| xAI | `POST /v1/realtime/client_secrets`, `GET /v1/tts/voices` | Talk it over (Grok voice): token and voice list |
 | Jetstream2 | `POST /api/chat/completions` (OpenAI format, `Authorization: Bearer <token>`) | Free-mode planning and writing; images are offered for planning and dropped if refused |
 | Microsoft (edge-tts) | WebSocket speech synthesis | Free voices |
 | ElevenLabs | `POST /v1/text-to-speech/{voice}` | Premium voices |
@@ -990,6 +1116,8 @@ flowchart LR
 | `app/script_pdf.py` | The printable script PDF |
 | `app/series.py` | Earlier retreats in a series as model context, within a size budget |
 | `app/llm_log.py` | The model call log |
+| `app/profile.py` | About me: `user info.md`, condensing, loading the notes into each job |
+| `app/talk.py` | Talk it over: companion instructions and context, GPT-Live and Grok sessions, memory, free allowance |
 | `app/search.py` | Research services for free-mode deep dives |
 | `app/pricing.py` | Model list, live prices, cost meter, ElevenLabs balance |
 | `app/config.py` | Environment settings |
@@ -1000,8 +1128,9 @@ flowchart LR
 
 | File | Responsibility |
 | --- | --- |
-| `index.html` | Page structure and templates |
-| `app.js` | API helper, sign-in, library, upload and polling, day cards, estimates, prompt and guidance editors, prayer player |
+| `index.html` | The seven views, the full-screen prayer screen and the settings dialog |
+| `app.js` | Router, API helper, settings (Advanced), library with series and Continue, new retreat, retreat view with day strip and progress, prayer player with images and listening progress, about me, talk it over (WebRTC and WebSocket audio), PDF, costs |
+| `manifest.webmanifest`, `icons/` | Installing on a phone's home screen (icons drawn by `tools/make_icons.py`) |
 | `config.js` | API address |
 | `style.css` | Layout, light and dark colors |
 | `sounds/` | Bell, 5 s and 30 s quiet (made by `tools/make_sounds.py`) |
@@ -1042,4 +1171,8 @@ flowchart LR
 | `MAX_DAYS` / `DEFAULT_DAYS` | 14 / 7 | Plan size |
 | `MAX_TRACK_CHARS` / `PREMIUM_MAX_TRACK_CHARS` | 6,000 / 2,500 | Section length caps |
 | `MAX_CONCURRENT_JOBS` | 2 | Jobs running at once |
+| `OPENAI_API_KEY` | | Talk it over with GPT-Live |
+| `XAI_API_KEY` / `XAI_VOICE_MODEL` / `XAI_DEFAULT_VOICE` / `XAI_USD_PER_MINUTE` | / `grok-voice-latest` / `eve` / 0.08 | Talk it over with Grok voice |
+| `FREE_TALK_SECONDS` / `TALK_MAX_SECONDS` | 60 / 1800 | Free seconds a day; longest premium conversation |
+| `PROFILE_MAX_CHARS` | 6,000 | Longer notes about the person are condensed |
 | `SERIES_MAX_CHARS` / `SERIES_MAX_CHARS_FREE` | 600,000 / 80,000 | How much of an earlier series is sent to Claude / to Jetstream models |
