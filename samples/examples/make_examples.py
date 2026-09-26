@@ -2,6 +2,10 @@
 
     be-still.pdf   "Be Still: Five Days with the Psalms of Trust"
     blessed.pdf    "Blessed: Six Days with the Beatitudes"
+    i-am.pdf       "I Am: Six Days with the “I Am” Sayings of Jesus"
+
+Blessed is no longer offered on the New retreat page (the free example retreat is
+built from it), so it is left out of examples.json but still built.
 
 Each is a small, finished retreat source: a cover, a page on how to pray, one page
 per day (passage, grace, focus, painting) and a credits page. Scripture is the World
@@ -21,6 +25,8 @@ Run: .venv/bin/python samples/examples/make_examples.py
 import io
 import json
 import re
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -125,6 +131,7 @@ EXAMPLES = [
     },
     {
         "slug": "blessed",
+        "catalog": False,  # the free example retreat is built from this one
         "title": "Blessed",
         "subtitle": "Six Days with the Beatitudes",
         "kicker": "A six-day retreat in daily life",
@@ -218,6 +225,102 @@ EXAMPLES = [
             },
         ],
     },
+    {
+        "slug": "i-am",
+        "title": "I Am",
+        "subtitle": "Six Days with the “I Am” Sayings of Jesus",
+        "kicker": "A six-day retreat in daily life",
+        "description": "Six times in John’s Gospel Jesus says “I am” and names himself with the ordinary things of life: bread, light, "
+                       "a shepherd, a road, a vine. Pray with one saying each day, from “I am the bread of life” to “I am the true vine,” "
+                       "with a great painting to help you stay with him.",
+        "palette": {"cover": (0.102, 0.176, 0.153), "accent": "#6e5a2c", "gold": (0.82, 0.70, 0.46), "ink": "#23241f"},
+        "intro": [
+            "At the burning bush God told Moses his name: I am. In the Gospel of John, Jesus takes that name on his own lips "
+            "and fills it with the plainest things of daily life: bread, light, a shepherd, a road, a vine. "
+            "Each saying tells us who he is, and in the same breath who we are to him: "
+            "the hungry who are fed, the lost who are found, the grieving who are raised, the branches who belong.",
+            "For the next six days, spend one time of prayer a day with one of these sayings. "
+            "About twenty to thirty minutes is enough. Hear Jesus say “I am” to you, not to a crowd, "
+            "and let each painting help you stay close to him as he speaks.",
+        ],
+        "steps": [
+            ("Become still", "Find a quiet place. Sit comfortably, breathe slowly, and become aware that God is already present, looking at you with love."),
+            ("Ask for the grace", "Each day names a grace. Ask for it plainly, as something you really want. Desire is where prayer begins."),
+            ("Read slowly", "Read the passage aloud if you can, and then read it again. Stay with any word or phrase that holds you; there is no need to finish."),
+            ("Enter the scene", "Use the painting and your imagination. Where are you standing? What does Jesus look like as he turns and says “I am” to you?"),
+            ("Speak as a friend", "End by talking with Jesus in your own words, as one friend speaks to another. Close with the Our Father."),
+            ("Notice", "Afterwards, take a moment to notice what stirred: consolation or desolation, peace or resistance. Jot down a word if it helps."),
+        ],
+        "closing": "On the last day, or on a seventh day if you can, pray all six sayings slowly together, and notice which of his names has become your own.",
+        "days": [
+            {
+                "title": "The Bread of Life",
+                "ref": "John 6:32-35",
+                "grace": "Ask for the grace to recognise my deepest hunger, and to come to Jesus to be fed by him rather than by what can never satisfy.",
+                "focus": "Name what you have been feeding on lately, and watch Jesus lift the bread at the table and hold it out to you.",
+                "file": "File:The Last Supper by Vicente Juan Macip.jpg",
+                "artist": "Juan de Juanes (c. 1507–1579)",
+                "work": "The Last Supper",
+                "date": "c. 1562",
+                "collection": "Museo del Prado, Madrid",
+            },
+            {
+                "title": "The Light of the World",
+                "ref": "John 8:10-12",
+                "grace": "Ask for the grace to step out of hiding into the light of Jesus, and to know that his light shows me the way without condemning me.",
+                "focus": "Hear Jesus knocking at the overgrown door of your heart, lantern in hand, and notice what it would take to open it.",
+                "file": "File:Hunt-light-of-the-world.jpeg",
+                "artist": "William Holman Hunt (1827–1910)",
+                "work": "The Light of the World",
+                "date": "1851–1853",
+                "collection": "Keble College, Oxford",
+            },
+            {
+                "title": "The Good Shepherd",
+                "ref": "John 10:11-15",
+                "grace": "Ask for the grace to know that I am known by name and carried, and that Jesus has laid down his life for me.",
+                "focus": "Let yourself be the lamb in the Shepherd’s arms, and notice where you have been trusting hired hands instead of him.",
+                "file": "File:Bernhard Plockhorst - Good Shephard.jpg",
+                "artist": "Bernhard Plockhorst (1825–1907)",
+                "work": "The Good Shepherd",
+                "date": "late 19th century",
+                "collection": "Original location unknown; widely reproduced as a print",
+            },
+            {
+                "title": "The Resurrection and the Life",
+                "ref": "John 11:21-27",
+                "grace": "Ask for the grace to bring Jesus my grief and disappointment as honestly as Martha did, and to answer him with her “Yes, Lord.”",
+                "focus": "Tell Jesus where you wish he had come sooner, and then listen as he asks you, “Do you believe this?”",
+                "file": "File:Sebastiano del Piombo - The Raising of Lazarus - Google Art Project.jpg",
+                "artist": "Sebastiano del Piombo (c. 1485–1547)",
+                "work": "The Raising of Lazarus",
+                "date": "1517–1519",
+                "collection": "National Gallery, London",
+            },
+            {
+                "title": "The Way, the Truth and the Life",
+                "ref": "John 14:1-6",
+                "grace": "Ask for the grace of an untroubled heart, trusting that Jesus himself is the way even when, like Thomas, I cannot see where I am going.",
+                "focus": "Look into the face of Christ in the icon, and ask him to be your way through the road that troubles you most right now.",
+                "file": "File:Spas vsederzhitel sinay.jpg",
+                "artist": "Unknown Byzantine icon painter",
+                "work": "Christ Pantocrator",
+                "date": "6th century",
+                "collection": "Saint Catherine’s Monastery, Sinai",
+            },
+            {
+                "title": "The True Vine",
+                "ref": "John 15:1-5",
+                "grace": "Ask for the grace to remain in Jesus as a branch remains in the vine, and to trust the Father’s hand even when he prunes.",
+                "focus": "Notice where you are straining to bear fruit by yourself, and simply rest in him, like the vineyard in the evening sun.",
+                "file": "File:Vincent van Gogh - Red Vineyard at Arles (1888).jpg",
+                "artist": "Vincent van Gogh (1853–1890)",
+                "work": "The Red Vineyard",
+                "date": "1888",
+                "collection": "Pushkin State Museum of Fine Arts, Moscow",
+            },
+        ],
+    },
 ]
 
 # ---------------------------------------------------------------------------------
@@ -226,8 +329,14 @@ EXAMPLES = [
 
 
 def fetch(url: str) -> bytes:
-    with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=120) as r:
-        return r.read()
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=120) as r:
+                return r.read()
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or attempt == 4:
+                raise
+            time.sleep(5 * (attempt + 1))  # Wikimedia rate limit: back off and retry
 
 
 def fonts() -> dict[str, bytes]:
@@ -270,6 +379,17 @@ def image(folder: Path, n: int, commons_title: str, meta: dict) -> Path:
         path.parent.mkdir(exist_ok=True)
         path.write_bytes(fetch(info["thumburl"]))
     return path
+
+
+def jpeg_for_pdf(path: Path, limit: int = 2_000_000) -> bytes:
+    """The painting's bytes for embedding; an unusually heavy file (a tall painting at 1920 px,
+    say, which prints narrow anyway) is scaled to 1280 px wide so each PDF stays under ~8 MB."""
+    data = path.read_bytes()
+    if len(data) <= limit:
+        return data
+    pix = pymupdf.Pixmap(data)
+    small = pymupdf.Pixmap(pix, 1280, round(1280 * pix.height / pix.width))
+    return small.tobytes("jpeg", jpg_quality=88)
 
 
 def verses(folder: Path, ref: str) -> list[dict]:
@@ -600,7 +720,7 @@ def build(ex: dict, font_bytes: dict) -> tuple[Path, list[dict]]:
             continue
         shadow = rect + (2.5, 2.5, 2.5, 2.5)
         page.draw_rect(shadow, color=None, fill=(0.86, 0.83, 0.78), overlay=True)
-        page.insert_image(rect, filename=str(img))
+        page.insert_image(rect, stream=jpeg_for_pdf(img))
         page.draw_rect(rect, color=(0.35, 0.3, 0.25), width=0.4)
     doc.subset_fonts()
     doc.set_metadata({"title": f"{ex['title']}: {ex['subtitle']}", "author": "Ignatius at Home",
@@ -641,6 +761,8 @@ def main() -> None:
         out, credits = build(ex, font_bytes)
         doc = pymupdf.open(out)
         print(out.name, f"{out.stat().st_size / 1e6:.1f} MB", doc.page_count, "pages")
+        if not ex.get("catalog", True):
+            continue
         listing.append({
             "slug": ex["slug"],
             "title": ex["title"],

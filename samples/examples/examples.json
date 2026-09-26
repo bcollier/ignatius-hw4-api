@@ -20,22 +20,22 @@
     }
   },
   {
-    "slug": "blessed",
-    "title": "Blessed",
-    "subtitle": "Six Days with the Beatitudes",
-    "description": "Sit on the mountain with the crowds and hear Jesus’ Beatitudes a few lines at a time, from “blessed are the poor in spirit” to “rejoice and be glad,” with a great painting for each day.",
+    "slug": "i-am",
+    "title": "I Am",
+    "subtitle": "Six Days with the “I Am” Sayings of Jesus",
+    "description": "Six times in John’s Gospel Jesus says “I am” and names himself with the ordinary things of life: bread, light, a shepherd, a road, a vine. Pray with one saying each day, from “I am the bread of life” to “I am the true vine,” with a great painting to help you stay with him.",
     "days": 6,
-    "file": "blessed.pdf",
-    "cover_image": "blessed/cover.jpg",
+    "file": "i-am.pdf",
+    "cover_image": "i-am/cover.jpg",
     "credits": {
       "scripture": "World English Bible, public domain",
       "images": [
-        "Day 1: Carl Bloch (1834–1890), The Sermon on the Mount, 1877. Museum of National History, Frederiksborg Castle, Hillerød. Public domain, via Wikimedia Commons.",
-        "Day 2: Vincent van Gogh (1853–1890), Sorrowing Old Man (“At Eternity’s Gate”), 1890. Kröller-Müller Museum, Otterlo. Public domain, via Wikimedia Commons.",
-        "Day 3: Jean-François Millet (1814–1875), The Gleaners, 1857. Musée d’Orsay, Paris. Public domain, via Wikimedia Commons.",
-        "Day 4: Fra Angelico (c. 1395–1455), The Annunciation, c. 1425–1426. Museo del Prado, Madrid. Public domain, via Wikimedia Commons.",
-        "Day 5: Rembrandt van Rijn (1606–1669), The Stoning of Saint Stephen, 1625. Musée des Beaux-Arts de Lyon. Public domain, via Wikimedia Commons.",
-        "Day 6: Jan van Eyck (c. 1390–1441) and Hubert van Eyck (d. 1426), The Adoration of the Mystic Lamb (Ghent Altarpiece, central panel), 1432. Saint Bavo’s Cathedral, Ghent. Public domain, via Wikimedia Commons."
+        "Day 1: Juan de Juanes (c. 1507–1579), The Last Supper, c. 1562. Museo del Prado, Madrid. Public domain, via Wikimedia Commons.",
+        "Day 2: William Holman Hunt (1827–1910), The Light of the World, 1851–1853. Keble College, Oxford. Public domain, via Wikimedia Commons.",
+        "Day 3: Bernhard Plockhorst (1825–1907), The Good Shepherd, late 19th century. Original location unknown; widely reproduced as a print. Public domain, via Wikimedia Commons.",
+        "Day 4: Sebastiano del Piombo (c. 1485–1547), The Raising of Lazarus, 1517–1519. National Gallery, London. Public domain, via Wikimedia Commons.",
+        "Day 5: Unknown Byzantine icon painter, Christ Pantocrator, 6th century. Saint Catherine’s Monastery, Sinai. Public domain, via Wikimedia Commons.",
+        "Day 6: Vincent van Gogh (1853–1890), The Red Vineyard, 1888. Pushkin State Museum of Fine Arts, Moscow. Public domain, via Wikimedia Commons."
       ],
       "type": "EB Garamond, SIL Open Font License"
     }
