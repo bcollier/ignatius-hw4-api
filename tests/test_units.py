@@ -45,3 +45,19 @@ def test_day_number_is_not_repeated_in_the_opening():
 
     day = {"day": 1, "title": "Day 1: Isaiah 43:1-4", "grace": ""}
     assert guide_text(GUIDE_DEFAULTS["opening"], day).startswith("Day 1. Isaiah 43:1-4. Settle")
+
+
+def test_meter_prices_tokens_cache_and_searches():
+    from types import SimpleNamespace
+
+    from app.pricing import FALLBACK_PRICES, Meter
+
+    meter = Meter("anthropic/claude-opus-5", FALLBACK_PRICES)
+    usage = SimpleNamespace(
+        input_tokens=10_000, output_tokens=2_000, cache_read_input_tokens=0, cache_creation_input_tokens=0,
+        server_tool_use=SimpleNamespace(web_search_requests=3),
+    )
+    meter.add(usage)
+    # 10k in at $5/M + 2k out at $25/M + 3 searches at $0.01
+    assert meter.summary()["usd"] == round(0.05 + 0.05 + 0.03, 4)
+    assert meter.summary()["web_searches"] == 3

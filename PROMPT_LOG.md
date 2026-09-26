@@ -24,6 +24,9 @@ These are the requests that shaped the build, lightly condensed.
 8. "Can you build in sound? How will you handle the pause and reflect?" This became the prayer player: a lectio sequence with a synthesized bell, quiet and a bell, played as real audio so it keeps going when a phone is locked.
 9. "The app should have a login so users can upload the materials on their laptop and then play the audio from a phone web browser." With "Supabase", this became Supabase Auth with email links, a `retreats` table and a private storage bucket.
 
+10. "I want to see how long the combined set is going to be. The start should ask for the grace … then give 10 to 20 seconds, then instructions similar to Ignatius' examen: as we read the reading four times, on this first reading focus on … I want to change the voice for each section, with a 5-second pause between sections." This became spoken guidance clips, a voice per section, 5-second gaps, and total length.
+11. "I want to be able to choose the model, and show estimated costs for both the ElevenLabs production and the model calls." This became a model menu with live OpenRouter prices, estimates before each build, and actual costs from token usage afterwards.
+
 ## Prompts the app sends to Claude
 
 The defaults are in `app/prompts.py` and are shown, editable, on the web page:

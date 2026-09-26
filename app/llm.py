@@ -12,12 +12,11 @@ import re
 
 import anthropic
 
-from . import config, prompts
+from . import config, pricing, prompts
 from .extract import Extracted
 
 log = logging.getLogger(__name__)
 
-WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search", "max_uses": 5}
 
 
 class LLMError(RuntimeError):
@@ -39,13 +38,16 @@ def client() -> anthropic.AsyncAnthropic:
     return _client
 
 
-async def _call(**params) -> anthropic.types.Message:
+async def _call(meter: pricing.Meter, **params) -> anthropic.types.Message:
     """Stream a request (long outputs) and continue server-tool turns that pause."""
     messages = list(params.pop("messages"))
     try:
         for _ in range(4):
-            async with client().messages.stream(model=config.LLM_MODEL, messages=messages, **params) as stream:
+            async with client().messages.stream(
+                model=pricing.api_model(meter.model), messages=messages, **params
+            ) as stream:
                 message = await stream.get_final_message()
+            meter.add(message.usage)
             if message.stop_reason != "pause_turn":
                 break
             messages.append({"role": "assistant", "content": message.content})
@@ -83,7 +85,7 @@ def _image_block(data: bytes, mime: str) -> dict:
 # ---------------------------------------------------------------- planning
 
 
-async def plan_retreat(source: Extracted, filename: str, instructions: str) -> dict:
+async def plan_retreat(source: Extracted, filename: str, instructions: str, meter: pricing.Meter) -> dict:
     if config.LLM_MODE == "stub":
         return stub_plan(source, filename)
 
@@ -99,6 +101,7 @@ async def plan_retreat(source: Extracted, filename: str, instructions: str) -> d
     params = dict(system=system, max_tokens=32000, messages=[{"role": "user", "content": content}])
     try:
         message = await _call(
+            meter,
             **params, output_config={"format": {"type": "json_schema", "schema": prompts.PLAN_SCHEMA}}
         )
     except anthropic.BadRequestError:
@@ -106,7 +109,7 @@ async def plan_retreat(source: Extracted, filename: str, instructions: str) -> d
         log.warning("structured output rejected; retrying with a JSON instruction")
         params["system"] += "\n\nReply with only a JSON object matching this schema:\n" + json.dumps(prompts.PLAN_SCHEMA)
         try:
-            message = await _call(**params)
+            message = await _call(meter, **params)
         except anthropic.BadRequestError as exc:
             raise LLMError(f"The model provider rejected the request: {exc.message}") from exc
     return _clean_plan(_parse_json(_text(message)), len(source.images))
@@ -166,26 +169,26 @@ def _split_script(text: str) -> tuple[str, list[str]]:
     return body, [ln for ln in lines if ln]
 
 
-async def write_heart(context: str, instructions: str, words: int) -> str:
+async def write_heart(context: str, instructions: str, words: int, meter: pricing.Meter) -> str:
     if config.LLM_MODE == "stub":
         return f"Stub heart reflection. Sit with the passage for a moment. {context[-400:]}"
     system = instructions + "\n\n" + prompts.HEART_FIXED.format(words=words)
     try:
-        message = await _call(system=system, max_tokens=16000, messages=[{"role": "user", "content": context}])
+        message = await _call(meter, system=system, max_tokens=16000, messages=[{"role": "user", "content": context}])
     except anthropic.BadRequestError as exc:
         raise LLMError(f"The model provider rejected the request: {exc.message}") from exc
     return _split_script(_text(message))[0]
 
 
-async def write_deep(context: str, instructions: str, words: int) -> tuple[str, list[str], bool]:
+async def write_deep(context: str, instructions: str, words: int, meter: pricing.Meter) -> tuple[str, list[str], bool]:
     """Returns (script, sources, searched)."""
     if config.LLM_MODE == "stub":
         return f"Stub deep dive on the passage. {context[:400]}", [], False
 
     async def attempt(search: bool):
         system = instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=prompts.SEARCH_ON if search else prompts.SEARCH_OFF, words=words)
-        extra = {"tools": [WEB_SEARCH_TOOL]} if search else {}
-        return await _call(system=system, max_tokens=16000, messages=[{"role": "user", "content": context}], **extra)
+        extra = {"tools": [pricing.web_search_tool(meter.model)]} if search else {}
+        return await _call(meter, system=system, max_tokens=16000, messages=[{"role": "user", "content": context}], **extra)
 
     searched = config.WEB_SEARCH
     try:

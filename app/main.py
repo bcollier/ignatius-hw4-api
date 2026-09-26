@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import auth, config, pipeline, prompts, tts
+from . import auth, config, pipeline, pricing, prompts, tts
 from .auth import User, current_user
 from .extract import ExtractError, extract
 from .storage import LocalStore, StorageError, store
@@ -83,18 +83,48 @@ def health():
     }
 
 
+def check_model(model: str | None) -> str:
+    model = model or config.LLM_MODEL
+    if model not in pricing.model_ids():
+        raise HTTPException(400, f"Unknown model: {model}")
+    return model
+
+
 @app.get("/api/options")
-def options():
+async def options():
     """Everything the frontend needs before sign-in: menus, default prompts, and
     the public Supabase settings for the sign-in form."""
     return {
         "tiers": tts.tiers(),
         "prompts": prompts.defaults(),
         "limits": {"max_upload_mb": config.MAX_UPLOAD_MB, "max_pages": config.MAX_PAGES},
+        "models": await model_options(),
+        "default_model": config.LLM_MODEL,
+        "web_search": config.WEB_SEARCH,
+        "elevenlabs": {
+            "usd_per_1k_chars": config.ELEVENLABS_USD_PER_1K_CHARS,
+            "balance": await pricing.elevenlabs_balance(),
+        },
         "auth": {"url": config.SUPABASE_URL, "publishable_key": config.SUPABASE_PUBLISHABLE_KEY}
         if auth.enabled()
         else None,
     }
+
+
+async def model_options() -> list[dict]:
+    """Each model with its price in dollars per million tokens, for menus and estimates."""
+    table = await pricing.prices()
+    out = []
+    for model, _, label in pricing.MODELS:
+        p = table.get(model, {})
+        out.append({
+            "id": model,
+            "label": label,
+            "input_per_m": round(p.get("prompt", 0) * 1e6, 3),
+            "output_per_m": round(p.get("completion", 0) * 1e6, 3),
+            "web_search_each": p.get("web_search", 0.01),
+        })
+    return out
 
 
 @app.get("/api/me")
@@ -109,9 +139,13 @@ async def list_retreats(user: User = Depends(current_user)):
 
 @app.post("/api/retreats", status_code=202)
 async def create_retreat(
-    file: UploadFile = File(...), plan_prompt: str = Form(""), user: User = Depends(current_user)
+    file: UploadFile = File(...),
+    plan_prompt: str = Form(""),
+    model: str = Form(""),
+    user: User = Depends(current_user),
 ):
     plan_prompt = check_prompt(plan_prompt, prompts.PLAN_INSTRUCTIONS, "planning")
+    model = check_model(model)
     data = await file.read(config.MAX_UPLOAD_MB * 1024 * 1024 + 1)
     if len(data) > config.MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(413, f"File is larger than {config.MAX_UPLOAD_MB} MB.")
@@ -121,7 +155,7 @@ async def create_retreat(
         source = extract(file.filename or "upload", data)
     except ExtractError as exc:
         raise HTTPException(400, str(exc)) from exc
-    retreat = await pipeline.create_retreat(user.id, file.filename or "upload", source, plan_prompt)
+    retreat = await pipeline.create_retreat(user.id, file.filename or "upload", source, plan_prompt, model)
     return await pipeline.public_view(retreat)
 
 
@@ -153,6 +187,8 @@ class BuildRequest(BaseModel):
     guide: dict[str, str] = {}
     # Re-record with new voices but keep the written reflection and deep dive.
     keep_scripts: bool = False
+    # Which Claude model writes the reflection and deep dive (an id from /api/options).
+    model: str | None = None
 
 
 @app.post("/api/retreats/{retreat_id}/days/{day}/build", status_code=202)
@@ -166,6 +202,7 @@ async def build_day(day: int, body: BuildRequest, retreat: dict = Depends(my_ret
         raise HTTPException(409, f"Day {day} is already being built.")
     heart = check_prompt(body.heart_prompt, prompts.HEART_PRESETS["companion"], "heart")
     deep = check_prompt(body.deep_prompt, prompts.DEEP_INSTRUCTIONS, "deep dive")
+    model = check_model(body.model)
     voices = {section: body.voices.get(section) or body.voice for section in pipeline.SECTIONS}
     guide = {}
     for name, default in prompts.GUIDE_DEFAULTS.items():
@@ -175,7 +212,7 @@ async def build_day(day: int, body: BuildRequest, retreat: dict = Depends(my_ret
         if text:
             guide[name] = text
     try:
-        await pipeline.start_day_build(retreat, day, voices, heart, deep, guide, body.keep_scripts)
+        await pipeline.start_day_build(retreat, day, voices, heart, deep, guide, body.keep_scripts, model)
     except tts.TTSError as exc:
         raise HTTPException(400, str(exc)) from exc
     return await pipeline.public_view(retreat)

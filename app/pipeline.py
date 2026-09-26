@@ -13,7 +13,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import config, llm, prompts, tts
+from . import config, llm, pricing, prompts, tts
 from .extract import Extracted
 from .storage import StorageError, store
 
@@ -90,7 +90,7 @@ async def public_view(retreat: dict) -> dict:
     return view
 
 
-async def create_retreat(user_id: str, filename: str, source: Extracted, plan_prompt: str) -> dict:
+async def create_retreat(user_id: str, filename: str, source: Extracted, plan_prompt: str, model: str) -> dict:
     retreat_id = str(uuid.uuid4())
     images = []
     for i, img in enumerate(source.images):
@@ -106,6 +106,8 @@ async def create_retreat(user_id: str, filename: str, source: Extracted, plan_pr
         "status": "planning",
         "error": None,
         "custom_plan_prompt": plan_prompt != prompts.PLAN_INSTRUCTIONS,
+        "model": model,
+        "costs": {},
         "source": {
             "kind": source.kind,
             "pages": source.page_count,
@@ -124,11 +126,12 @@ async def create_retreat(user_id: str, filename: str, source: Extracted, plan_pr
 
 
 async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
+    meter = pricing.Meter(retreat["model"], await pricing.prices())
     async with _jobs:
         try:
-            plan = await llm.plan_retreat(source, retreat["filename"], plan_prompt)
+            plan = await llm.plan_retreat(source, retreat["filename"], plan_prompt, meter)
         except llm.LLMError as exc:
-            retreat.update(status="failed", error=str(exc))
+            retreat.update(status="failed", error=str(exc), costs={"plan": meter.summary()})
             return await save(retreat)
         except Exception:
             log.exception("planning failed")
@@ -142,6 +145,7 @@ async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
         str(d["day"]): {"status": "idle", "error": None, "tier": None, "voice": None, "tracks": {}} for d in plan["days"]
     }
     retreat["status"] = "ready"
+    retreat["costs"] = {"plan": meter.summary()}
     await save(retreat)
 
 
@@ -162,7 +166,7 @@ SECTIONS = ("guide", "reading", "heart", "deep")  # each can have its own voice
 
 
 async def start_day_build(
-    retreat: dict, day_no: int, voices: dict, heart_prompt: str, deep_prompt: str, guide: dict, keep_scripts: bool
+    retreat: dict, day_no: int, voices: dict, heart_prompt: str, deep_prompt: str, guide: dict, keep_scripts: bool, model: str
 ) -> dict:
     for section in SECTIONS:
         tts.tier_of(voices[section])  # raises TTSError for an unknown voice
@@ -176,13 +180,17 @@ async def start_day_build(
         voices=voices,
         tracks={name: {"status": "waiting"} for name in TRACKS},
         guide={name: {"status": "waiting"} for name in guide},
+        cost=None,
     )
     await save(retreat)
-    spawn(retreat, _build_day(retreat, day_no, heart_prompt, deep_prompt, guide, old if keep_scripts else {}))
+    meter = pricing.Meter(model, await pricing.prices())
+    spawn(retreat, _build_day(retreat, day_no, heart_prompt, deep_prompt, guide, old if keep_scripts else {}, meter))
     return state
 
 
-async def _build_day(retreat: dict, day_no: int, heart_prompt: str, deep_prompt: str, guide: dict, kept: dict) -> None:
+async def _build_day(
+    retreat: dict, day_no: int, heart_prompt: str, deep_prompt: str, guide: dict, kept: dict, meter: pricing.Meter
+) -> None:
     state = retreat["days"][str(day_no)]
     day = retreat["plan"]["days"][day_no - 1]
     voices = state["voices"]
@@ -209,14 +217,14 @@ async def _build_day(retreat: dict, day_no: int, heart_prompt: str, deep_prompt:
         if "heart" in kept:
             return await record("tracks", "heart", kept["heart"]["script"], voices["heart"])
         state["tracks"]["heart"]["status"] = "writing"
-        await record("tracks", "heart", await llm.write_heart(context, heart_prompt, words_for("heart")), voices["heart"])
+        await record("tracks", "heart", await llm.write_heart(context, heart_prompt, words_for("heart"), meter), voices["heart"])
 
     async def deep() -> None:
         if "deep" in kept:
             k = kept["deep"]
             return await record("tracks", "deep", k["script"], voices["deep"], sources=k.get("sources", []), web_search=k.get("web_search"))
         state["tracks"]["deep"]["status"] = "writing"
-        script, sources, searched = await llm.write_deep(context, deep_prompt, words_for("deep"))
+        script, sources, searched = await llm.write_deep(context, deep_prompt, words_for("deep"), meter)
         await record("tracks", "deep", script, voices["deep"], sources=sources, web_search=searched)
 
     reading = re.sub(r"\n{3,}", "\n\n", day["passage_text"]).strip()
@@ -240,4 +248,26 @@ async def _build_day(retreat: dict, day_no: int, heart_prompt: str, deep_prompt:
             errors.append(f"{name}: {message}")
     state["status"] = "failed" if errors else "ready"
     state["error"] = "; ".join(dict.fromkeys(errors)) or None
+    state["cost"] = _day_cost(state, meter)
     await save(retreat)
+
+
+def _day_cost(state: dict, meter: pricing.Meter) -> dict:
+    """What this build spent: model calls from token usage, voices by character."""
+    chars = {"free": 0, "premium": 0}
+    for group in ("tracks", "guide"):
+        for clip in state.get(group, {}).values():
+            if clip.get("status") == "ready":
+                try:
+                    tier = tts.tier_of(clip["voice"])
+                except tts.TTSError:  # a premium voice after the ElevenLabs key was removed
+                    tier = "premium"
+                chars[tier] += clip.get("characters", 0)
+    llm_cost = meter.summary()
+    voice_usd = pricing.tts_usd(chars["premium"], "premium")
+    return {
+        "llm": llm_cost,
+        "voice_characters": chars,
+        "voice_usd": voice_usd,
+        "total_usd": round(llm_cost["usd"] + voice_usd, 4),
+    }

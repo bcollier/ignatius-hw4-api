@@ -34,13 +34,14 @@ elif ANTHROPIC_API_KEY:
 else:
     LLM_MODE = "stub"
 
-# OpenRouter names Claude models "anthropic/<id>"; the Anthropic API uses the bare id.
-LLM_MODEL = os.environ.get(
-    "LLM_MODEL", "anthropic/claude-opus-5" if LLM_MODE == "openrouter" else "claude-opus-5"
-)
+# The default model, by its OpenRouter id (mapped to the Anthropic id when calling
+# Anthropic directly). Users can pick another from pricing.MODELS.
+LLM_MODEL = os.environ.get("LLM_MODEL", "anthropic/claude-opus-5")
 WEB_SEARCH = os.environ.get("WEB_SEARCH", "1") == "1"
 
 ELEVENLABS_MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_multilingual_v2")
+# What an ElevenLabs character costs depends on the plan; this is for estimates.
+ELEVENLABS_USD_PER_1K_CHARS = float(os.environ.get("ELEVENLABS_USD_PER_1K_CHARS", "0.30"))
 
 # Supabase: sign-in, the retreats table and file storage. Leave unset to run
 # locally with no sign-in and files on disk.

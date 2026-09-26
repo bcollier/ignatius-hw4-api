@@ -37,6 +37,13 @@ def upload(client, name):
         return client.post("/api/retreats", files={"file": (name, f)})
 
 
+def test_options_list_models_with_prices(client):
+    body = client.get("/api/options").json()
+    ids = [m["id"] for m in body["models"]]
+    assert body["default_model"] in ids and "anthropic/claude-haiku-4.5" in ids
+    assert all(m["input_per_m"] > 0 and m["output_per_m"] > 0 for m in body["models"])
+
+
 def test_health(client):
     body = client.get("/api/health").json()
     assert body["ok"] and body["llm"] == "stub" and "free" in body["tiers"] and body["sign_in"] is False
@@ -76,7 +83,7 @@ def test_pdf_to_plan_to_audio(client):
 
     voices = {"guide": "en-US-AvaMultilingualNeural", "reading": "en-US-AndrewMultilingualNeural",
               "heart": "en-US-EmmaMultilingualNeural", "deep": "en-US-ChristopherNeural"}
-    r = client.post(f"{url}/days/1/build", json={"voices": voices, "guide": {"closing": ""}})
+    r = client.post(f"{url}/days/1/build", json={"voices": voices, "guide": {"closing": ""}, "model": "anthropic/claude-sonnet-5"})
     assert r.status_code == 202
     retreat = wait_for(client, url, lambda b: b["days"]["1"]["status"] != "building")
     day = retreat["days"]["1"]
@@ -90,6 +97,9 @@ def test_pdf_to_plan_to_audio(client):
     assert set(day["guide"]) == {"opening", "first", "second", "third", "silence", "last"}
     assert all(c["status"] == "ready" and c["voice"] == voices["guide"] and c["url"] for c in day["guide"].values())
     assert day["guide"]["opening"]["script"].startswith("Day 1.")
+    # Free voices cost nothing; every character is counted.
+    assert day["cost"]["voice_usd"] == 0 and day["cost"]["voice_characters"]["free"] > 0
+    assert day["cost"]["llm"]["model"] == "anthropic/claude-sonnet-5"
 
     # Re-recording with a new voice keeps the written scripts.
     heart_script = day["tracks"]["heart"]["script"]
@@ -114,6 +124,8 @@ def test_build_rejects_unknown_voice_and_day(client):
     assert r.status_code == 400
     r = client.post(f"{url}/days/99/build", json={})
     assert r.status_code == 404
+    r = client.post(f"{url}/days/1/build", json={"model": "gpt-9"})
+    assert r.status_code == 400 and "Unknown model" in r.json()["error"]["message"]
 
 
 def test_retreat_survives_restart_and_is_private(client):
