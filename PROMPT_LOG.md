@@ -801,6 +801,13 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 > If a day is an exercise just say so and say go do the exercise today and have a mark as complete button
 
 **What was done:** Server: the planner marks activity days (worksheets, review or repetition days) as kind "exercise" and copies the handout's instruction word for word; the build writes and records nothing for them. App: an exercise day shows "Today's exercise", its title, the instruction, "Go and do this exercise today, then mark it complete." and a Mark as complete button (then "Completed · date" with a Mark as not complete link), with no Pray button, length or parts. On the home screen the Today card says "Today's exercise" with Mark as complete instead of Pray this day. A completed exercise counts as a prayed day (gold) in the day strip and on the covers, the prayer screen never opens for one, and the build bar counts it done once it's ready.
+
+### 128. 2026-09-26, 23:08 UTC
+
+> Remove the section that says today's colors why is it there
+
+**What was done:** It was a leftover from the mockups, meant to show that each day's colors come from its painting. Removed the "today's colors" dots from the Today card and the day page. The colors still quietly tint each day's page.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
