@@ -37,7 +37,7 @@ def test_jetstream_call_is_logged_with_context(monkeypatch):
     row = log_rows()[before]
     assert (row["user_id"], row["email"], row["retreat_id"], row["day"], row["purpose"]) == ("u-1", "guest", "r-1", 2, "heart")
     assert row["provider"] == "jetstream" and row["model"] == "jetstream/muse-glimmer" and row["status"] == "ok"
-    assert row["request"]["system"] == "SYSTEM"
+    assert row["request"]["system"].startswith("Background for this work") and row["request"]["system"].endswith("SYSTEM")
     assert row["request"]["messages"][0]["content"][1] == {"type": "image", "media_type": "image/jpeg", "bytes": 3000}
     assert row["response_text"] == "<script>Hi.</script>" and row["response"]["reasoning"] == "thinking…"
     assert (row["input_tokens"], row["output_tokens"]) == (40, 9) and row["duration_ms"] >= 0
@@ -81,6 +81,7 @@ def test_claude_call_and_failure_are_logged(monkeypatch):
     assert row["purpose"] == "deep" and row["response_text"] == "<script>Deep.</script>"
     assert row["response"]["web_search_queries"] == [{"query": "Luke 15 setting"}]
     assert row["web_searches"] == 1 and row["usd"] > 0 and row["status"] == "ok"
+    assert "Lectio divina" in row["request"]["system"] and row["request"]["system"].endswith("S")
 
     fail["on"] = True
     try:

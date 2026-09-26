@@ -97,12 +97,26 @@ async def synthesize(text: str, voice: str, out_path: Path) -> float:
     return round(out_path.stat().st_size / BYTES_PER_SECOND[tier], 1)
 
 
+EDGE_ATTEMPTS = 4
+
+
 async def _edge_piece(text: str, voice: str) -> bytes:
-    audio = bytearray()
-    async for chunk in edge_tts.Communicate(text, voice, rate="-5%").stream():
-        if chunk["type"] == "audio":
-            audio += chunk["data"]
-    return bytes(audio)
+    """One piece from the free service, retried with a growing pause: the service
+    sometimes drops a connection or returns nothing, especially under load."""
+    for attempt in range(EDGE_ATTEMPTS):
+        try:
+            audio = bytearray()
+            async for chunk in edge_tts.Communicate(text, voice, rate="-5%").stream():
+                if chunk["type"] == "audio":
+                    audio += chunk["data"]
+            if audio:
+                return bytes(audio)
+            raise RuntimeError("no audio returned")
+        except Exception:
+            if attempt == EDGE_ATTEMPTS - 1:
+                raise
+            await asyncio.sleep(1.5 * 2**attempt)  # 1.5 s, 3 s, 6 s
+    raise RuntimeError("unreachable")
 
 
 async def _edge(text: str, voice: str, out_path: Path) -> None:

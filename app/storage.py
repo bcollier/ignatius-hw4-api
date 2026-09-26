@@ -103,7 +103,10 @@ class LocalStore:
         target.write_bytes(data)
 
     async def get_file(self, path: str) -> bytes:
-        return self.local_path(path).read_bytes()
+        try:
+            return self.local_path(path).read_bytes()
+        except OSError as exc:  # same contract as SupabaseStore: missing files raise StorageError
+            raise StorageError("File not found.") from exc
 
     async def log_llm_call(self, row: dict) -> None:
         row = {"created_at": datetime.now(timezone.utc).isoformat(), **row}

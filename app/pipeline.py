@@ -21,7 +21,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import config, llm, llm_log, pricing, prompts, search, series, tts
+from . import config, llm, llm_log, pricing, profile, prompts, search, series, tts
 from .extract import Extracted, Image
 from .storage import StorageError, store
 
@@ -250,6 +250,7 @@ async def series_context(retreat: dict, model: str) -> str:
 async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
     meter = pricing.Meter(retreat["model"], await pricing.prices())
     llm_log.tag(user_id=retreat["user_id"], retreat_id=retreat["id"], purpose="plan")
+    await profile.use_for_job(retreat["user_id"])  # "user info.md" informs every call
     series_text = await series_context(retreat, retreat["model"])
     async with _jobs:
         try:
@@ -414,6 +415,7 @@ async def _build_day(
         await save(retreat)
 
     llm_log.tag(user_id=retreat["user_id"], retreat_id=retreat["id"], day=day_no)
+    await profile.use_for_job(retreat["user_id"])  # "user info.md" informs every call
     series_text = await series_context(retreat, meter.model)
     recordings: dict[tuple[str, str], asyncio.Task] = {}
     errors: dict[tuple[str, str], Exception] = {}

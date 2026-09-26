@@ -24,6 +24,10 @@ async def complete(model: str, system: str, text: str, meter, images: list[tuple
     """One chat completion. `images` are (bytes, mime) pairs sent as data URLs; if the
     model or proxy refuses them, ImagesRejected is raised so the caller can retry
     without them. Every call is logged to llm_calls."""
+    from .prompts import BACKGROUND, PERSON, person_block  # background, then the person's own notes
+
+    about = person_block(PERSON.get())
+    system = BACKGROUND + "\n\n" + (about + "\n\n" if about else "") + system
     timer = llm_log.Timer()
     before = meter.summary()
     result: dict = {}

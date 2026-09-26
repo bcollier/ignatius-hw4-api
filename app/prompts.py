@@ -1,6 +1,46 @@
 """Prompts for planning a retreat and writing each day's scripts."""
 
+import contextvars
 import re
+
+# Sent ahead of every prompt to every model (see llm._call and jetstream.complete),
+# so each step understands the tradition it's writing for.
+BACKGROUND = """Background for this work (for your understanding; don't recite it to the listener):
+
+This app, Ignatius at Home, turns material a person has chosen (a retreat handout, scripture passages, readings, images) into a guided audio retreat they pray at home, usually one day at a time, often week after week over months.
+
+The Spiritual Exercises. Ignatius of Loyola (1491 to 1556), founder of the Jesuits, wrote the Spiritual Exercises as a manual for the person who gives them, not a book to be read straight through; Pope Paul III approved them in 1548. They are a structured path of prayer, traditionally arranged in four "weeks" that are stages rather than calendar weeks: the first on God's love, sin and mercy; the second on the life of Christ and following him; the third on his passion; the fourth on the resurrection and love in action. They open with the Principle and Foundation, on what we are made for and the freedom (Ignatius calls it indifference) to choose what leads there. Features that matter for this app:
+- Each prayer period begins by asking for a specific grace, "what I want and desire," named plainly.
+- Imaginative contemplation: entering a Gospel scene with the senses, as if present. Application of the senses gathers a scene through each sense.
+- The colloquy: speaking to God or to Christ "as one friend speaks to another," usually at the end of a period, closing with the Our Father.
+- Repetition: returning to the points where one felt more consolation or desolation, rather than always moving on to new material.
+- Consolation and desolation: the inner movements of the heart toward or away from God (peace, desire, tears, or dryness, restlessness). Noticing them is the heart of discernment; the director helps the person notice, not tell them what to feel.
+- The Examen: a short daily review of the day with gratitude, noticing where God was present.
+- The one who gives the Exercises should not push the retreatant but "let the Creator deal directly with the creature" (Annotation 15). Guidance should invite, not instruct or moralize.
+
+A retreat. A retreat is a period set apart for prayer. The full Exercises can be made over about thirty days in silence, or, following Ignatius' nineteenth annotation, "in daily life": at home over many months, with a set time of prayer each day and regular meetings with a spiritual director. Programs of this kind often run through the school year week by week, with a handout of scripture and readings for each week. That is the listener here: an adult praying for perhaps half an hour a day, in the middle of work and family life.
+
+Lectio divina. "Divine reading" is the monastic practice of slow, prayerful reading of scripture, central to the Rule of Saint Benedict. The Carthusian Guigo II (twelfth century) named its steps in The Ladder of Monks: lectio (reading), meditatio (meditation), oratio (prayer), contemplatio (contemplation). Pope Benedict XVI's Verbum Domini (2010, paragraph 87) describes them as: what does the text say in itself; what does it say to us; what do we say to the Lord in response; and taking up God's way of seeing, with actio (action) following.
+
+How a day in this app is prayed. The day opens by asking for the grace, then a short silence. The passage is read four times, loosely following lectio divina: the first reading simply to hear it (lectio); then the reflection for the heart, and the second reading, listening for what the text says to me (meditatio); then the deep dive on its theology, history and interpretation, and the third reading, listening for what God may offer or ask; then a silence framed by a bell (contemplatio); then the last reading, answered in one's own words as a colloquy (oratio), and a closing. The reflection is heard between the first and second readings; the deep dive between the second and third. Everything is heard aloud, once, in order, so each part should prepare for the next and never assume the listener can look back at a page.
+"""
+
+
+# What the person has written about themselves ("user info.md"), set for the length
+# of a job so every model call made for them includes it (llm._call, jetstream.complete).
+PERSON: contextvars.ContextVar[str] = contextvars.ContextVar("person", default="")
+
+
+def person_block(about: str) -> str:
+    if not about.strip():
+        return ""
+    return (
+        "About the person praying, in their own words (from their saved notes; it may be a summary). Let it shape "
+        "your choice of examples, images and tone, and what you notice or ask about. Don't quote it back, don't "
+        "mention that you have notes about them, and don't assume more than it says.\n<about_the_person>\n"
+        + about.strip() + "\n</about_the_person>"
+    )
+
 
 HOUSE_STYLE = """House style for anything that will be read aloud:
 - Plain prose paragraphs. No headings, lists, bold, emoji or markdown.

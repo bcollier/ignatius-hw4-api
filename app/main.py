@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import auth, config, llm_log, pipeline, pricing, prompts, script_pdf, search, series, tts
+from . import auth, config, llm_log, pipeline, pricing, profile, prompts, script_pdf, search, series, talk, tts
 from .auth import User, current_user
 from .extract import ExtractError, extract
 from .storage import LocalStore, StorageError, store
@@ -141,6 +141,7 @@ async def options():
             "usd_per_1k_chars": config.ELEVENLABS_USD_PER_1K_CHARS,
             "balance": await pricing.elevenlabs_balance(),
         },
+        "talk": talk.options(),
         "search_providers": search.configured(),
         "search_status": search.status(),
         "default_search_provider": search.default_provider(),
@@ -180,6 +181,81 @@ def me(user: User = Depends(current_user)):
         "anonymous": user.anonymous,
         "mode": "full" if user.full else "free",
     }
+
+
+class TalkRequest(BaseModel):
+    provider: str | None = None
+    voice: str | None = None
+    sdp: str | None = None  # the browser's WebRTC offer (OpenAI)
+    retreat_id: str | None = None
+
+
+@app.post("/api/talk/session")
+async def talk_session(body: TalkRequest, user: User = Depends(current_user)):
+    """Start a live conversation with the companion, with the person's notes and the
+    retreat (and which days they've listened to) as its context."""
+    retreat = None
+    if body.retreat_id:
+        retreat = await pipeline.get(body.retreat_id)
+        if not retreat or retreat["user_id"] != user.id:
+            raise HTTPException(404, "Retreat not found.")
+    p = await profile.load(user.id)
+    provider = body.provider or talk.options()["default_provider"]
+    try:
+        return await talk.start(user, retreat, p["about"], p["companion_notes"], provider or "", body.voice or "", body.sdp)
+    except talk.TalkError as exc:
+        raise HTTPException(exc.status, str(exc)) from exc
+
+
+class TalkEnd(BaseModel):
+    session_id: str
+    seconds: int = 0
+    transcript: str = ""
+
+
+@app.post("/api/talk/end")
+async def talk_end(body: TalkEnd, user: User = Depends(current_user)):
+    """The browser reports the end of a conversation: counts free minutes, logs the transcript."""
+    await talk.end(user, body.session_id, body.seconds, body.transcript)
+    return {"ok": True}
+
+
+class ProfileRequest(BaseModel):
+    about: str | None = None
+    companion_notes: str | None = None
+
+
+@app.get("/api/profile")
+async def read_profile(user: User = Depends(current_user)):
+    """What the person has told the app about themselves ("user info.md")."""
+    return await profile.load(user.id)
+
+
+@app.put("/api/profile")
+async def write_profile(body: ProfileRequest, user: User = Depends(current_user)):
+    llm_log.tag(user_id=user.id, email=user.email or ("guest" if user.anonymous else None))
+    return await profile.save(user.id, body.about, body.companion_notes, user.full)
+
+
+@app.post("/api/profile/upload")
+async def upload_profile(file: UploadFile = File(...), user: User = Depends(current_user)):
+    """Replace the about-me notes with a text, Markdown, Word or PDF file."""
+    data = await file.read(config.MAX_UPLOAD_MB * 1024 * 1024 + 1)
+    if len(data) > config.MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(413, f"File is larger than {config.MAX_UPLOAD_MB} MB.")
+    name = (file.filename or "notes").lower()
+    if name.endswith((".txt", ".md", ".markdown")):
+        text = data.decode("utf-8", errors="replace")
+    else:
+        try:
+            text = extract(file.filename or "notes", data).text
+        except ExtractError as exc:
+            raise HTTPException(400, "Upload a text (.txt or .md), Word (.docx) or PDF file.") from exc
+    text = text.replace("[Page ", "\n[Page ")
+    if not text.strip():
+        raise HTTPException(400, "No text found in that file.")
+    llm_log.tag(user_id=user.id, email=user.email or ("guest" if user.anonymous else None))
+    return await profile.save(user.id, text, None, user.full, source=file.filename or "upload")
 
 
 @app.get("/api/retreats")

@@ -43,6 +43,7 @@ async def _call(meter: pricing.Meter, **params) -> anthropic.types.Message:
     Every call is logged to llm_calls, including failures."""
     messages = list(params.pop("messages"))
     request_messages = list(messages)
+    params["system"] = _with_background(params.get("system", ""))
     timer = llm_log.Timer()
     before = meter.summary()
     searches: list = []
@@ -92,6 +93,16 @@ async def _call(meter: pricing.Meter, **params) -> anthropic.types.Message:
             duration_ms=timer.ms,
             error=error,
         )
+
+
+def _with_background(system):
+    """Every prompt starts with the background on the Exercises, retreats and lectio
+    divina (prompts.BACKGROUND), then what the person wrote about themselves, if
+    anything (prompts.PERSON). With a series, both join the cached first block."""
+    lead = prompts.BACKGROUND + "\n\n" + (prompts.person_block(prompts.PERSON.get()) + "\n\n" if prompts.PERSON.get() else "")
+    if isinstance(system, list):
+        return [{**system[0], "text": lead + system[0]["text"]}] + system[1:]
+    return lead + system
 
 
 def _system(instructions: str, series_text: str):
@@ -318,6 +329,16 @@ async def tailor_guide(context: str, heart: str, deep: str, lines: dict, meter: 
             ok = grace in text  # the request for the grace must survive word for word
         out[name] = text if ok else default
     return out
+
+
+async def condense_text(instructions: str, text: str, meter: pricing.Meter) -> str:
+    """A plain summarizing call (used for long profile notes)."""
+    if config.LLM_MODE == "stub":
+        return text[: config.PROFILE_MAX_CHARS]
+    if pricing.is_jetstream(meter.model):
+        return await jetstream.complete(pricing.api_model(meter.model), instructions, text, meter)
+    message = await _call(meter, system=instructions, max_tokens=8000, messages=[{"role": "user", "content": text}])
+    return _text(message)
 
 
 def _split_script(text: str) -> tuple[str, list[str]]:
