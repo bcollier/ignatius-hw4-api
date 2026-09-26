@@ -122,3 +122,13 @@ def test_writers_know_the_rest_of_the_retreat():
     tight = prompts.retreat_so_far(plan, days, 3, max_chars=100)
     assert "HEART TWO" not in tight and "HEART ONE" in tight  # too long: title only, older short day still fits
     assert prompts.retreat_so_far({"days": plan["days"][:1]}, {}, 1) == ""
+
+
+def test_passage_is_copied_between_its_first_and_last_words():
+    from app.llm import passage_between
+
+    text = ("Day 3\n[Page 2]\nPsalm 33\nRejoice in Yahweh, you righteous!\nPraise is fitting for the upright.\n"
+            "Our soul has waited for Yahweh.\nHe is our help and our shield.\n\nDay 4 Jeremiah 18")
+    got = passage_between(text, "Rejoice in Yahweh, you righteous! Praise is", "waited for Yahweh. He is our help and our shield")
+    assert got.startswith("Rejoice in Yahweh") and got.endswith("our shield.") and "Day 4" not in got
+    assert passage_between(text, "words that are not there at all", "our shield") == ""

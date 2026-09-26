@@ -298,6 +298,7 @@ async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
         try:
             plan = await llm.plan_retreat(source, retreat["filename"], plan_prompt, meter, series_text)
         except llm.LLMError as exc:
+            log.warning("planning %s failed: %s", retreat["id"], exc)
             retreat.update(status="failed", error=str(exc), costs={"plan": meter.summary()})
             await llm_log.step(f"Planning failed: {exc}")
             return await save(retreat)

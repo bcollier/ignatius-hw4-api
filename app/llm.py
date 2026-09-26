@@ -166,7 +166,9 @@ def _parse_json(text: str) -> dict:
     try:
         return json.loads(match.group(0))
     except json.JSONDecodeError as exc:
-        raise LLMError("The model returned a plan that couldn't be read.") from exc
+        log.warning("unreadable plan JSON (%s characters): %s", len(text), exc)
+        raise LLMError(f"The model returned a plan that couldn't be read ({exc.msg} at character {exc.pos:,} "
+                       f"of {len(text):,}).") from exc
 
 
 def _image_block(data: bytes, mime: str) -> dict:
@@ -231,15 +233,72 @@ async def _plan_jetstream(
     text += f"\n<source>\n{source.text}\n</source>"
     text = _with_series(text, series_text)
     images = [(img.data, img.mime) for img in source.images + source.scanned_pages]
+    model = pricing.api_model(meter.model)
     try:
         try:
-            reply = await jetstream.complete(pricing.api_model(meter.model), system, text, meter, images=images, max_tokens=32000)
+            reply = await jetstream.complete(model, system, text, meter, images=images, max_tokens=32000, whole=True)
         except jetstream.ImagesRejected:
             log.warning("jetstream refused images; planning from text only")
-            reply = await jetstream.complete(pricing.api_model(meter.model), system, text, meter, max_tokens=32000)
+            images = []
+            reply = await jetstream.complete(model, system, text, meter, max_tokens=32000, whole=True)
+    except jetstream.Truncated:
+        # A long handout: the full plan (every passage copied out) doesn't fit in one
+        # reply. Ask for a compact plan that marks each passage's first and last words,
+        # and copy the passages from the source here, word for word.
+        log.warning("plan cut off at the output limit; planning compactly")
+        await llm_log.step("The plan was too long for one reply, so the model is marking each day's passage instead "
+                           "of copying it out, and the app is copying the passages from your document.")
+        return await _plan_compact(source, model, system, text, images, meter)
     except jetstream.JetstreamError as exc:
         raise LLMError(str(exc)) from exc
     return _clean_plan(_parse_json(reply), len(source.images))
+
+
+COMPACT_PLAN = (
+    "\n\nYour full plan would be too long to write in one reply. Write the same plan, but for each day put "
+    "\"PASSAGE\" in passage_text, and add two fields: passage_start, the first ten words of that day's passage "
+    "exactly as they appear in the source, and passage_end, the last ten words exactly as they appear. The app "
+    "copies everything between them from the source."
+)
+
+
+async def _plan_compact(source: Extracted, model: str, system: str, text: str, images, meter: pricing.Meter) -> dict:
+    try:
+        reply = await jetstream.complete(model, system + COMPACT_PLAN, text, meter, images=images, max_tokens=32000, whole=True)
+    except jetstream.Truncated as exc:
+        raise LLMError("This document is too long for the free model to plan. Try a Claude model, or a shorter document.") from exc
+    except jetstream.JetstreamError as exc:
+        raise LLMError(str(exc)) from exc
+    plan = _parse_json(reply)
+    for day in plan.get("days", []):
+        day["passage_text"] = passage_between(source.text, day.pop("passage_start", ""), day.pop("passage_end", ""))
+    return _clean_plan(plan, len(source.images))
+
+
+def passage_between(text: str, start: str, end: str) -> str:
+    """The source text from the words `start` begins with to the words `end` ends with,
+    matched loosely (spacing, line breaks and page markers may differ). Empty if either
+    can't be found, so that day is dropped rather than invented."""
+    def pattern(words: str, take: int, from_end: bool) -> str:
+        ws = re.findall(r"\w+", words)
+        ws = ws[-take:] if from_end else ws[:take]
+        return r"\W+(?:\[Page \d+\]\W+)?".join(re.escape(w) for w in ws)
+
+    if not start.strip() or not end.strip():
+        return ""
+    first = re.search(pattern(start, 6, False), text, re.I)
+    if not first:
+        return ""
+    last = None
+    for m in re.finditer(pattern(end, 6, True), text[first.start():], re.I):
+        last = m
+        break
+    if not last:
+        return ""
+    end_at = first.start() + last.end()
+    tail = re.match(r"[^\w\s]*", text[end_at:])  # keep closing punctuation and quotes
+    passage = text[first.start(): end_at + (tail.end() if tail else 0)]
+    return re.sub(r"\[Page \d+\]\n?", "", passage).strip()
 
 
 def _clean_plan(plan: dict, image_count: int) -> dict:

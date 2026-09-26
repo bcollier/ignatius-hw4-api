@@ -20,10 +20,21 @@ class ImagesRejected(JetstreamError):
     pass
 
 
-async def complete(model: str, system: str, text: str, meter, images: list[tuple[bytes, str]] = (), max_tokens: int = 16000) -> str:
+class Truncated(JetstreamError):
+    """The reply stopped at the service's output limit; `partial` is what came back."""
+
+    def __init__(self, message: str, partial: str):
+        super().__init__(message)
+        self.partial = partial
+
+
+async def complete(model: str, system: str, text: str, meter, images: list[tuple[bytes, str]] = (), max_tokens: int = 16000,
+                   whole: bool = False) -> str:
     """One chat completion. `images` are (bytes, mime) pairs sent as data URLs; if the
     model or proxy refuses them, ImagesRejected is raised so the caller can retry
-    without them. Every call is logged to llm_calls."""
+    without them. A reply cut off at the output limit is logged as an error, and with
+    `whole` (the caller needs all of it, like a JSON plan) raises Truncated. Every call
+    is logged to llm_calls."""
     from .prompts import BACKGROUND, PERSON, person_block  # background, then the person's own notes
 
     about = person_block(PERSON.get())
@@ -33,7 +44,13 @@ async def complete(model: str, system: str, text: str, meter, images: list[tuple
     result: dict = {}
     error: str | None = None
     try:
-        return await _complete(model, system, text, meter, images, max_tokens, result)
+        reply = await _complete(model, system, text, meter, images, max_tokens, result)
+        if result.get("finish_reason") == "length":
+            used = meter.summary()["output_tokens"] - before["output_tokens"]
+            error = f"The reply was cut off at the output limit ({used:,} tokens, {len(reply):,} characters)."
+            if whole:
+                raise Truncated(error, reply)
+        return reply
     except JetstreamError as exc:
         error = str(exc)
         raise
