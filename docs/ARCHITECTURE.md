@@ -301,16 +301,16 @@ flowchart TD
     G -- yes --> K
     G -- no --> H["Upload PDF or .docx<br/>choose model · optional planning prompt<br/>tick 'I have rights'"]
     H --> I["Planning… (about a minute)"]
-    I -- failed --> I1["Reason shown; try again"]
+    I -- failed --> I1["Reason shown, try again"]
     I --> K["Retreat: plan, gallery, days"]
     K --> L["Choose voices for guide, reading,<br/>reflection, deep dive · choose model<br/>see estimated cost"]
     L --> M["Build audio for a day<br/>(about 2–3 minutes)"]
-    M -- "some sections failed" --> M1["Reasons shown; rebuild"]
+    M -- "some sections failed" --> M1["Reasons shown, rebuild"]
     M --> N["Day shows total length,<br/>last build cost, track players"]
     N --> O["Pray this day"]
     N --> P["Re-record with other voices<br/>(keeps the scripts)"] --> N
     N --> Q["Rewrite and record"] --> M
-    O --> R["Guided sequence plays;<br/>Back · Skip · Stop"]
+    O --> R["Guided sequence plays,<br/>Back · Skip · Stop"]
     F --> S["Delete a retreat (click twice)"]
 ```
 
@@ -425,7 +425,7 @@ sequenceDiagram
     participant DB as Postgres
 
     W->>API: POST /api/retreats/{id}/days/{n}/build<br/>{voices, model, heart_prompt, deep_prompt, guide, keep_scripts}
-    API->>API: check voices, model, text lengths; day not already building
+    API->>API: check voices, model, text lengths, day not already building
     API->>DB: save day {status: building, sections waiting}
     API->>J: start task
     API-->>W: 202 retreat
@@ -490,7 +490,7 @@ flowchart TD
         a1["Opening: asks for the day's grace"] --> a2["Silence 10–20 s"]
     end
     subgraph P2["Part 2"]
-        b1["Before the first reading:<br/>we'll hear it four times; simply listen"] --> b2["First reading"]
+        b1["Before the first reading:<br/>we'll hear it four times, simply listen"] --> b2["First reading"]
     end
     subgraph P3["Part 3"]
         c1["For the heart"]
