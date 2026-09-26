@@ -838,6 +838,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** The circles had already been removed, and the reference already cleaned ("Romans 8:18–25"); the phone was showing an older copy of the page (GitHub Pages lets browsers keep it for up to ten minutes). The app now checks for a newer version when it opens and whenever the tab comes back into view, and reloads itself if there is one, but never in the middle of a prayer or a conversation.
 
+### 134. 2026-09-26, 23:57 UTC
+
+> When I tap start talking it briefly shows an error or something underneath and then says microphone note allowed *(with a screenshot of the Talk page in Chrome on an iPhone)*
+
+**What was done:** The app asks for the microphone right on the tap, so the refusal comes from the phone or browser. On an iPhone the browser asks only once per site; after that, or when the phone blocks the microphone for the browser, it refuses without asking. The message now says exactly where to allow it for the browser in use (for Chrome on iPhone: Settings, Apps, Chrome, Microphone), and shows the error name in small print.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
