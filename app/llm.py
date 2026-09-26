@@ -270,35 +270,59 @@ async def _plan_compact(source: Extracted, model: str, system: str, text: str, i
     except jetstream.JetstreamError as exc:
         raise LLMError(str(exc)) from exc
     plan = _parse_json(reply)
-    for day in plan.get("days", []):
-        day["passage_text"] = passage_between(source.text, day.pop("passage_start", ""), day.pop("passage_end", ""))
+    days = plan.get("days", [])
+    starts, pos = [], 0
+    for day in days:  # passages come in order, so each one is looked for after the last
+        at = passage_start(source.text, day.get("passage_start", ""), pos)
+        starts.append(at)
+        pos = at if at is not None else pos
+    for i, day in enumerate(days):
+        stop = next((s for s in starts[i + 1:] if s is not None and starts[i] is not None and s > starts[i]), None)
+        text = source.text[starts[i]:] if starts[i] is not None else ""
+        day["passage_text"] = passage_between(text, day.pop("passage_start", ""), day.pop("passage_end", ""),
+                                              stop - starts[i] if stop else None) if text else ""
     return _clean_plan(plan, len(source.images))
 
 
-def passage_between(text: str, start: str, end: str) -> str:
+def passage_between(text: str, start: str, end: str, stop_at: int | None = None) -> str:
     """The source text from the words `start` begins with to the words `end` ends with,
-    matched loosely (spacing, line breaks and page markers may differ). Empty if either
-    can't be found, so that day is dropped rather than invented."""
-    def pattern(words: str, take: int, from_end: bool) -> str:
-        ws = re.findall(r"\w+", words)
-        ws = ws[-take:] if from_end else ws[:take]
-        return r"\W+(?:\[Page \d+\]\W+)?".join(re.escape(w) for w in ws)
-
-    if not start.strip() or not end.strip():
+    matched loosely (spacing, line breaks and page markers may differ). The end is the
+    LAST match before `stop_at` (the next day's passage), because psalms often end with
+    their opening line. Empty if either can't be found, so that day is dropped rather
+    than invented."""
+    first = passage_start(text, start)
+    if first is None or not end.strip():
         return ""
-    first = re.search(pattern(start, 6, False), text, re.I)
-    if not first:
+    after = first + len(" ".join(_words(start)[:ANCHOR_WORDS]))
+    window = text[after: stop_at if stop_at and stop_at > after else len(text)]
+    matches = list(re.finditer(_anchor(end, from_end=True), window, re.I))
+    if not matches:
         return ""
-    last = None
-    for m in re.finditer(pattern(end, 6, True), text[first.start():], re.I):
-        last = m
-        break
-    if not last:
-        return ""
-    end_at = first.start() + last.end()
+    end_at = after + matches[-1].end()
     tail = re.match(r"[^\w\s]*", text[end_at:])  # keep closing punctuation and quotes
-    passage = text[first.start(): end_at + (tail.end() if tail else 0)]
+    passage = text[first: end_at + (tail.end() if tail else 0)]
     return re.sub(r"\[Page \d+\]\n?", "", passage).strip()
+
+
+ANCHOR_WORDS = 6
+
+
+def _words(phrase: str) -> list[str]:
+    return re.findall(r"\w+", phrase)
+
+
+def _anchor(phrase: str, from_end: bool = False) -> str:
+    ws = _words(phrase)
+    ws = ws[-ANCHOR_WORDS:] if from_end else ws[:ANCHOR_WORDS]
+    return r"\W+(?:\[Page \d+\]\W+)?".join(re.escape(w) for w in ws)
+
+
+def passage_start(text: str, start: str, after: int = 0) -> int | None:
+    """Where a passage beginning with the words `start` begins in the source."""
+    if not start.strip():
+        return None
+    m = re.compile(_anchor(start), re.I).search(text, after)
+    return m.start() if m else None
 
 
 def _clean_plan(plan: dict, image_count: int) -> dict:

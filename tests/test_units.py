@@ -132,3 +132,13 @@ def test_passage_is_copied_between_its_first_and_last_words():
     got = passage_between(text, "Rejoice in Yahweh, you righteous! Praise is", "waited for Yahweh. He is our help and our shield")
     assert got.startswith("Rejoice in Yahweh") and got.endswith("our shield.") and "Day 4" not in got
     assert passage_between(text, "words that are not there at all", "our shield") == ""
+
+
+def test_a_psalm_that_ends_with_its_first_line_is_copied_whole():
+    from app.llm import passage_between
+
+    text = ("Day 1\nO LORD, our Lord, How majestic is Your name in all the earth!\nWhat is man that You take thought of him?\n"
+            "O LORD, our Lord, How majestic is Your name in all the earth!\n\nDay 2\nBless the LORD, O my soul!")
+    stop = text.index("Day 2")
+    got = passage_between(text, "O LORD, our Lord, How majestic is Your name", "How majestic is Your name in all the earth!", stop)
+    assert "What is man" in got and got.count("How majestic") == 2 and "Bless" not in got
