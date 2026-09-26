@@ -700,6 +700,20 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Added a debug mode, turned on by opening the site with ?debug=true (?debug=false turns it off) and remembered in the browser. Without it, the build log link, "Show the technical details", "Watch the technical details" on New retreat and the Costs link are hidden. Removed the long "Research notes for this retreat" link at the foot; each day's short "Research notes" link stays.
 
+### 112. 2026-09-26, 23:30 UTC
+
+> don't do the exact same retreat for the premium and the free examples, have one be come and see and the other be Blessed retreat. build another example to suggest when doing new retreat (instead of blessed since that will already be done).
+>
+> when you're done rebuild both the premium and the free
+
+**What was done:** The premium example stays "Come and See" (Claude Fable with ElevenLabs), rebuilt with the new prompts and the free research as a head start. The free example is now "Blessed" (Muse with every free search service, four Microsoft voices). A third example document, "I Am" (six of the "I am" sayings in John), replaces Blessed on the New retreat page. The build tool now takes each example from its own document, re-records failed clips, and replaces the old example only when the new one is ready.
+
+### 113. 2026-09-26, 23:40 UTC
+
+> after clicking into the examples add a way to dismiss each example from the home page
+
+**What was done:** An example's page now has "Remove it from my home page". It's saved to the person's account with their progress, so it holds across devices. The home page shows "Show … again" when any are hidden. New endpoint: POST /api/retreats/{id}/hidden.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

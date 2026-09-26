@@ -44,6 +44,7 @@ async def save_retreat(retreat: dict) -> None:
         return
     everything = await demos.load_state(retreat["_viewer"])
     everything[retreat["id"]] = {
+        **everything.get(retreat["id"], {}),  # keeps other personal choices, like hiding it
         "start_date": retreat.get("start_date"),
         "days": {n: {k: d.get(k) for k in PERSONAL_DAY_FIELDS} for n, d in retreat["days"].items()},
     }

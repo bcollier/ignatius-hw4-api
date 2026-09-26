@@ -30,7 +30,9 @@ async def list_retreats(user: User = Depends(current_user)):
     mine = [r for r in await store.list_for(user.id) if r["id"] not in registered]
     examples_list = await _example_summaries(user, registered)
     await _add_cover_urls(mine + examples_list)
-    return {"retreats": mine, "examples": examples_list}
+    shown = [r for r in examples_list if not r.pop("hidden")]
+    hidden = [{"id": r["id"], "title": r["title"]} for r in examples_list if r not in shown]
+    return {"retreats": mine, "examples": shown, "hidden_examples": hidden}
 
 
 async def _example_summaries(user: User, registered: dict) -> list[dict]:
@@ -39,7 +41,8 @@ async def _example_summaries(user: User, registered: dict) -> list[dict]:
     for rid, meta in registered.items():
         retreat = await pipeline.get(rid)
         if retreat and retreat.get("status") == "ready":
-            out.append({**summary(demos.personal(retreat, state.get(rid), meta)), "demo": meta, "read_only": True})
+            out.append({**summary(demos.personal(retreat, state.get(rid), meta)), "demo": meta, "read_only": True,
+                        "hidden": bool((state.get(rid) or {}).get("hidden"))})
     return out
 
 
@@ -248,3 +251,20 @@ async def delete_retreat(retreat: dict = Depends(my_retreat)):
         raise HTTPException(409, "Wait for the current job to finish before deleting this retreat.")
     await store.delete(retreat)
     return {"deleted": retreat["id"]}
+
+
+class HideRequest(BaseModel):
+    hidden: bool = True
+
+
+@router.post("/{retreat_id}/hidden")
+async def hide_example(body: HideRequest, retreat: dict = Depends(readable_retreat), user: User = Depends(current_user)):
+    """Take an example off this person's home page (or put it back). Only for examples;
+    it's their own choice, kept with their progress in it."""
+    if retreat["id"] not in await demos.registry():
+        raise HTTPException(400, "Only example retreats can be hidden.")
+    state = await demos.load_state(user.id)
+    mine = state.setdefault(retreat["id"], {})
+    mine["hidden"] = body.hidden
+    await demos.save_state(user.id, state)
+    return {"id": retreat["id"], "hidden": body.hidden}

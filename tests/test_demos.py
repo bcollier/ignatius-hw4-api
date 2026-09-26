@@ -100,3 +100,22 @@ def test_example_retreat_is_shared_but_progress_is_personal(client):
     assert client.delete(f"/api/retreats/{rid}").status_code == 409
     asyncio.run(demos.unregister(rid))
     assert client.get(f"/api/retreats/{rid}").json().get("read_only") is None  # an ordinary retreat again
+
+
+def test_an_example_can_be_hidden_from_the_home_page(client):
+    rid = made(client)
+    asyncio.run(demos.register(rid, "Example retreat · free", "free"))
+    as_user(VISITOR)
+    client.post(f"/api/retreats/{rid}/days/1/prayed", json={"word": "Still"})
+    assert client.post(f"/api/retreats/{rid}/hidden", json={"hidden": True}).json()["hidden"] is True
+    lib = client.get("/api/retreats").json()
+    assert lib["examples"] == [] and lib["hidden_examples"][0]["id"] == rid
+    client.post(f"/api/retreats/{rid}/days/2/prayed", json={})  # praying it later doesn't unhide it
+    assert client.get("/api/retreats").json()["examples"] == []
+    client.post(f"/api/retreats/{rid}/hidden", json={"hidden": False})
+    back = client.get("/api/retreats").json()
+    assert back["examples"][0]["id"] == rid and back["hidden_examples"] == [] and back["examples"][0]["days_prayed"] == 2
+    as_user(OWNER)
+    own = made(client)
+    assert client.post(f"/api/retreats/{own}/hidden", json={"hidden": True}).status_code == 400
+    asyncio.run(demos.unregister(rid))
