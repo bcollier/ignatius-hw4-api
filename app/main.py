@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import auth, config, llm_log, pipeline, pricing, prompts, script_pdf, tts
+from . import auth, config, llm_log, pipeline, pricing, prompts, script_pdf, search, tts
 from .auth import User, current_user
 from .extract import ExtractError, extract
 from .storage import LocalStore, StorageError, store
@@ -111,6 +111,8 @@ async def options():
             "usd_per_1k_chars": config.ELEVENLABS_USD_PER_1K_CHARS,
             "balance": await pricing.elevenlabs_balance(),
         },
+        "search_providers": search.available(),
+        "default_search_provider": search.default_provider(),
         "free_mode": {
             "enabled": config.FREE_MODE,
             "models": [m for m, _ in pricing.jetstream_models()],
@@ -246,8 +248,10 @@ class BuildRequest(BaseModel):
     guide: dict[str, str] = {}
     # Re-record with new voices but keep the written reflection and deep dive.
     keep_scripts: bool = False
-    # Which Claude model writes the reflection and deep dive (an id from /api/options).
+    # Which model writes the reflection and deep dive (an id from /api/options).
     model: str | None = None
+    # Web research for Jetstream models: a key of search_providers, or "none".
+    search_provider: str | None = None
 
 
 @app.post("/api/retreats/{retreat_id}/days/{day}/build", status_code=202)
@@ -274,9 +278,14 @@ async def build_day(
             raise HTTPException(400, f"The '{name}' guidance is longer than {prompts.MAX_GUIDE_CHARS} characters.")
         if text:
             guide[name] = text
+    provider = body.search_provider or search.default_provider()  # None when no service has a key
+    if provider == "none":
+        provider = None
+    elif provider is not None and provider not in search.available():
+        raise HTTPException(400, f"Unknown or unavailable search service: {provider}")
     llm_log.tag(email=user.email or ("guest" if user.anonymous else None))  # inherited by the build job
     try:
-        await pipeline.start_day_build(retreat, day, voices, heart, deep, guide, body.keep_scripts, model)
+        await pipeline.start_day_build(retreat, day, voices, heart, deep, guide, body.keep_scripts, model, provider)
     except tts.TTSError as exc:
         raise HTTPException(400, str(exc)) from exc
     return await pipeline.public_view(retreat)

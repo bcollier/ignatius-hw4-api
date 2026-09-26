@@ -13,7 +13,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import config, llm, llm_log, pricing, prompts, tts
+from . import config, llm, llm_log, pricing, prompts, search, tts
 from .extract import Extracted
 from .storage import StorageError, store
 
@@ -167,7 +167,8 @@ SECTIONS = ("guide", "reading", "heart", "deep")  # each can have its own voice
 
 
 async def start_day_build(
-    retreat: dict, day_no: int, voices: dict, heart_prompt: str, deep_prompt: str, guide: dict, keep_scripts: bool, model: str
+    retreat: dict, day_no: int, voices: dict, heart_prompt: str, deep_prompt: str, guide: dict, keep_scripts: bool, model: str,
+    search_provider: str | None = None,
 ) -> dict:
     for section in SECTIONS:
         tts.tier_of(voices[section])  # raises TTSError for an unknown voice
@@ -185,12 +186,13 @@ async def start_day_build(
     )
     await save(retreat)
     meter = pricing.Meter(model, await pricing.prices())
-    spawn(retreat, _build_day(retreat, day_no, heart_prompt, deep_prompt, guide, old if keep_scripts else {}, meter))
+    spawn(retreat, _build_day(retreat, day_no, heart_prompt, deep_prompt, guide, old if keep_scripts else {}, meter, search_provider))
     return state
 
 
 async def _build_day(
-    retreat: dict, day_no: int, heart_prompt: str, deep_prompt: str, guide: dict, kept: dict, meter: pricing.Meter
+    retreat: dict, day_no: int, heart_prompt: str, deep_prompt: str, guide: dict, kept: dict, meter: pricing.Meter,
+    search_provider: str | None = None,
 ) -> None:
     state = retreat["days"][str(day_no)]
     day = retreat["plan"]["days"][day_no - 1]
@@ -229,8 +231,9 @@ async def _build_day(
             k = kept["deep"]
             return await record("tracks", "deep", k["script"], voices["deep"], sources=k.get("sources", []), web_search=k.get("web_search"))
         state["tracks"]["deep"]["status"] = "writing"
-        script, sources, searched = await llm.write_deep(context, deep_prompt, words_for("deep"), meter)
-        await record("tracks", "deep", script, voices["deep"], sources=sources, web_search=searched)
+        script, sources, searched = await llm.write_deep(context, deep_prompt, words_for("deep"), meter, search_provider)
+        await record("tracks", "deep", script, voices["deep"], sources=sources, web_search=searched,
+                     research=search.PROVIDERS.get(search_provider) if searched and pricing.is_jetstream(meter.model) else None)
 
     reading = re.sub(r"\n{3,}", "\n\n", day["passage_text"]).strip()
     jobs = {("tracks", "reading"): record("tracks", "reading", reading, voices["reading"]),

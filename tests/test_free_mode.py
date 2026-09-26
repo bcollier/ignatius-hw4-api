@@ -112,14 +112,18 @@ def test_free_deep_dive_searches_and_keeps_only_real_sources(monkeypatch):
         return ("<script>The father runs.</script><sources>\nLexicon - https://real.example/lexicon\n"
                 "Invented - https://made-up.example/page\n</sources>")
 
-    async def fake_search(queries):
+    async def fake_search(queries, provider):
         assert queries == ["Luke 15 historical setting", "splagchnizomai meaning", "Church Fathers prodigal son"]
-        return [{"title": "Lexicon", "url": "https://real.example/lexicon", "content": "compassion"}]
+        assert provider == "tavily"
+        research = search.Research()
+        research.add("Lexicon", "https://real.example/lexicon", "compassion")
+        research.queries = 3
+        return research
 
     monkeypatch.setattr(jetstream, "complete", fake_complete)
     monkeypatch.setattr(search, "search", fake_search)
     meter = pricing.Meter("jetstream/llama-4-scout", {})
-    script, sources, searched = asyncio.run(llm.write_deep("Retreat: R\nDay 1: T\nSource reference: Luke 15", "Write.", 500, meter))
+    script, sources, searched = asyncio.run(llm.write_deep("Retreat: R\nDay 1: T\nSource reference: Luke 15", "Write.", 500, meter, "tavily"))
     assert script == "The father runs." and searched
     assert sources == ["Lexicon - https://real.example/lexicon"]  # the invented URL is dropped
     assert "<search_results>" in prompts_seen[1][1] and meter.summary()["web_searches"] == 3

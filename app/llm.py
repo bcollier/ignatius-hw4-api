@@ -218,20 +218,25 @@ def stub_plan(source: Extracted, filename: str) -> dict:
 # ---------------------------------------------------------------- scripts
 
 
-async def _deep_jetstream(context: str, instructions: str, words: int, meter: pricing.Meter) -> tuple[str, list[str], bool]:
-    """Jetstream models can't search, so with Tavily configured the server does it:
-    the model proposes queries, Tavily runs them, and the model writes from the
-    results. Sources are limited to URLs that were actually returned."""
+async def _deep_jetstream(
+    context: str, instructions: str, words: int, meter: pricing.Meter, provider: str | None
+) -> tuple[str, list[str], bool]:
+    """Jetstream models can't search, so the server does: the model proposes queries,
+    a search service runs them, and the model writes from the results. Sources are
+    limited to URLs that were actually returned."""
     model = pricing.api_model(meter.model)
     results: list[dict] = []
     try:
-        if search.enabled() and config.WEB_SEARCH:
+        if provider and config.WEB_SEARCH:
             llm_log.tag(purpose="search_queries")
             reply = await jetstream.complete(model, prompts.SEARCH_QUERIES, context, meter, max_tokens=4000)
-            llm_log.tag(purpose="deep")
             queries = [q.strip(" -*0123456789.\"'\t") for q in reply.splitlines() if q.strip()][:3]
-            results = await search.search(queries or [context.splitlines()[2]])
-            meter.searches += len(queries)
+            llm_log.tag(purpose="research")
+            research = await search.search(queries or [context.splitlines()[2]], provider)
+            results = research.results
+            meter.searches += research.queries
+            meter.usd += research.usd
+            llm_log.tag(purpose="deep")
         note = prompts.SEARCH_RESULTS if results else prompts.SEARCH_OFF
         system = instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=note, words=words)
         user = context + ("\n\n" + search.as_prompt(results) if results else "")
@@ -270,7 +275,9 @@ async def write_heart(context: str, instructions: str, words: int, meter: pricin
     return _split_script(_text(message))[0]
 
 
-async def write_deep(context: str, instructions: str, words: int, meter: pricing.Meter) -> tuple[str, list[str], bool]:
+async def write_deep(
+    context: str, instructions: str, words: int, meter: pricing.Meter, search_provider: str | None = None
+) -> tuple[str, list[str], bool]:
     """Returns (script, sources, searched)."""
     if config.LLM_MODE == "stub":
         return f"Stub deep dive on the passage. {context[:400]}", [], False
@@ -281,7 +288,7 @@ async def write_deep(context: str, instructions: str, words: int, meter: pricing
         return await _call(meter, system=system, max_tokens=16000, messages=[{"role": "user", "content": context}], **extra)
 
     if pricing.is_jetstream(meter.model):
-        return await _deep_jetstream(context, instructions, words, meter)
+        return await _deep_jetstream(context, instructions, words, meter, search_provider)
 
     searched = config.WEB_SEARCH
     try:

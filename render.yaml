@@ -30,3 +30,9 @@ services:
         sync: false
       - key: TAVILY_API_KEY
         sync: false
+      - key: EXA_API_KEY
+        sync: false
+      - key: BRAVE_SEARCH_API_KEY
+        sync: false
+      - key: BRAVE_ANSWERS_API_KEY
+        sync: false

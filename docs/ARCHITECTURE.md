@@ -52,7 +52,7 @@ flowchart LR
     subgraph AI["Model and voice services"]
         OR["OpenRouter<br/>Anthropic-compatible API"]
         JS["Jetstream2 inference<br/>(Open WebUI proxy, OpenAI-compatible)<br/>free mode"]
-        TV["Tavily search<br/>free mode"]
+        TV["Research services<br/>Tavily · Exa · Brave Search · Brave Answers<br/>free mode"]
         CLAUDE["Claude<br/>(Opus 5 by default)<br/>+ web search"]
         EDGE["Microsoft neural voices<br/>(edge-tts, free)"]
         ELEVEN["ElevenLabs<br/>(premium voices)"]
@@ -84,7 +84,7 @@ flowchart LR
 | File storage | Supabase Storage | Extracted images and every MP3, in a private bucket. |
 | Claude | Anthropic, reached through OpenRouter | Plans the retreat, writes the reflection and deep dive, searches the web for the deep dive (full mode). |
 | Open models | Jetstream2 inference service (Llama 4 Scout, Muse Glimmer) | The same writing jobs for free-mode users. |
-| Tavily | Tavily search API | Web search for free-mode deep dives, run by the server. |
+| Research services | Tavily, Exa, Brave Search, Brave Answers | Web research for free-mode deep dives, run by the server; the user picks one. |
 | Voices | Microsoft (free), ElevenLabs (premium) | Turn scripts into MP3. |
 
 ---
@@ -163,8 +163,8 @@ erDiagram
         text email "or guest"
         uuid retreat_id FK
         int day
-        text purpose "plan | heart | deep | search_queries"
-        text provider "openrouter | anthropic | jetstream"
+        text purpose "plan | heart | deep | search_queries | research"
+        text provider "openrouter | anthropic | jetstream | brave_answers"
         text model
         jsonb request "system + messages, images as placeholders"
         text response_text
@@ -545,18 +545,25 @@ flowchart LR
 
 Both services produce constant-bitrate MP3, so pieces can be joined byte for byte and the length follows directly from the file size.
 
-**Free-mode deep dive.** Jetstream's models can't search, so the server does it for them:
+**Free-mode deep dive.** Jetstream's models can't search, so the server does it for them, with the service chosen on the page ("Web research for the deep dive"):
+
+| Service | Call | What becomes a result |
+| --- | --- | --- |
+| Tavily | `POST api.tavily.com/search` (Bearer key), basic depth, 4 results | title, URL, content snippet |
+| Exa | `POST api.exa.ai/search` (`x-api-key`), type auto, 4 results with highlights | title, URL, highlights; Exa's reported cost is added to the day's cost |
+| Brave Search | `GET api.search.brave.com/res/v1/web/search` (`X-Subscription-Token`), 4 results with extra snippets | title, URL, description and extra snippets |
+| Brave Answers | `POST api.search.brave.com/res/v1/chat/completions` (its own key), model `brave`, streamed, citations on | the written answer (under its first cited URL) and each citation's snippet; also logged in `llm_calls` as provider `brave_answers` |
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant J as Build job
     participant M as Jetstream model
-    participant T as Tavily
+    participant T as Research service
     J->>M: "Write three search queries for this passage"
     M-->>J: three queries
     loop each query
-        J->>T: POST /search (basic, 4 results)
+        J->>T: search (up to 4 results)
         T-->>J: title, url, snippet
     end
     J->>M: deep-dive prompt + day context + numbered results<br/>"cite only URLs from the results"
@@ -855,7 +862,7 @@ Serves files from `DATA_DIR` when Supabase isn't configured. In production, file
 | Supabase Storage | `GET/POST /storage/v1/bucket` | Startup: create the bucket if missing |
 | OpenRouter | `POST /api/v1/messages` (Anthropic Messages format, streamed) | Planning, reflection, deep dive |
 | OpenRouter | `GET /api/v1/models` | Prices, cached 6 hours |
-| Tavily | `POST https://api.tavily.com/search` (`Authorization: Bearer tvly-…`) | Free-mode deep dives: three basic searches (1 credit each) |
+| Tavily / Exa / Brave Search / Brave Answers | See section 7 | Free-mode deep dives: three queries with the chosen service |
 | Jetstream2 | `POST /api/chat/completions` (OpenAI format, `Authorization: Bearer <token>`) | Free-mode planning and writing; images are offered for planning and dropped if refused |
 | Microsoft (edge-tts) | WebSocket speech synthesis | Free voices |
 | ElevenLabs | `POST /v1/text-to-speech/{voice}` | Premium voices |
@@ -937,6 +944,7 @@ flowchart LR
 | `app/tts.py` | Voices, tiers, chunking, Microsoft and ElevenLabs recording, lengths |
 | `app/script_pdf.py` | The printable script PDF |
 | `app/llm_log.py` | The model call log |
+| `app/search.py` | Research services for free-mode deep dives |
 | `app/pricing.py` | Model list, live prices, cost meter, ElevenLabs balance |
 | `app/config.py` | Environment settings |
 | `tests/` | API flow, errors, storage and auth against a fake Supabase, cost math, text helpers |
@@ -974,7 +982,11 @@ flowchart LR
 | `JETSTREAM_MODELS` | `llama-4-scout,muse-glimmer` | Free-mode models |
 | `FREE_MODE` / `FREE_MAX_RETREATS` | `1` / 3 | Free mode switch and retreat cap |
 | `LOCAL_USER_MODE` | | `free` previews free mode locally |
-| `TAVILY_API_KEY` / `TAVILY_SEARCH_DEPTH` | / `basic` | Web search for free-mode deep dives |
+| `TAVILY_API_KEY` / `TAVILY_SEARCH_DEPTH` | / `basic` | Tavily research |
+| `EXA_API_KEY` | | Exa research |
+| `BRAVE_SEARCH_API_KEY` | | Brave Search research |
+| `BRAVE_ANSWERS_API_KEY` | | Brave Answers research (a separate Brave plan and key) |
+| `SEARCH_PROVIDER` | `brave` | Default research service |
 | `ALLOWED_ORIGINS` | localhost ports | CORS origins |
 | `DATA_DIR` | `/tmp/ignatius` | Local storage when Supabase is off |
 | `MAX_UPLOAD_MB` / `MAX_PAGES` / `MAX_SOURCE_CHARS` | 15 / 40 / 80,000 | Upload limits |

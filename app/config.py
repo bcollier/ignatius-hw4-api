@@ -59,6 +59,12 @@ JETSTREAM_MODELS = _list("JETSTREAM_MODELS", "llama-4-scout,muse-glimmer")
 # Tavily web search for free-mode deep dives (the Jetstream models can't search).
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "").strip()
 TAVILY_SEARCH_DEPTH = os.environ.get("TAVILY_SEARCH_DEPTH", "basic")  # basic = 1 credit, advanced = 2
+EXA_API_KEY = os.environ.get("EXA_API_KEY", "").strip()
+BRAVE_SEARCH_API_KEY = os.environ.get("BRAVE_SEARCH_API_KEY", "").strip()  # Brave "Search" plan
+BRAVE_ANSWERS_API_KEY = os.environ.get("BRAVE_ANSWERS_API_KEY", "").strip()  # Brave "Answers" plan (separate key)
+# Default research service for free mode: tavily, exa, brave or brave_answers
+# (falls back to the first one with a key). Users can pick another on the page.
+SEARCH_PROVIDER = os.environ.get("SEARCH_PROVIDER", "brave")
 
 # Who gets the full app (Claude, web search, ElevenLabs). Empty means everyone.
 ALLOWED_EMAILS = [e.lower() for e in _list("ALLOWED_EMAILS", "")]
