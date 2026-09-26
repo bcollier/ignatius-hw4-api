@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import auth, config, pipeline, pricing, prompts, script_pdf, tts
+from . import auth, config, llm_log, pipeline, pricing, prompts, script_pdf, tts
 from .auth import User, current_user
 from .extract import ExtractError, extract
 from .storage import LocalStore, StorageError, store
@@ -178,6 +178,7 @@ async def create_retreat(
         source = extract(file.filename or "upload", data)
     except ExtractError as exc:
         raise HTTPException(400, str(exc)) from exc
+    llm_log.tag(email=user.email or ("guest" if user.anonymous else None))  # inherited by the planning job
     retreat = await pipeline.create_retreat(user.id, file.filename or "upload", source, plan_prompt, model)
     return await pipeline.public_view(retreat)
 
@@ -273,6 +274,7 @@ async def build_day(
             raise HTTPException(400, f"The '{name}' guidance is longer than {prompts.MAX_GUIDE_CHARS} characters.")
         if text:
             guide[name] = text
+    llm_log.tag(email=user.email or ("guest" if user.anonymous else None))  # inherited by the build job
     try:
         await pipeline.start_day_build(retreat, day, voices, heart, deep, guide, body.keep_scripts, model)
     except tts.TTSError as exc:

@@ -86,6 +86,11 @@ class LocalStore:
     async def get_file(self, path: str) -> bytes:
         return self.local_path(path).read_bytes()
 
+    async def log_llm_call(self, row: dict) -> None:
+        row = {"created_at": datetime.now(timezone.utc).isoformat(), **row}
+        with open(self.rows.parent / "llm_calls.jsonl", "a") as f:
+            f.write(json.dumps(row) + "\n")
+
     async def urls(self, paths: list[str]) -> dict[str, str]:
         return {p: f"/api/files/{p}?v={int(self.local_path(p).stat().st_mtime)}" for p in paths if self.local_path(p).exists()}
 
@@ -167,6 +172,9 @@ class SupabaseStore:
 
     async def get_file(self, path: str) -> bytes:
         return (await self._request("GET", f"/storage/v1/object/{self.bucket}/{path}")).content
+
+    async def log_llm_call(self, row: dict) -> None:
+        await self._request("POST", "/rest/v1/llm_calls", json=row, headers={"Prefer": "return=minimal"})
 
     async def urls(self, paths: list[str]) -> dict[str, str]:
         now = time.time()

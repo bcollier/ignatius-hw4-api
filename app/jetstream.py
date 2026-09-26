@@ -7,7 +7,7 @@ import logging
 
 import httpx
 
-from . import config
+from . import config, llm_log
 
 log = logging.getLogger(__name__)
 
@@ -23,7 +23,34 @@ class ImagesRejected(JetstreamError):
 async def complete(model: str, system: str, text: str, meter, images: list[tuple[bytes, str]] = (), max_tokens: int = 8000) -> str:
     """One chat completion. `images` are (bytes, mime) pairs sent as data URLs; if the
     model or proxy refuses them, ImagesRejected is raised so the caller can retry
-    without them."""
+    without them. Every call is logged to llm_calls."""
+    timer = llm_log.Timer()
+    before = meter.summary()
+    result: dict = {}
+    error: str | None = None
+    try:
+        return await _complete(model, system, text, meter, images, max_tokens, result)
+    except JetstreamError as exc:
+        error = str(exc)
+        raise
+    finally:
+        after = meter.summary()
+        await llm_log.record(
+            provider="jetstream",
+            model=meter.model,
+            system=system,
+            messages=[{"role": "user", "content": [{"type": "text", "text": text}] + [
+                {"type": "image", "media_type": mime, "bytes": len(data)} for data, mime in images
+            ]}],
+            response_text=result.get("content"),
+            response_extra={"reasoning": result.get("reasoning"), "finish_reason": result.get("finish_reason")},
+            usage={k: after[k] - before[k] for k in ("input_tokens", "output_tokens", "web_searches", "usd")},
+            duration_ms=timer.ms,
+            error=error,
+        )
+
+
+async def _complete(model, system, text, meter, images, max_tokens, result: dict) -> str:
     content: list[dict] | str = text
     if images:
         content = [{"type": "text", "text": text}] + [
@@ -56,9 +83,15 @@ async def complete(model: str, system: str, text: str, meter, images: list[tuple
         raise JetstreamError(f"Jetstream returned an error ({response.status_code}).")
     try:
         data = response.json()
-        message = data["choices"][0]["message"]["content"] or ""
+        choice = data["choices"][0]
+        message = choice["message"]["content"] or ""
     except (ValueError, KeyError, IndexError) as exc:
         raise JetstreamError("Jetstream returned a response that couldn't be read.") from exc
+    result.update(
+        content=message,
+        reasoning=choice["message"].get("reasoning_content"),  # reasoning models such as Muse Glimmer
+        finish_reason=choice.get("finish_reason"),
+    )
     usage = data.get("usage") or {}
     meter.add_tokens(usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
     if not message.strip():

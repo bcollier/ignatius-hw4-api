@@ -87,7 +87,7 @@ Free mode is on whenever `JETSTREAM_API_KEY` is set. It reaches Jetstream throug
 
 ## Supabase setup
 
-1. Create a project. In the SQL editor run:
+1. Create a project. In the SQL editor, run [`sql/001_retreats.sql`](sql/001_retreats.sql), then [`sql/002_llm_calls.sql`](sql/002_llm_calls.sql). The second adds the log of every model call, and a per-user summary view. The first is also shown here:
 
    ```sql
    create table public.retreats (

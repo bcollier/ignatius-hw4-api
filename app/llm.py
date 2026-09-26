@@ -12,7 +12,7 @@ import re
 
 import anthropic
 
-from . import config, jetstream, pricing, prompts, search
+from . import config, jetstream, llm_log, pricing, prompts, search
 from .extract import Extracted
 
 log = logging.getLogger(__name__)
@@ -39,29 +39,59 @@ def client() -> anthropic.AsyncAnthropic:
 
 
 async def _call(meter: pricing.Meter, **params) -> anthropic.types.Message:
-    """Stream a request (long outputs) and continue server-tool turns that pause."""
+    """Stream a request (long outputs) and continue server-tool turns that pause.
+    Every call is logged to llm_calls, including failures."""
     messages = list(params.pop("messages"))
+    request_messages = list(messages)
+    timer = llm_log.Timer()
+    before = meter.summary()
+    searches: list = []
+    message = None
+    error: str | None = None
     try:
-        for _ in range(4):
-            async with client().messages.stream(
-                model=pricing.api_model(meter.model), messages=messages, **params
-            ) as stream:
-                message = await stream.get_final_message()
-            meter.add(message.usage)
-            if message.stop_reason != "pause_turn":
-                break
-            messages.append({"role": "assistant", "content": message.content})
-    except anthropic.AuthenticationError as exc:
-        raise LLMError("The model provider rejected the API key.") from exc
-    except anthropic.RateLimitError as exc:
-        raise LLMError("The model provider is rate limiting requests. Try again in a minute.") from exc
-    except anthropic.APIConnectionError as exc:
-        raise LLMError("Couldn't reach the model provider.") from exc
-    if message.stop_reason == "refusal":
-        raise LLMError("The model declined to write this section.")
-    if message.stop_reason == "max_tokens":
-        raise LLMError("The model ran out of room before finishing. Try a shorter document.")
-    return message
+        try:
+            for _ in range(4):
+                async with client().messages.stream(
+                    model=pricing.api_model(meter.model), messages=messages, **params
+                ) as stream:
+                    message = await stream.get_final_message()
+                meter.add(message.usage)
+                searches += [b.input for b in message.content if b.type == "server_tool_use"]
+                if message.stop_reason != "pause_turn":
+                    break
+                messages.append({"role": "assistant", "content": message.content})
+        except anthropic.AuthenticationError as exc:
+            raise LLMError("The model provider rejected the API key.") from exc
+        except anthropic.RateLimitError as exc:
+            raise LLMError("The model provider is rate limiting requests. Try again in a minute.") from exc
+        except anthropic.APIConnectionError as exc:
+            raise LLMError("Couldn't reach the model provider.") from exc
+        if message.stop_reason == "refusal":
+            raise LLMError("The model declined to write this section.")
+        if message.stop_reason == "max_tokens":
+            raise LLMError("The model ran out of room before finishing. Try a shorter document.")
+        return message
+    except Exception as exc:
+        error = getattr(exc, "message", None) or str(exc)
+        raise
+    finally:
+        after = meter.summary()
+        await llm_log.record(
+            provider=config.LLM_MODE,
+            model=meter.model,
+            system=params.get("system", ""),
+            messages=request_messages,
+            response_text=_text(message) if message else None,
+            response_extra={
+                "stop_reason": message.stop_reason if message else None,
+                "web_search_queries": searches,
+                "output_format": "json_schema" if "output_config" in params else None,
+                "tools": [t.get("type") for t in params.get("tools", [])],
+            },
+            usage={k: after[k] - before[k] for k in ("input_tokens", "output_tokens", "web_searches", "usd")},
+            duration_ms=timer.ms,
+            error=error,
+        )
 
 
 def _text(message: anthropic.types.Message) -> str:
@@ -196,7 +226,9 @@ async def _deep_jetstream(context: str, instructions: str, words: int, meter: pr
     results: list[dict] = []
     try:
         if search.enabled() and config.WEB_SEARCH:
+            llm_log.tag(purpose="search_queries")
             reply = await jetstream.complete(model, prompts.SEARCH_QUERIES, context, meter, max_tokens=4000)
+            llm_log.tag(purpose="deep")
             queries = [q.strip(" -*0123456789.\"'\t") for q in reply.splitlines() if q.strip()][:3]
             results = await search.search(queries or [context.splitlines()[2]])
             meter.searches += len(queries)

@@ -139,6 +139,8 @@ The database has one application table, linked to Supabase's own users table. Ro
 erDiagram
     AUTH_USERS ||--o{ RETREATS : owns
     RETREATS ||--o{ STORAGE_OBJECTS : "files under {user_id}/{retreat_id}/"
+    AUTH_USERS ||--o{ LLM_CALLS : "made (set null on delete)"
+    RETREATS ||--o{ LLM_CALLS : "for (set null on delete)"
 
     AUTH_USERS {
         uuid id PK
@@ -153,6 +155,27 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at "set on every save"
         jsonb data "the whole retreat document (3.2)"
+    }
+    LLM_CALLS {
+        bigint id PK
+        timestamptz created_at
+        uuid user_id FK
+        text email "or guest"
+        uuid retreat_id FK
+        int day
+        text purpose "plan | heart | deep | search_queries"
+        text provider "openrouter | anthropic | jetstream"
+        text model
+        jsonb request "system + messages, images as placeholders"
+        text response_text
+        jsonb response "stop reason, web search queries, reasoning"
+        int input_tokens
+        int output_tokens
+        int web_searches
+        numeric usd
+        int duration_ms
+        text status "ok | error"
+        text error
     }
     STORAGE_OBJECTS {
         text bucket_id "retreats (private)"
@@ -173,6 +196,31 @@ create table public.retreats (
 create index retreats_user_idx on public.retreats (user_id, created_at desc);
 alter table public.retreats enable row level security;
 ```
+
+The SQL for both tables is in [`sql/`](../sql): `001_retreats.sql` and `002_llm_calls.sql`, which also creates the `llm_usage_by_user` summary view.
+
+### 3.1a The model call log
+
+Every call to a model, Claude or Jetstream, adds one row to `llm_calls`, including calls that fail. The row records:
+- who made it (user id and email, or "guest");
+- which retreat and day, and the purpose: planning, reflection, deep dive, or free-mode search questions;
+- the provider and model;
+- the full prompt (system and messages), with images replaced by their type and size;
+- the full response, with the stop reason, Claude's web search queries, or a Jetstream model's reasoning;
+- tokens, web searches, cost, time taken, and status or error.
+
+Prompts and responses over 200,000 characters are cut, with a note. The log is locked like `retreats` and read in the Supabase dashboard (Table Editor → `llm_calls`, or the `llm_usage_by_user` view for per-user totals). A failure to write a log row is recorded in the server log and never stops the job.
+
+```mermaid
+flowchart LR
+    REQ["Upload or build request<br/>(tags email)"] --> JOB["Background job<br/>(tags user, retreat, day, purpose)"]
+    JOB --> CALL["Model call<br/>llm._call or jetstream.complete"]
+    CALL --> ROW["llm_log.record()"]
+    ROW --> DB[("public.llm_calls")]
+    DB --> VIEW[("llm_usage_by_user view")]
+```
+
+The context travels with the job: the request handler tags the email, the job tags the retreat and day, and the reflection and deep-dive tasks each tag their own purpose. Python context variables are copied into each asyncio task, so parallel calls don't overwrite each other's tags.
 
 **Why a JSON document.** A retreat is read and written as a whole: the page asks for one retreat, and each job step saves one retreat. Keeping it as one `jsonb` value means one read and one upsert per step, no joins, and the shape can grow (as it did with guidance clips and costs) without migrations. The trade-off is that the database can't enforce the inner structure; the API is the only writer, so it enforces it in code.
 
@@ -888,6 +936,7 @@ flowchart LR
 | `app/prompts.py` | Default prompts, house style, spoken guidance templates |
 | `app/tts.py` | Voices, tiers, chunking, Microsoft and ElevenLabs recording, lengths |
 | `app/script_pdf.py` | The printable script PDF |
+| `app/llm_log.py` | The model call log |
 | `app/pricing.py` | Model list, live prices, cost meter, ElevenLabs balance |
 | `app/config.py` | Environment settings |
 | `tests/` | API flow, errors, storage and auth against a fake Supabase, cost math, text helpers |

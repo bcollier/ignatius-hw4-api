@@ -13,7 +13,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import config, llm, pricing, prompts, tts
+from . import config, llm, llm_log, pricing, prompts, tts
 from .extract import Extracted
 from .storage import StorageError, store
 
@@ -127,6 +127,7 @@ async def create_retreat(user_id: str, filename: str, source: Extracted, plan_pr
 
 async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
     meter = pricing.Meter(retreat["model"], await pricing.prices())
+    llm_log.tag(user_id=retreat["user_id"], retreat_id=retreat["id"], purpose="plan")
     async with _jobs:
         try:
             plan = await llm.plan_retreat(source, retreat["filename"], plan_prompt, meter)
@@ -213,13 +214,17 @@ async def _build_day(
         clip.update(status="ready", path=path, seconds=seconds)
         await save(retreat)
 
+    llm_log.tag(user_id=retreat["user_id"], retreat_id=retreat["id"], day=day_no)
+
     async def heart() -> None:
+        llm_log.tag(purpose="heart")
         if "heart" in kept:
             return await record("tracks", "heart", kept["heart"]["script"], voices["heart"])
         state["tracks"]["heart"]["status"] = "writing"
         await record("tracks", "heart", await llm.write_heart(context, heart_prompt, words_for("heart"), meter), voices["heart"])
 
     async def deep() -> None:
+        llm_log.tag(purpose="deep")
         if "deep" in kept:
             k = kept["deep"]
             return await record("tracks", "deep", k["script"], voices["deep"], sources=k.get("sources", []), web_search=k.get("web_search"))
