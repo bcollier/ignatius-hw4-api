@@ -35,6 +35,9 @@ def summary(retreat: dict) -> dict:
     days = retreat.get("days", {})
     prayed = [d.get("prayed_at") for d in days.values() if d.get("prayed_at")]
     plan_days = {str(d["day"]): d for d in (retreat.get("plan") or {}).get("days", [])}
+    images = retreat.get("images", [])
+    first = next((i for d in plan_days.values() for i in (d.get("image_indexes") or [d.get("image_index", -1)])
+                  if 0 <= i < len(images)), None)
     return {
         "id": retreat["id"],
         "title": (retreat.get("plan") or {}).get("title") or retreat["filename"],
@@ -48,6 +51,7 @@ def summary(retreat: dict) -> dict:
         "series": retreat.get("series", []),
         "start_date": retreat.get("start_date"),
         "progress": retreat.get("progress"),
+        "cover_path": images[first]["path"] if first is not None else None,  # the API turns this into a URL
         # One entry per day, for the library's day chips and the Continue card.
         "day_states": [
             {

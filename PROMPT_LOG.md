@@ -536,6 +536,18 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Added a "To do" section to docs/IMPROVEMENTS.md with the SMTP steps. Saved the three branded templates in docs/email-templates.md so they're ready to paste.
 
+### 85. 2026-09-26, 19:40 UTC
+
+> my premium user page look not as good as teh new user, where are the example guides *(with a screenshot of the library signed in as ben@collier.phd)*
+
+**What was done:** The examples were built under Ben's account, so they were listed as his own retreats, with a Delete link that would have removed them for everyone. Examples are now always listed as examples, even for the account that built them, and can't be deleted from the site. Your own retreats now show a cover painting, and a single retreat is one clean card.
+
+### 86. 2026-09-26, 19:45 UTC
+
+> *(screenshot of the sign-in page: "Couldn't send the link: email rate limit exceeded")*
+
+**What was done:** Explained that Supabase's built-in sender allows only a couple of sign-in emails an hour (fixed by the SMTP to-do). The sign-in page now says so plainly and points to "Try it without an account".
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

@@ -91,8 +91,12 @@ def test_example_retreat_is_shared_but_progress_is_personal(client):
     assert client.delete(f"/api/retreats/{rid}").status_code == 404
     assert client.post(f"/api/retreats/{rid}/days/1/build", json={"voices": VOICES}).status_code == 404
 
+    # The account that built it sees it as an example too, with its own progress, and can't delete it here.
     as_user(OWNER)
     own = client.get(f"/api/retreats/{rid}").json()
-    assert not own["days"]["1"].get("journal") and own["start_date"] != "2026-09-01" and not own.get("read_only")
-    assert client.get("/api/retreats").json()["examples"] == []  # the owner sees it as their own
+    assert own["read_only"] and not own["days"]["1"].get("journal") and own["start_date"] != "2026-09-01"
+    lib = client.get("/api/retreats").json()
+    assert [r["id"] for r in lib["examples"]] == [rid] and rid not in [r["id"] for r in lib["retreats"]]
+    assert client.delete(f"/api/retreats/{rid}").status_code == 409
     asyncio.run(demos.unregister(rid))
+    assert client.get(f"/api/retreats/{rid}").json().get("read_only") is None  # an ordinary retreat again

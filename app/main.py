@@ -98,12 +98,13 @@ async def my_retreat(retreat_id: str, user: User = Depends(current_user)) -> dic
 
 
 async def readable_retreat(retreat_id: str, user: User = Depends(current_user)) -> dict:
-    """The person's own retreat, or a demo retreat seen with their own progress laid
-    over it (marked read_only; save changes with save_retreat)."""
+    """The person's own retreat, or an example retreat seen with their own progress laid
+    over it (marked read_only; save changes with save_retreat). Examples are read only
+    on the site even for the account that built them; tools/ can still rebuild them."""
     retreat = await pipeline.get(retreat_id)
-    if retreat and retreat["user_id"] == user.id:
-        return retreat
     meta = (await demos.registry()).get(retreat_id)
+    if retreat and retreat["user_id"] == user.id and not meta:
+        return retreat
     if not retreat or not meta:
         raise HTTPException(404, "Retreat not found.")
     mine = (await demos.load_state(user.id)).get(retreat_id)
@@ -308,18 +309,20 @@ async def upload_profile(file: UploadFile = File(...), user: User = Depends(curr
 
 @app.get("/api/retreats")
 async def list_retreats(user: User = Depends(current_user)):
-    mine = await store.list_for(user.id)
-    own_ids = {r["id"] for r in mine}
-    examples = []
+    """Your retreats, and the example retreats (with your own progress in them).
+    Examples are always listed as examples, even for the account that built them."""
     registered = await demos.registry()
+    mine = [r for r in await store.list_for(user.id) if r["id"] not in registered]
+    examples = []
     state = await demos.load_state(user.id) if registered else {}
     for rid, meta in registered.items():
-        retreat = None if rid in own_ids else await pipeline.get(rid)
+        retreat = await pipeline.get(rid)
         if retreat and retreat.get("status") == "ready":
-            first = next((d.get("image_index", -1) for d in retreat["plan"]["days"] if d.get("image_index", -1) >= 0), -1)
-            cover = retreat["images"][first]["path"] if 0 <= first < len(retreat["images"]) else None
-            examples.append({**summary(demos.personal(retreat, state.get(rid), meta)), "demo": meta, "read_only": True,
-                             "cover": (await store.urls([cover])).get(cover) if cover else None})
+            examples.append({**summary(demos.personal(retreat, state.get(rid), meta)), "demo": meta, "read_only": True})
+    everything = mine + examples
+    urls = await store.urls([p for r in everything if (p := r.get("cover_path"))])
+    for r in everything:
+        r["cover"] = urls.get(r.pop("cover_path", None))
     return {"retreats": mine, "examples": examples}
 
 
@@ -518,6 +521,8 @@ async def listening_progress(day: int, body: ProgressRequest, retreat: dict = De
 
 @app.delete("/api/retreats/{retreat_id}")
 async def delete_retreat(retreat: dict = Depends(my_retreat)):
+    if retreat["id"] in await demos.registry():
+        raise HTTPException(409, "This is an example retreat that everyone sees. Unregister it before deleting it.")
     if retreat["id"] in pipeline.active:
         raise HTTPException(409, "Wait for the current job to finish before deleting this retreat.")
     await store.delete(retreat)
