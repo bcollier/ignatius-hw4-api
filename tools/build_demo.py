@@ -10,8 +10,6 @@ premium: planned and written by Claude Fable 5.1 with web search, recorded with 
 """
 
 import asyncio
-import json
-import os
 import sys
 import time
 from pathlib import Path

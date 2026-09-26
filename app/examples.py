@@ -32,6 +32,6 @@ def file_for(slug: str, kind: str) -> Path | None:
     e = catalog().get(slug)
     if not e:
         return None
-    rel = {"pdf": e.get("file"), "cover": e.get("cover_image"), "txt": e.get("txt") or f"{slug}.txt"}[kind]
+    rel = {"pdf": e.get("file"), "cover": e.get("cover_image"), "txt": e.get("txt") or f"{slug}.txt"}.get(kind)
     path = (DIR / rel).resolve() if rel else None
     return path if path and path.is_file() and DIR in path.parents else None

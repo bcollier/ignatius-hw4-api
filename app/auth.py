@@ -20,8 +20,13 @@ CACHE_SECONDS = 300
 class User:
     id: str
     email: str
-    full: bool = True  # False: free mode (Jetstream models, free voices, few retreats)
+    full: bool = True  # False: free mode (Jetstream models and the free voices)
     anonymous: bool = False
+
+    @property
+    def log_email(self) -> str | None:
+        """How this person appears in the llm_calls log: their email, or "guest"."""
+        return self.email or ("guest" if self.anonymous else None)
 
 
 def enabled() -> bool:

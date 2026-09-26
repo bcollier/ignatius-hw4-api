@@ -9,7 +9,7 @@ import pymupdf
 import pytest
 from fastapi.testclient import TestClient
 
-from app import config, jetstream, llm, main, pipeline, pricing, prompts, tts
+from app import config, jetstream, llm, main, pipeline, pricing, tts
 from app.auth import User, current_user
 from app.storage import store
 

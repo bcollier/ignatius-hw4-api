@@ -2,6 +2,8 @@
 
 > ## 📐 How it all works: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 >
+> How the code is organized and kept readable: [docs/CODE_CLEANUP.md](docs/CODE_CLEANUP.md)
+>
 > The full documentation, with 26 diagrams: the system and hosting on Render and Supabase, the database ERD, sign-in and guest flows, how a retreat is made step by step, the research services, the prayer player, Talk it over, example retreats, the research page, status lifecycles, every API endpoint with example requests and responses, costs, security, and failure handling.
 >
 > **Live app:** https://bcollier.github.io/ignatius-hw4-web/ · **Frontend repo, with screenshots and the full story:** [ignatius-hw4-web](https://github.com/bcollier/ignatius-hw4-web) · **Every prompt used to build it:** [PROMPT_LOG.md](PROMPT_LOG.md) · **Design spec:** [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md)
@@ -320,7 +322,7 @@ flowchart TD
     OVER --> NO["Build or delete: 404, rename: 403"]
 ```
 
-- `readable_retreat` in `app/main.py` returns the owner's retreat or the personal view (`demos.personal`); `save_retreat` writes either the retreat or just the visitor's own fields (start date, prayed, journal, listening) to `{user_id}/demo_state.json`.
+- `readable_retreat` in `app/access.py` returns the owner's retreat or the personal view (`demos.personal`); `save_retreat` writes either the retreat or just the visitor's own fields (start date, prayed, journal, listening) to `{user_id}/demo_state.json`.
 - `GET /api/retreats` returns `{retreats, examples}`; each example is a summary with the person's own progress, `demo: {label, kind}`, `read_only: true` and a signed `cover` image URL.
 - Nobody's models or voices are spent when someone listens to an example.
 
@@ -557,7 +559,10 @@ Names only; values go in `.env` or Render's dashboard.
 
 | File | Responsibility |
 | --- | --- |
-| `app/main.py` | Routes, validation, error format, CORS, startup; `my_retreat` (owner) and `readable_retreat` (owner or example) |
+| `app/main.py` | The app: CORS, error format, start-up, and the list of routers |
+| `app/routes/` | The routes, one module per area (meta, retreats, days, build log, costs, conversation, about me, example documents) |
+| `app/checks.py` | Request checks: prompts, dates, models, series, build options |
+| `app/access.py` | `my_retreat` (owner) and `readable_retreat` (owner or example), and saving an example's personal progress |
 | `app/auth.py` | Token check with Supabase Auth (cached), allowlist, guests, local user |
 | `app/storage.py` | `SupabaseStore` (rows, files, signed URLs, call log) and `LocalStore`; library summaries |
 | `app/pipeline.py` | Background jobs: planning, making every day, building a day in listening order, saving research, heartbeat and resume, progress, costs |
@@ -580,7 +585,7 @@ Names only; values go in `.env` or Render's dashboard.
 | `samples/demo/` | The "Come and See" package and `make_demo.py` |
 | `samples/` | Other public-domain sample uploads |
 | `sql/` | `001_retreats.sql`, `002_llm_calls.sql` |
-| `docs/` | `ARCHITECTURE.md`, `IMPROVEMENTS.md` |
+| `docs/` | `ARCHITECTURE.md`, `IMPROVEMENTS.md`, `CODE_CLEANUP.md` (how the code is organized and kept readable) |
 
 ---
 

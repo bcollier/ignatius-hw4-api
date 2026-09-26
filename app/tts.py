@@ -194,46 +194,75 @@ def _write_words(text: str, spoken: list[tuple[float, str]], out_path: Path) -> 
         words_path(out_path).write_text(json.dumps(words))
 
 
+ELEVENLABS_FORMAT = "mp3_44100_128"
+PREVIOUS_TEXT_CHARS = 500  # the text before each piece, so the voice carries on in the same tone
+ELEVENLABS_TIMEOUT = 120
+
+
 async def _elevenlabs(text: str, voice: str, out_path: Path) -> None:
     # The with-timestamps endpoint costs the same and also gives each character's time.
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice}/with-timestamps"
-    headers = {"xi-api-key": config.ELEVENLABS_API_KEY}
     audio = bytearray()
     spoken: list[tuple[float, str]] = []
-    async with httpx.AsyncClient(timeout=120) as http:
+    async with httpx.AsyncClient(timeout=ELEVENLABS_TIMEOUT) as http:
         previous = ""
         for piece in chunk_text(text, ELEVENLABS_CHUNK):
-            body = {"text": piece, "model_id": config.ELEVENLABS_MODEL, "previous_text": previous[-500:]}
-            for attempt in range(ELEVENLABS_ATTEMPTS):
-                try:
-                    async with _eleven_slots:
-                        response = await http.post(url, headers=headers, params={"output_format": "mp3_44100_128"}, json=body)
-                except httpx.HTTPError as exc:
-                    if attempt == ELEVENLABS_ATTEMPTS - 1:
-                        raise TTSError("Couldn't reach ElevenLabs.") from exc
-                    await asyncio.sleep(2 * 2**attempt)
-                    continue
-                busy = response.status_code == 429 and "quota" not in response.text.lower()  # an error body, not audio
-                if busy and attempt < ELEVENLABS_ATTEMPTS - 1:
-                    await asyncio.sleep(2 * 2**attempt)  # too many at once: wait our turn
-                    continue
-                break
-            if response.status_code == 401:
-                raise TTSError("ElevenLabs rejected the API key.")
-            failed = response.status_code >= 400
-            if response.status_code == 429 and "quota" not in response.text.lower():
-                raise TTSError("ElevenLabs is busy (too many requests at once). Try again in a minute.")
-            if response.status_code == 402 or (failed and "quota" in response.text.lower()):
-                raise TTSError("ElevenLabs is out of credits. Use the free tier or add credits.")
-            if response.status_code >= 400:
-                raise TTSError(f"ElevenLabs returned an error ({response.status_code}).")
-            try:
-                data = response.json()
-                clip = base64.b64decode(data["audio_base64"])
-            except (ValueError, KeyError) as exc:
-                raise TTSError("ElevenLabs returned an unexpected response.") from exc
-            spoken += words_from_alignment(data.get("alignment") or {}, len(audio) / BYTES_PER_SECOND["premium"])
+            body = {"text": piece, "model_id": config.ELEVENLABS_MODEL, "previous_text": previous[-PREVIOUS_TEXT_CHARS:]}
+            response = await _eleven_post(http, url, body)
+            _check_eleven_response(response)
+            clip, alignment = _eleven_audio(response)
+            spoken += words_from_alignment(alignment, len(audio) / BYTES_PER_SECOND["premium"])
             audio += clip  # constant-bitrate MP3 pieces can be joined directly
             previous = piece
     out_path.write_bytes(bytes(audio))
     _write_words(text, spoken, out_path)
+
+
+def _backoff(attempt: int) -> float:
+    return 2 * 2**attempt  # 2, 4, 8, 16 seconds
+
+
+async def _eleven_post(http: httpx.AsyncClient, url: str, body: dict) -> httpx.Response:
+    """One piece, retried when ElevenLabs can't be reached or has too many requests at once."""
+    headers = {"xi-api-key": config.ELEVENLABS_API_KEY}
+    for attempt in range(ELEVENLABS_ATTEMPTS):
+        last_try = attempt == ELEVENLABS_ATTEMPTS - 1
+        try:
+            async with _eleven_slots:
+                response = await http.post(url, headers=headers, params={"output_format": ELEVENLABS_FORMAT}, json=body)
+        except httpx.HTTPError as exc:
+            if last_try:
+                raise TTSError("Couldn't reach ElevenLabs.") from exc
+            await asyncio.sleep(_backoff(attempt))
+            continue
+        if _is_busy(response) and not last_try:
+            await asyncio.sleep(_backoff(attempt))  # too many at once: wait our turn
+            continue
+        return response
+    raise TTSError("Couldn't reach ElevenLabs.")  # not reached: the last try returns or raises
+
+
+def _is_busy(response: httpx.Response) -> bool:
+    """429 without "quota" means too many requests at once (an error body, not audio)."""
+    return response.status_code == 429 and "quota" not in response.text.lower()
+
+
+def _check_eleven_response(response: httpx.Response) -> None:
+    status = response.status_code
+    if status == 401:
+        raise TTSError("ElevenLabs rejected the API key.")
+    if _is_busy(response):
+        raise TTSError("ElevenLabs is busy (too many requests at once). Try again in a minute.")
+    if status == 402 or (status >= 400 and "quota" in response.text.lower()):
+        raise TTSError("ElevenLabs is out of credits. Use the free tier or add credits.")
+    if status >= 400:
+        raise TTSError(f"ElevenLabs returned an error ({status}).")
+
+
+def _eleven_audio(response: httpx.Response) -> tuple[bytes, dict]:
+    """The MP3 bytes and the character timings from a with-timestamps reply."""
+    try:
+        data = response.json()
+        return base64.b64decode(data["audio_base64"]), data.get("alignment") or {}
+    except (ValueError, KeyError) as exc:
+        raise TTSError("ElevenLabs returned an unexpected response.") from exc

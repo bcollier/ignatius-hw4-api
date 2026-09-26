@@ -9,6 +9,7 @@ import base64
 import json
 import logging
 import re
+from dataclasses import dataclass, field
 
 import anthropic
 
@@ -38,6 +39,18 @@ def client() -> anthropic.AsyncAnthropic:
     return _client
 
 
+MAX_TURNS = 4  # a server-side tool (web search) may pause the reply; continue it up to this many times
+
+
+@dataclass
+class _Exchange:
+    """What came back from one model call, gathered across paused turns (kept even if
+    a later turn fails, so the log shows how far it got)."""
+    message: anthropic.types.Message | None = None
+    searches: list = field(default_factory=list)
+    blocks: list = field(default_factory=list)  # content from every turn, for the research log
+
+
 async def _call(meter: pricing.Meter, **params) -> anthropic.types.Message:
     """Stream a request (long outputs) and continue server-tool turns that pause.
     Every call is logged to llm_calls, including failures."""
@@ -46,56 +59,69 @@ async def _call(meter: pricing.Meter, **params) -> anthropic.types.Message:
     params["system"] = _with_background(params.get("system", ""))
     timer = llm_log.Timer()
     before = meter.summary()
-    searches: list = []
-    blocks: list = []  # content from every round, for the research log
-    message = None
+    exchange = _Exchange()
     error: str | None = None
     try:
-        try:
-            for _ in range(4):
-                async with client().messages.stream(
-                    model=pricing.api_model(meter.model), messages=messages, **params
-                ) as stream:
-                    message = await stream.get_final_message()
-                meter.add(message.usage)
-                searches += [b.input for b in message.content if b.type == "server_tool_use"]
-                blocks += list(message.content)
-                if message.stop_reason != "pause_turn":
-                    break
-                messages.append({"role": "assistant", "content": message.content})
-        except anthropic.AuthenticationError as exc:
-            raise LLMError("The model provider rejected the API key.") from exc
-        except anthropic.RateLimitError as exc:
-            raise LLMError("The model provider is rate limiting requests. Try again in a minute.") from exc
-        except anthropic.APIConnectionError as exc:
-            raise LLMError("Couldn't reach the model provider.") from exc
-        meter.blocks = blocks
-        if message.stop_reason == "refusal":
-            raise LLMError("The model declined to write this section.")
-        if message.stop_reason == "max_tokens":
-            raise LLMError("The model ran out of room before finishing. Try a shorter document.")
-        return message
+        await _stream_turns(meter, messages, params, exchange)
+        meter.blocks = exchange.blocks
+        _check_stop_reason(exchange.message)
+        return exchange.message
     except Exception as exc:
         error = getattr(exc, "message", None) or str(exc)
         raise
     finally:
-        after = meter.summary()
-        await llm_log.record(
-            provider=config.LLM_MODE,
-            model=meter.model,
-            system=_system_text(params.get("system", "")),
-            messages=request_messages,
-            response_text=_text(message) if message else None,
-            response_extra={
-                "stop_reason": message.stop_reason if message else None,
-                "web_search_queries": searches,
-                "output_format": "json_schema" if "output_config" in params else None,
-                "tools": [t.get("type") for t in params.get("tools", [])],
-            },
-            usage={k: after[k] - before[k] for k in ("input_tokens", "output_tokens", "web_searches", "usd")},
-            duration_ms=timer.ms,
-            error=error,
-        )
+        await _log_call(meter, params, request_messages, exchange, before, timer, error)
+
+
+async def _stream_turns(meter: pricing.Meter, messages: list, params: dict, exchange: _Exchange) -> None:
+    try:
+        for _ in range(MAX_TURNS):
+            async with client().messages.stream(
+                model=pricing.api_model(meter.model), messages=messages, **params
+            ) as stream:
+                message = await stream.get_final_message()
+            exchange.message = message
+            meter.add(message.usage)
+            exchange.searches += [b.input for b in message.content if b.type == "server_tool_use"]
+            exchange.blocks += list(message.content)
+            if message.stop_reason != "pause_turn":
+                return
+            messages.append({"role": "assistant", "content": message.content})
+    except anthropic.AuthenticationError as exc:
+        raise LLMError("The model provider rejected the API key.") from exc
+    except anthropic.RateLimitError as exc:
+        raise LLMError("The model provider is rate limiting requests. Try again in a minute.") from exc
+    except anthropic.APIConnectionError as exc:
+        raise LLMError("Couldn't reach the model provider.") from exc
+
+
+def _check_stop_reason(message: anthropic.types.Message) -> None:
+    if message.stop_reason == "refusal":
+        raise LLMError("The model declined to write this section.")
+    if message.stop_reason == "max_tokens":
+        raise LLMError("The model ran out of room before finishing. Try a shorter document.")
+
+
+async def _log_call(meter: pricing.Meter, params: dict, request_messages: list, exchange: _Exchange, before: dict,
+                    timer: llm_log.Timer, error: str | None) -> None:
+    message = exchange.message
+    after = meter.summary()
+    await llm_log.record(
+        provider=config.LLM_MODE,
+        model=meter.model,
+        system=_system_text(params.get("system", "")),
+        messages=request_messages,
+        response_text=_text(message) if message else None,
+        response_extra={
+            "stop_reason": message.stop_reason if message else None,
+            "web_search_queries": exchange.searches,
+            "output_format": "json_schema" if "output_config" in params else None,
+            "tools": [t.get("type") for t in params.get("tools", [])],
+        },
+        usage={k: after[k] - before[k] for k in ("input_tokens", "output_tokens", "web_searches", "usd")},
+        duration_ms=timer.ms,
+        error=error,
+    )
 
 
 def _with_background(system):
@@ -274,24 +300,13 @@ async def _deep_jetstream(
     a search service runs them, and the model writes from the results. Sources are
     limited to URLs that were actually returned."""
     model = pricing.api_model(meter.model)
-    results: list[dict] = []
     research = None
     try:
         if provider and config.WEB_SEARCH:
-            llm_log.tag(purpose="search_queries")
-            reply = await jetstream.complete(model, prompts.SEARCH_QUERIES, context, meter, max_tokens=16000)
-            queries = _queries(reply)
-            llm_log.tag(purpose="research")
-            research = await search.search(queries or [context.splitlines()[2]], provider)
-            research.query_texts = queries or [context.splitlines()[2]]
-            results = research.results
-            meter.searches += research.queries
-            meter.usd += research.usd
-            llm_log.tag(purpose="deep")
-        note = prompts.SEARCH_RESULTS if results else prompts.SEARCH_OFF
-        system = instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=note, words=words)
-        user = context + ("\n\n" + search.as_prompt(results) if results else "")
-        reply = await jetstream.complete(model, system, _with_series(user, series_text), meter)
+            research = await _server_research(model, context, meter, provider)
+        results = research.results if research else []
+        system = _deep_system(instructions, words, bool(results), search_on=False)
+        reply = await jetstream.complete(model, system, _with_series(_deep_user(context, results), series_text), meter)
     except jetstream.JetstreamError as exc:
         raise LLMError(str(exc)) from exc
     script, sources = _split_script(reply)
@@ -299,11 +314,55 @@ async def _deep_jetstream(
         urls = {r["url"] for r in results}
         sources = [line for line in sources if any(u in line for u in urls)]  # drop anything not from the results
     if research is not None:
-        meter.research = {
-            "how": "server search", "service": research.provider or None, "queries": research.query_texts,
-            "contributors": research.contributors, "skipped": research.skipped, "results": results,
-        }
+        meter.research = _research_record(research, results)
     return script, sources, (research.provider or False) if results else False  # the service that answered
+
+
+async def _server_research(model: str, context: str, meter: pricing.Meter, provider: str):
+    """The Jetstream model writes the queries; the search services run them."""
+    llm_log.tag(purpose="search_queries")
+    reply = await jetstream.complete(model, prompts.SEARCH_QUERIES, context, meter, max_tokens=16000)
+    queries = _queries(reply) or [_passage_ref(context)]
+    llm_log.tag(purpose="research")
+    research = await search.search(queries, provider)
+    research.query_texts = queries
+    meter.searches += research.queries
+    meter.usd += research.usd
+    llm_log.tag(purpose="deep")
+    return research
+
+
+def _passage_ref(context: str) -> str:
+    """The day context's third line (the source reference), a fallback search query."""
+    return context.splitlines()[2]
+
+
+def _deep_system(instructions: str, words: int, has_results: bool, search_on: bool) -> str:
+    """The deep dive's instructions, with a note on what research it has to work with."""
+    if has_results:
+        note = prompts.SEARCH_BOTH if search_on else prompts.SEARCH_RESULTS
+    else:
+        note = prompts.SEARCH_ON if search_on else prompts.SEARCH_OFF
+    return instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=note, words=words)
+
+
+def _deep_user(context: str, results: list[dict]) -> str:
+    return context + ("\n\n" + search.as_prompt(results) if results else "")
+
+
+def _research_record(research, results: list[dict], own: dict | None = None) -> dict:
+    """What the research page shows for the day: the server's searches and results,
+    plus (for Claude) the searches it ran itself."""
+    own_queries = own["queries"] if own else []
+    own_results = own["results"] if own else []
+    return {
+        "how": "server search" + (" + model web search" if own_queries else ""),
+        "service": research.provider or None,
+        "queries": research.query_texts + own_queries,
+        "contributors": research.contributors + (["Claude web search"] if own_results else []),
+        "skipped": research.skipped,
+        "results": results + own_results,
+    }
 
 
 async def tailor_guide(context: str, heart: str, deep: str, lines: dict, meter: pricing.Meter) -> dict:
@@ -380,57 +439,56 @@ async def write_deep(
     context: str, instructions: str, words: int, meter: pricing.Meter, search_provider: str | None = None,
     series_text: str = "",
 ) -> tuple[str, list[str], bool]:
-    """Returns (script, sources, searched)."""
+    """Returns (script, sources, searched). `searched` names the search service(s)
+    when the free services found results, otherwise whether the model searched."""
     if config.LLM_MODE == "stub":
         return f"Stub deep dive on the passage. {context[:400]}", [], False
-
     if pricing.is_jetstream(meter.model):
         return await _deep_jetstream(context, instructions, words, meter, search_provider, series_text)
+    return await _deep_claude(context, instructions, words, meter, search_provider, series_text)
 
+
+async def _deep_claude(
+    context: str, instructions: str, words: int, meter: pricing.Meter, search_provider: str | None, series_text: str
+) -> tuple[str, list[str], bool]:
     # The free search services go first as a head start; Claude still searches as much
     # as it needs (its full allowance), so weak free results never limit the deep dive.
     research = await _free_research(context, meter, search_provider) if config.WEB_SEARCH else None
     results = research.results if research else []
 
     async def attempt(search_on: bool):
-        if results:
-            note = prompts.SEARCH_BOTH if search_on else prompts.SEARCH_RESULTS
-        else:
-            note = prompts.SEARCH_ON if search_on else prompts.SEARCH_OFF
-        system = instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=note, words=words)
         extra = {"tools": [pricing.web_search_tool(meter.model)]} if search_on else {}
-        user = context + ("\n\n" + search.as_prompt(results) if results else "")
-        return await _call(meter, system=_system(system, series_text), max_tokens=32000,
-                           messages=[{"role": "user", "content": user}], **extra)
+        return await _call(meter, system=_system(_deep_system(instructions, words, bool(results), search_on), series_text),
+                           max_tokens=32000, messages=[{"role": "user", "content": _deep_user(context, results)}], **extra)
 
-    searched = config.WEB_SEARCH
-    try:
-        message = await attempt(searched)
-    except anthropic.BadRequestError as exc:
-        if not searched:
-            raise LLMError(f"The model provider rejected the request: {exc.message}") from exc
-        log.warning("web search rejected (%s); writing the deep dive without it", exc.message)
-        searched = False
-        try:
-            message = await attempt(False)
-        except anthropic.BadRequestError as exc2:
-            raise LLMError(f"The model provider rejected the request: {exc2.message}") from exc2
+    message, searched = await _with_search_fallback(attempt)
     # With web search the reply is split into many text blocks around the search
     # results; the <script> tags mark the part to read aloud.
     script, sources = _split_script(_text(message))
     own = _web_search_log(getattr(meter, "blocks", None) or message.content) if searched else None
     if research is not None:
-        meter.research = {
-            "how": "server search" + (" + model web search" if own and own["queries"] else ""),
-            "service": research.provider or None, "queries": research.query_texts + (own["queries"] if own else []),
-            "contributors": research.contributors + (["Claude web search"] if own and own["results"] else []),
-            "skipped": research.skipped, "results": results + (own["results"] if own else []),
-        }
+        meter.research = _research_record(research, results, own)
     elif own:
         meter.research = own
     if results:
         return script, sources, research.provider or True  # names the free service(s) for the page
     return script, sources, searched
+
+
+async def _with_search_fallback(attempt):
+    """Try with web search (when on); if the provider refuses the search tool, write
+    without it rather than fail. Returns (message, whether web search was used)."""
+    searched = config.WEB_SEARCH
+    try:
+        return await attempt(searched), searched
+    except anthropic.BadRequestError as exc:
+        if not searched:
+            raise LLMError(f"The model provider rejected the request: {exc.message}") from exc
+        log.warning("web search rejected (%s); writing the deep dive without it", exc.message)
+    try:
+        return await attempt(False), False
+    except anthropic.BadRequestError as exc2:
+        raise LLMError(f"The model provider rejected the request: {exc2.message}") from exc2
 
 
 def _queries(reply: str) -> list[str]:
@@ -450,7 +508,7 @@ async def _free_research(context: str, meter: pricing.Meter, provider: str | Non
                               messages=[{"role": "user", "content": context}])
         queries = _queries(_text(message))
         llm_log.tag(purpose="research")
-        research = await search.search(queries or [context.splitlines()[2]], provider)
+        research = await search.search(queries or [_passage_ref(context)], provider)
         research.query_texts = queries
         meter.searches += research.queries
         meter.usd += research.usd

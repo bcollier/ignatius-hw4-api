@@ -1,15 +1,14 @@
 """Watching a retreat being made: steps, calls and recordings in order, and .txt uploads."""
 
-import asyncio
 import json
 import time
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app import demos, main, tts
+from app import main, tts
 from app.auth import User, current_user
-from app.storage import store
+from app.routes.build_log import log_row
 
 VOICES = {"guide": "en-US-AvaMultilingualNeural", "reading": "en-US-AndrewMultilingualNeural",
           "heart": "en-US-AndrewMultilingualNeural", "deep": "en-US-ChristopherNeural"}
@@ -63,8 +62,8 @@ def test_txt_upload_and_the_build_log(client):
 def test_private_notes_are_hidden_from_others():
     row = {"id": 1, "purpose": "heart", "request": {"system": "Background.\n<about_the_person>I am grieving.</about_the_person>\nWrite.",
                                                    "messages": [{"role": "user", "content": "Day 1"}]}, "response_text": "x"}
-    mine = main._log_row(row, full=True, owner=True)
-    theirs = main._log_row(row, full=True, owner=False)
+    mine = log_row(row, full=True, owner=True)
+    theirs = log_row(row, full=True, owner=False)
     assert "grieving" in mine["system"] and "grieving" not in theirs["system"] and "[private]" in theirs["system"]
-    short = main._log_row({**row, "response_text": "y" * 5000}, full=False, owner=True)
+    short = log_row({**row, "response_text": "y" * 5000}, full=False, owner=True)
     assert len(short["response"]) < 1300 and "system" not in short and short["system_chars"] > 0
