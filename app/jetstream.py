@@ -20,7 +20,7 @@ class ImagesRejected(JetstreamError):
     pass
 
 
-async def complete(model: str, system: str, text: str, meter, images: list[tuple[bytes, str]] = (), max_tokens: int = 8000) -> str:
+async def complete(model: str, system: str, text: str, meter, images: list[tuple[bytes, str]] = (), max_tokens: int = 16000) -> str:
     """One chat completion. `images` are (bytes, mime) pairs sent as data URLs; if the
     model or proxy refuses them, ImagesRejected is raised so the caller can retry
     without them. Every call is logged to llm_calls."""

@@ -54,7 +54,7 @@ SUPABASE_BUCKET = os.environ.get("SUPABASE_BUCKET", "retreats")
 # WebUI proxy, which is OpenAI-compatible and reachable from outside Jetstream.
 JETSTREAM_API_KEY = os.environ.get("JETSTREAM_API_KEY", "").strip()
 JETSTREAM_BASE_URL = os.environ.get("JETSTREAM_BASE_URL", "https://llm.jetstream-cloud.org/api").rstrip("/")
-JETSTREAM_MODELS = _list("JETSTREAM_MODELS", "llama-4-scout,muse-glimmer")
+JETSTREAM_MODELS = _list("JETSTREAM_MODELS", "muse-glimmer,llama-4-scout")  # the first is the free-mode default
 
 # Tavily web search for free-mode deep dives (the Jetstream models can't search).
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "").strip()

@@ -1004,7 +1004,7 @@ flowchart LR
 | `ALLOWED_EMAILS` | anyone | Who gets full mode |
 | `JETSTREAM_API_KEY` | | Turns on free mode |
 | `JETSTREAM_BASE_URL` | `https://llm.jetstream-cloud.org/api` | Jetstream Open WebUI proxy |
-| `JETSTREAM_MODELS` | `llama-4-scout,muse-glimmer` | Free-mode models |
+| `JETSTREAM_MODELS` | `muse-glimmer,llama-4-scout` | Free-mode models; the first is the default |
 | `FREE_MODE` / `FREE_MAX_RETREATS` | `1` / 3 | Free mode switch and retreat cap |
 | `LOCAL_USER_MODE` | | `free` previews free mode locally |
 | `TAVILY_API_KEY` / `TAVILY_SEARCH_DEPTH` | / `basic` | Tavily research |

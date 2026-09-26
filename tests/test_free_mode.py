@@ -50,7 +50,7 @@ def test_guest_gets_jetstream_and_a_retreat_cap(guest):
     assert me["mode"] == "free" and me["anonymous"] and me["max_retreats"] == config.FREE_MAX_RETREATS
 
     r = upload(guest)
-    assert r.status_code == 202 and r.json()["model"] == "jetstream/llama-4-scout"
+    assert r.status_code == 202 and r.json()["model"] == "jetstream/muse-glimmer"  # Muse is the default
     assert upload(guest, model="anthropic/claude-opus-5").status_code == 403
 
     for _ in range(config.FREE_MAX_RETREATS - 1):

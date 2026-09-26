@@ -163,10 +163,10 @@ async def _plan_jetstream(source: Extracted, filename: str, instructions: str, m
     images = [(img.data, img.mime) for img in source.images + source.scanned_pages]
     try:
         try:
-            reply = await jetstream.complete(pricing.api_model(meter.model), system, text, meter, images=images, max_tokens=16000)
+            reply = await jetstream.complete(pricing.api_model(meter.model), system, text, meter, images=images, max_tokens=32000)
         except jetstream.ImagesRejected:
             log.warning("jetstream refused images; planning from text only")
-            reply = await jetstream.complete(pricing.api_model(meter.model), system, text, meter, max_tokens=16000)
+            reply = await jetstream.complete(pricing.api_model(meter.model), system, text, meter, max_tokens=32000)
     except jetstream.JetstreamError as exc:
         raise LLMError(str(exc)) from exc
     return _clean_plan(_parse_json(reply), len(source.images))
@@ -230,7 +230,7 @@ async def _deep_jetstream(
     try:
         if provider and config.WEB_SEARCH:
             llm_log.tag(purpose="search_queries")
-            reply = await jetstream.complete(model, prompts.SEARCH_QUERIES, context, meter, max_tokens=4000)
+            reply = await jetstream.complete(model, prompts.SEARCH_QUERIES, context, meter, max_tokens=16000)
             queries = [q.strip(" -*0123456789.\"'\t") for q in reply.splitlines() if q.strip()][:3]
             llm_log.tag(purpose="research")
             research = await search.search(queries or [context.splitlines()[2]], provider)
