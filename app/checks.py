@@ -62,7 +62,7 @@ def check_model(model: str | None, user: User) -> str:
     if not user.full:
         model = model or (free_models[0] if free_models else "")
         if model not in free_models:
-            raise HTTPException(403, "Free mode uses the Jetstream models. Claude is reserved for the site owner.")
+            raise HTTPException(403, "Free mode uses the free open models. Claude is reserved for the site owner.")
         return model
     model = model or config.LLM_MODEL
     if model not in pricing.model_ids():

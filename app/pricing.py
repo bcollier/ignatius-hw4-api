@@ -26,9 +26,9 @@ MODELS = [
 BASIC_SEARCH_MODELS = {"anthropic/claude-haiku-4.5"}
 
 JETSTREAM_LABELS = {
-    "llama-4-scout": "Llama 4 Scout (Jetstream, free)",
-    "muse-glimmer": "Muse Glimmer (Jetstream, free)",
-    "gpt-oss-120b": "gpt-oss-120b (Jetstream, free)",
+    "llama-4-scout": "Llama 4 Scout (free)",
+    "muse-glimmer": "Muse Glimmer (free)",
+    "gpt-oss-120b": "gpt-oss-120b (free)",
 }
 JETSTREAM_PREFIX = "jetstream/"
 
@@ -37,7 +37,7 @@ def jetstream_models() -> list[tuple[str, str]]:
     """(our id, label) for each configured Jetstream model; ids are "jetstream/<name>"."""
     if not config.JETSTREAM_API_KEY:
         return []
-    return [(JETSTREAM_PREFIX + m, JETSTREAM_LABELS.get(m, f"{m} (Jetstream, free)")) for m in config.JETSTREAM_MODELS]
+    return [(JETSTREAM_PREFIX + m, JETSTREAM_LABELS.get(m, f"{m} (free)")) for m in config.JETSTREAM_MODELS]
 
 
 def is_jetstream(model: str) -> bool:

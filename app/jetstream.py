@@ -78,7 +78,7 @@ async def _complete(model, system, text, meter, images, max_tokens, result: dict
     usage = data.get("usage") or {}
     meter.add_tokens(usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
     if not message.strip():
-        raise JetstreamError("Jetstream returned an empty response.")
+        raise JetstreamError("The open-model service returned an empty response.")
     return message
 
 
@@ -101,21 +101,21 @@ async def _post(body: dict) -> httpx.Response:
                 json=body,
             )
     except httpx.HTTPError as exc:
-        raise JetstreamError("Couldn't reach the Jetstream model service.") from exc
+        raise JetstreamError("Couldn't reach the open-model service.") from exc
 
 
 def _check_status(response: httpx.Response, sent_images: bool) -> None:
     status = response.status_code
     if status in (401, 403):
-        raise JetstreamError("Jetstream rejected the API token.")
+        raise JetstreamError("The open-model service rejected the API token.")
     if status == 429:
-        raise JetstreamError("Jetstream is rate limiting requests. Try again in a minute.")
+        raise JetstreamError("The open-model service is rate limiting requests. Try again in a minute.")
     if status >= 400:
         log.warning("jetstream %s: %s", status, response.text[:LOGGED_ERROR_CHARS])
         # A model that can't take images says so with one of these; the caller retries without them.
         if sent_images and status in (400, 413, 415, 422):
             raise ImagesRejected("images not accepted")
-        raise JetstreamError(f"Jetstream returned an error ({status}).")
+        raise JetstreamError(f"The open-model service returned an error ({status}).")
 
 
 def _read_reply(response: httpx.Response) -> tuple[dict, dict, str]:
@@ -124,4 +124,4 @@ def _read_reply(response: httpx.Response) -> tuple[dict, dict, str]:
         choice = data["choices"][0]
         return data, choice, choice["message"]["content"] or ""
     except (ValueError, KeyError, IndexError) as exc:
-        raise JetstreamError("Jetstream returned a response that couldn't be read.") from exc
+        raise JetstreamError("The open-model service returned a response that couldn't be read.") from exc

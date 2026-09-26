@@ -9,7 +9,7 @@ SECTIONS = {
     "research": "Research", "guide": "Spoken guidance", "talk": "Talk it over",
 }
 SECTION_ORDER = ["Planning", "For the heart", "Deep dive", "Research", "Spoken guidance", "Voices", "Talk it over", "Other"]
-VENDORS = {"openrouter": "Anthropic (via OpenRouter)", "anthropic": "Anthropic", "jetstream": "Jetstream (academic, free)",
+VENDORS = {"openrouter": "Anthropic (via OpenRouter)", "anthropic": "Anthropic", "jetstream": "Open models (free)",
            "openai": "OpenAI GPT-Live", "xai": "xAI Grok voice"}
 
 
