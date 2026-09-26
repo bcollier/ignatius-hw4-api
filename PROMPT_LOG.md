@@ -694,6 +694,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Removed the button from the top of the retreat page. The link at the bottom of each day prints only that day, so the whole-retreat PDF moved to the quiet links at the foot of the page ("The whole retreat as a printable PDF"), shown once the retreat is finished.
 
+### 111. 2026-09-26, 23:20 UTC
+
+> how about hide build log and costs links unless the user is in a debug=TRUE mode in the browser. there are two research notes links at the bottom. remove the verbose one that is plain every search results etc. *(with a screenshot of the foot of a retreat page)*
+
+**What was done:** Added a debug mode, turned on by opening the site with ?debug=true (?debug=false turns it off) and remembered in the browser. Without it, the build log link, "Show the technical details", "Watch the technical details" on New retreat and the Costs link are hidden. Removed the long "Research notes for this retreat" link at the foot; each day's short "Research notes" link stays.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
