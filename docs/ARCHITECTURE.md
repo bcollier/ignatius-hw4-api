@@ -52,6 +52,7 @@ flowchart LR
     subgraph AI["Model and voice services"]
         OR["OpenRouter<br/>Anthropic-compatible API"]
         JS["Jetstream2 inference<br/>(Open WebUI proxy, OpenAI-compatible)<br/>free mode"]
+        TV["Tavily search<br/>free mode"]
         CLAUDE["Claude<br/>(Opus 5 by default)<br/>+ web search"]
         EDGE["Microsoft neural voices<br/>(edge-tts, free)"]
         ELEVEN["ElevenLabs<br/>(premium voices)"]
@@ -67,6 +68,7 @@ flowchart LR
     API --> JOBS
     JOBS -- "plan, reflection, deep dive" --> OR --> CLAUDE
     JOBS -- "free mode: plan, reflection, deep dive" --> JS
+    JOBS -- "free mode: deep-dive searches" --> TV
     JOBS -- "free voices" --> EDGE
     JOBS -- "premium voices" --> ELEVEN
     API -- "prices" --> OR
@@ -81,7 +83,8 @@ flowchart LR
 | Database | Supabase Postgres | One row per retreat; the retreat itself is a JSON document. |
 | File storage | Supabase Storage | Extracted images and every MP3, in a private bucket. |
 | Claude | Anthropic, reached through OpenRouter | Plans the retreat, writes the reflection and deep dive, searches the web for the deep dive (full mode). |
-| Open models | Jetstream2 inference service (Llama 4 Scout, Muse Glimmer) | The same writing jobs for free-mode users, without web search. |
+| Open models | Jetstream2 inference service (Llama 4 Scout, Muse Glimmer) | The same writing jobs for free-mode users. |
+| Tavily | Tavily search API | Web search for free-mode deep dives, run by the server. |
 | Voices | Microsoft (free), ElevenLabs (premium) | Turn scripts into MP3. |
 
 ---
@@ -365,7 +368,7 @@ flowchart TD
     E -- no --> FM{Free mode on?<br/>JETSTREAM_API_KEY set}
     FM -- yes --> F
     FM -- no --> X["403: not on the allowed list"]
-    F --> FL["Jetstream models only · free voices only · up to 3 retreats"]
+    F --> FL["Jetstream models · Tavily search · free voices · up to 3 retreats"]
 ```
 
 **Rules the API applies**
@@ -492,6 +495,25 @@ flowchart LR
 ```
 
 Both services produce constant-bitrate MP3, so pieces can be joined byte for byte and the length follows directly from the file size.
+
+**Free-mode deep dive.** Jetstream's models can't search, so the server does it for them:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant J as Build job
+    participant M as Jetstream model
+    participant T as Tavily
+    J->>M: "Write three search queries for this passage"
+    M-->>J: three queries
+    loop each query
+        J->>T: POST /search (basic, 4 results)
+        T-->>J: title, url, snippet
+    end
+    J->>M: deep-dive prompt + day context + numbered results<br/>"cite only URLs from the results"
+    M-->>J: script + sources
+    J->>J: keep only sources whose URL came back from Tavily
+```
 
 **What Claude is asked.** Each prompt has an editable part (shown on the page) and a fixed part the server always appends: the length target and the output format (`<script>…</script>`, plus `<sources>` for the deep dive). A house style for listening applies to both: plain paragraphs, no lists, parentheses or dashes, no verse numbers with colons, and never inventing a Hebrew or Greek word, a textual variant, a quotation or a historical fact.
 
@@ -771,6 +793,7 @@ Serves files from `DATA_DIR` when Supabase isn't configured. In production, file
 | Supabase Storage | `GET/POST /storage/v1/bucket` | Startup: create the bucket if missing |
 | OpenRouter | `POST /api/v1/messages` (Anthropic Messages format, streamed) | Planning, reflection, deep dive |
 | OpenRouter | `GET /api/v1/models` | Prices, cached 6 hours |
+| Tavily | `POST https://api.tavily.com/search` (`Authorization: Bearer tvly-…`) | Free-mode deep dives: three basic searches (1 credit each) |
 | Jetstream2 | `POST /api/chat/completions` (OpenAI format, `Authorization: Bearer <token>`) | Free-mode planning and writing; images are offered for planning and dropped if refused |
 | Microsoft (edge-tts) | WebSocket speech synthesis | Free voices |
 | ElevenLabs | `POST /v1/text-to-speech/{voice}` | Premium voices |
@@ -887,6 +910,7 @@ flowchart LR
 | `JETSTREAM_MODELS` | `llama-4-scout,muse-glimmer` | Free-mode models |
 | `FREE_MODE` / `FREE_MAX_RETREATS` | `1` / 3 | Free mode switch and retreat cap |
 | `LOCAL_USER_MODE` | | `free` previews free mode locally |
+| `TAVILY_API_KEY` / `TAVILY_SEARCH_DEPTH` | / `basic` | Web search for free-mode deep dives |
 | `ALLOWED_ORIGINS` | localhost ports | CORS origins |
 | `DATA_DIR` | `/tmp/ignatius` | Local storage when Supabase is off |
 | `MAX_UPLOAD_MB` / `MAX_PAGES` / `MAX_SOURCE_CHARS` | 15 / 40 / 80,000 | Upload limits |

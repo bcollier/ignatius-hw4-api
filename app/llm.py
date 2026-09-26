@@ -12,7 +12,7 @@ import re
 
 import anthropic
 
-from . import config, jetstream, pricing, prompts
+from . import config, jetstream, pricing, prompts, search
 from .extract import Extracted
 
 log = logging.getLogger(__name__)
@@ -188,6 +188,31 @@ def stub_plan(source: Extracted, filename: str) -> dict:
 # ---------------------------------------------------------------- scripts
 
 
+async def _deep_jetstream(context: str, instructions: str, words: int, meter: pricing.Meter) -> tuple[str, list[str], bool]:
+    """Jetstream models can't search, so with Tavily configured the server does it:
+    the model proposes queries, Tavily runs them, and the model writes from the
+    results. Sources are limited to URLs that were actually returned."""
+    model = pricing.api_model(meter.model)
+    results: list[dict] = []
+    try:
+        if search.enabled() and config.WEB_SEARCH:
+            reply = await jetstream.complete(model, prompts.SEARCH_QUERIES, context, meter, max_tokens=4000)
+            queries = [q.strip(" -*0123456789.\"'\t") for q in reply.splitlines() if q.strip()][:3]
+            results = await search.search(queries or [context.splitlines()[2]])
+            meter.searches += len(queries)
+        note = prompts.SEARCH_RESULTS if results else prompts.SEARCH_OFF
+        system = instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=note, words=words)
+        user = context + ("\n\n" + search.as_prompt(results) if results else "")
+        reply = await jetstream.complete(model, system, user, meter)
+    except jetstream.JetstreamError as exc:
+        raise LLMError(str(exc)) from exc
+    script, sources = _split_script(reply)
+    if results:
+        urls = {r["url"] for r in results}
+        sources = [line for line in sources if any(u in line for u in urls)]  # drop anything not from the results
+    return script, sources, bool(results)
+
+
 def _split_script(text: str) -> tuple[str, list[str]]:
     script = re.search(r"<script>(.*?)</script>", text, re.S)
     sources = re.search(r"<sources>(.*?)</sources>", text, re.S)
@@ -223,14 +248,8 @@ async def write_deep(context: str, instructions: str, words: int, meter: pricing
         extra = {"tools": [pricing.web_search_tool(meter.model)]} if search else {}
         return await _call(meter, system=system, max_tokens=16000, messages=[{"role": "user", "content": context}], **extra)
 
-    if pricing.is_jetstream(meter.model):  # no web search on Jetstream
-        system = instructions + "\n\n" + prompts.DEEP_FIXED.format(search_note=prompts.SEARCH_OFF, words=words)
-        try:
-            reply = await jetstream.complete(pricing.api_model(meter.model), system, context, meter)
-        except jetstream.JetstreamError as exc:
-            raise LLMError(str(exc)) from exc
-        script, sources = _split_script(reply)
-        return script, sources, False
+    if pricing.is_jetstream(meter.model):
+        return await _deep_jetstream(context, instructions, words, meter)
 
     searched = config.WEB_SEARCH
     try:

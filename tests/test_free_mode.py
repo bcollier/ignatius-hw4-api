@@ -95,3 +95,31 @@ def test_jetstream_client_retries_without_images(monkeypatch):
         asyncio.run(jetstream.complete("llama-4-scout", "sys", "text", meter, images=[(b"x", "image/jpeg")]))
     reply = asyncio.run(jetstream.complete("llama-4-scout", "sys", "text", meter))
     assert reply == "<script>Hello.</script>" and meter.summary()["input_tokens"] == 12 and meter.summary()["usd"] == 0
+
+
+def test_free_deep_dive_searches_and_keeps_only_real_sources(monkeypatch):
+    from app import llm, search
+
+    monkeypatch.setattr(config, "LLM_MODE", "openrouter")  # not stub, so the real path runs
+    monkeypatch.setattr(config, "TAVILY_API_KEY", "tvly-test")
+    monkeypatch.setattr(config, "WEB_SEARCH", True)
+    prompts_seen = []
+
+    async def fake_complete(model, system, text, meter, images=(), max_tokens=8000):
+        prompts_seen.append((system, text))
+        if len(prompts_seen) == 1:
+            return "Luke 15 historical setting\nsplagchnizomai meaning\nChurch Fathers prodigal son"
+        return ("<script>The father runs.</script><sources>\nLexicon - https://real.example/lexicon\n"
+                "Invented - https://made-up.example/page\n</sources>")
+
+    async def fake_search(queries):
+        assert queries == ["Luke 15 historical setting", "splagchnizomai meaning", "Church Fathers prodigal son"]
+        return [{"title": "Lexicon", "url": "https://real.example/lexicon", "content": "compassion"}]
+
+    monkeypatch.setattr(jetstream, "complete", fake_complete)
+    monkeypatch.setattr(search, "search", fake_search)
+    meter = pricing.Meter("jetstream/llama-4-scout", {})
+    script, sources, searched = asyncio.run(llm.write_deep("Retreat: R\nDay 1: T\nSource reference: Luke 15", "Write.", 500, meter))
+    assert script == "The father runs." and searched
+    assert sources == ["Lexicon - https://real.example/lexicon"]  # the invented URL is dropped
+    assert "<search_results>" in prompts_seen[1][1] and meter.summary()["web_searches"] == 3

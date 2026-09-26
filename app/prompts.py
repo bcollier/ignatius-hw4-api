@@ -163,6 +163,16 @@ def defaults() -> dict:
 
 
 SEARCH_ON = "Use web search to check specific claims (dates, word meanings, quotations, attributions) before you make them. Prefer scholarly and church sources."
+SEARCH_RESULTS = (
+    "Web search results for this passage are included below, numbered. Check specific claims (dates, word meanings, "
+    "quotations, attributions) against them. In <sources>, list only URLs that appear in the results and that you relied on. "
+    "If the results don't support a claim, leave the claim out or say it is uncertain."
+)
+SEARCH_QUERIES = (
+    "Write three web search queries that would help a writer check facts for a short talk on the theology, history "
+    "and interpretation of the passage below: its historical setting, key words in the original language, and how the "
+    "church has read it. Reply with only the three queries, one per line, no numbering."
+)
 SEARCH_OFF = "You cannot search the web. Make only claims you are confident are well established, and say when a point is debated."
 
 

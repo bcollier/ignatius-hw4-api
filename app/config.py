@@ -56,6 +56,10 @@ JETSTREAM_API_KEY = os.environ.get("JETSTREAM_API_KEY", "").strip()
 JETSTREAM_BASE_URL = os.environ.get("JETSTREAM_BASE_URL", "https://llm.jetstream-cloud.org/api").rstrip("/")
 JETSTREAM_MODELS = _list("JETSTREAM_MODELS", "llama-4-scout,muse-glimmer")
 
+# Tavily web search for free-mode deep dives (the Jetstream models can't search).
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "").strip()
+TAVILY_SEARCH_DEPTH = os.environ.get("TAVILY_SEARCH_DEPTH", "basic")  # basic = 1 credit, advanced = 2
+
 # Who gets the full app (Claude, web search, ElevenLabs). Empty means everyone.
 ALLOWED_EMAILS = [e.lower() for e in _list("ALLOWED_EMAILS", "")]
 # Everyone else, including anonymous "try it" sessions, gets free mode: Jetstream
