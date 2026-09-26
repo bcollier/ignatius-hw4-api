@@ -495,6 +495,8 @@ async def _build_day(
     state["status"] = "failed" if messages else "ready"
     state["error"] = "; ".join(dict.fromkeys(messages)) or None
     state["cost"] = _day_cost(state, meter)
+    if retreat.get("progress"):
+        _count_progress(retreat)  # a retried day clears itself from the failed list
     await save(retreat)
 
 
