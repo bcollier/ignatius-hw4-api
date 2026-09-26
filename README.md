@@ -1,5 +1,11 @@
 # Ignatius at Home: API
 
+> ## 📐 How it all works: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+>
+> The full documentation, with diagrams: the system and hosting on Render and Supabase, the database ERD, sign-in and guest flows, how a retreat is made step by step, the prayer player, status lifecycles, every API endpoint with example requests and responses, costs, security, the research services, and failure handling.
+>
+> **Live app:** https://bcollier.github.io/ignatius-hw4-web/ · **Frontend repo:** [ignatius-hw4-web](https://github.com/bcollier/ignatius-hw4-web)
+
 Backend for **Ignatius at Home**, which turns material you have rights to (a prayer handout, a few scripture passages, a reading, with images) into a guided audio retreat. For each day it produces three MP3 tracks:
 
 1. **The reading**: the day's passage, word for word from your document.
@@ -12,7 +18,7 @@ Built with FastAPI and deployed on Render. Claude (Opus 5, through OpenRouter) p
 
 ## How it works
 
-**Full documentation with diagrams:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). It covers the system and hosting diagrams, the database ERD, sign-in and job sequence diagrams, the prayer player, status lifecycles, the complete API reference, costs, security, and failure handling.
+**Full documentation with diagrams:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ```
 browser ── POST /api/retreats (PDF or .docx) ──▶ extract text, images, scanned pages (PyMuPDF, python-docx)
