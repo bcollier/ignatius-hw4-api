@@ -36,7 +36,7 @@ else:
 
 # The default model, by its OpenRouter id (mapped to the Anthropic id when calling
 # Anthropic directly). Users can pick another from pricing.MODELS.
-LLM_MODEL = os.environ.get("LLM_MODEL", "anthropic/claude-opus-5")
+LLM_MODEL = os.environ.get("LLM_MODEL", "anthropic/claude-opus-5.5")
 WEB_SEARCH = os.environ.get("WEB_SEARCH", "1") == "1"
 
 ELEVENLABS_MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_multilingual_v2")

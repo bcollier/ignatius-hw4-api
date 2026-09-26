@@ -27,6 +27,8 @@ class StorageError(RuntimeError):
     """Saving or loading failed; the message is safe to show to the user."""
 
 
+LOG_FIELDS = ("id", "created_at", "day", "purpose", "provider", "model", "request", "response_text", "response",
+              "input_tokens", "output_tokens", "web_searches", "usd", "duration_ms", "status", "error")
 USAGE_FIELDS = ("created_at", "retreat_id", "day", "purpose", "provider", "model", "usd", "web_searches",
                 "input_tokens", "output_tokens", "duration_ms")
 
@@ -121,6 +123,22 @@ class LocalStore:
         row = {"created_at": datetime.now(timezone.utc).isoformat(), **row}
         with open(self.rows.parent / "llm_calls.jsonl", "a") as f:
             f.write(json.dumps(row) + "\n")
+
+    async def call_log(self, retreat_id: str, after: int = 0, limit: int = 200) -> list[dict]:
+        """A retreat's logged steps and calls in order; ids are line numbers here."""
+        path = self.rows.parent / "llm_calls.jsonl"
+        if not path.exists():
+            return []
+        out = []
+        for i, line in enumerate(path.read_text().splitlines(), start=1):
+            if i <= after or not line.strip():
+                continue
+            row = json.loads(line)
+            if row.get("retreat_id") == retreat_id:
+                out.append({**{k: row.get(k) for k in LOG_FIELDS}, "id": i})
+                if len(out) >= limit:
+                    break
+        return out
 
     async def usage_rows(self, user_id: str) -> list[dict]:
         """This person's logged model, search and conversation calls (for the Costs page)."""
@@ -220,6 +238,15 @@ class SupabaseStore:
 
     async def log_llm_call(self, row: dict) -> None:
         await self._request("POST", "/rest/v1/llm_calls", json=row, headers={"Prefer": "return=minimal"})
+
+    async def call_log(self, retreat_id: str, after: int = 0, limit: int = 200) -> list[dict]:
+        """A retreat's logged steps and calls in order, from the llm_calls table."""
+        response = await self._request(
+            "GET", "/rest/v1/llm_calls",
+            params={"retreat_id": f"eq.{retreat_id}", "id": f"gt.{after}", "select": ",".join(LOG_FIELDS),
+                    "order": "id.asc", "limit": str(limit)},
+        )
+        return response.json()
 
     async def usage_rows(self, user_id: str) -> list[dict]:
         """This person's logged model, search and conversation calls (for the Costs page)."""

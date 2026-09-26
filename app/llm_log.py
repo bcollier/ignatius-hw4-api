@@ -70,6 +70,7 @@ async def record(
     usage: dict,
     duration_ms: int,
     error: str | None = None,
+    purpose: str | None = None,
 ) -> None:
     from .storage import store  # late import: storage imports config only
 
@@ -79,7 +80,7 @@ async def record(
         "email": ctx.get("email"),
         "retreat_id": ctx.get("retreat_id"),
         "day": ctx.get("day"),
-        "purpose": ctx.get("purpose", "unknown"),
+        "purpose": purpose or ctx.get("purpose", "unknown"),
         "provider": provider,
         "model": model,
         "request": {"system": _clip(system), "messages": redact_images(messages)},
@@ -97,3 +98,10 @@ async def record(
         await store.log_llm_call(row)
     except Exception:
         log.exception("couldn't log an LLM call")
+
+
+async def step(text: str, **details) -> None:
+    """A step in making a retreat ("Day 2: writing the deep dive..."), logged alongside
+    the calls so a build can be watched live and followed afterwards."""
+    await record(provider="app", model="pipeline", system="", messages=[], response_text=text,
+                 response_extra=details or None, usage={}, duration_ms=0, purpose="step")

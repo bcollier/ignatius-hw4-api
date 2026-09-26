@@ -1,0 +1,43 @@
+[
+  {
+    "slug": "be-still",
+    "title": "Be Still",
+    "subtitle": "Five Days with the Psalms of Trust",
+    "description": "Five of the Bible’s great songs of trust, from the Shepherd Psalm to “you have searched me and you know me,” each paired with a painting to pray with. A gentle first retreat for anyone who is tired, anxious or simply wants to rest in God.",
+    "days": 5,
+    "file": "be-still.pdf",
+    "cover_image": "be-still/cover.jpg",
+    "credits": {
+      "scripture": "World English Bible, public domain",
+      "images": [
+        "Day 1: Bartolomé Esteban Murillo (1617–1682), The Good Shepherd, c. 1660. Museo del Prado, Madrid. Public domain, via Wikimedia Commons.",
+        "Day 2: Ivan Aivazovsky (1817–1900), The Ninth Wave, 1850. State Russian Museum, Saint Petersburg. Public domain, via Wikimedia Commons.",
+        "Day 3: Caspar David Friedrich (1774–1840), Morning in the Riesengebirge, 1810–1811. Charlottenburg Palace, Berlin (Prussian Palaces and Gardens Foundation). Public domain, via Wikimedia Commons.",
+        "Day 4: Raphael (1483–1520), The Tempi Madonna, 1508. Alte Pinakothek, Munich. Public domain, via Wikimedia Commons.",
+        "Day 5: Vincent van Gogh (1853–1890), The Starry Night, 1889. Museum of Modern Art, New York. Public domain, via Wikimedia Commons."
+      ],
+      "type": "EB Garamond, SIL Open Font License"
+    }
+  },
+  {
+    "slug": "blessed",
+    "title": "Blessed",
+    "subtitle": "Six Days with the Beatitudes",
+    "description": "Sit on the mountain with the crowds and hear Jesus’ Beatitudes a few lines at a time, from “blessed are the poor in spirit” to “rejoice and be glad,” with a great painting for each day.",
+    "days": 6,
+    "file": "blessed.pdf",
+    "cover_image": "blessed/cover.jpg",
+    "credits": {
+      "scripture": "World English Bible, public domain",
+      "images": [
+        "Day 1: Carl Bloch (1834–1890), The Sermon on the Mount, 1877. Museum of National History, Frederiksborg Castle, Hillerød. Public domain, via Wikimedia Commons.",
+        "Day 2: Vincent van Gogh (1853–1890), Sorrowing Old Man (“At Eternity’s Gate”), 1890. Kröller-Müller Museum, Otterlo. Public domain, via Wikimedia Commons.",
+        "Day 3: Jean-François Millet (1814–1875), The Gleaners, 1857. Musée d’Orsay, Paris. Public domain, via Wikimedia Commons.",
+        "Day 4: Fra Angelico (c. 1395–1455), The Annunciation, c. 1425–1426. Museo del Prado, Madrid. Public domain, via Wikimedia Commons.",
+        "Day 5: Rembrandt van Rijn (1606–1669), The Stoning of Saint Stephen, 1625. Musée des Beaux-Arts de Lyon. Public domain, via Wikimedia Commons.",
+        "Day 6: Jan van Eyck (c. 1390–1441) and Hubert van Eyck (d. 1426), The Adoration of the Mystic Lamb (Ghent Altarpiece, central panel), 1432. Saint Bavo’s Cathedral, Ghent. Public domain, via Wikimedia Commons."
+      ],
+      "type": "EB Garamond, SIL Open Font License"
+    }
+  }
+]

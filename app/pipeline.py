@@ -267,11 +267,22 @@ async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
     llm_log.tag(user_id=retreat["user_id"], retreat_id=retreat["id"], purpose="plan")
     await profile.use_for_job(retreat["user_id"])  # "user info.md" informs every call
     series_text = await series_context(retreat, retreat["model"])
+    src = retreat["source"]
+    await llm_log.step(
+        f"Read {retreat['filename']}: " + (f"{src['pages']} page(s), " if src["pages"] else "") + f"{src['characters']:,} characters of text, "
+        f"{src['images']} image(s){', ' + str(src['scanned_pages']) + ' scanned page(s)' if src['scanned_pages'] else ''}."
+        + (" (Long document: the text was shortened to fit.)" if src["truncated"] else ""))
+    await llm_log.step(
+        f"Next: planning the retreat with {retreat['model']}. The model reads the whole document"
+        f"{' and looks at its images' if src['images'] else ''}, then decides the days, each day's passage "
+        "(copied word for word), a grace to ask for, a focus, and which image goes with which day."
+        + (f" It also reads the {len(retreat['series'])} earlier week(s) of the series." if retreat.get("series") else ""))
     async with _jobs:
         try:
             plan = await llm.plan_retreat(source, retreat["filename"], plan_prompt, meter, series_text)
         except llm.LLMError as exc:
             retreat.update(status="failed", error=str(exc), costs={"plan": meter.summary()})
+            await llm_log.step(f"Planning failed: {exc}")
             return await save(retreat)
         except Exception:
             log.exception("planning failed")
@@ -286,7 +297,12 @@ async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
         str(d["day"]): {"status": first, "error": None, "tracks": {}, "guide": {}, "cost": None} for d in plan["days"]
     }
     retreat["costs"] = {"plan": meter.summary()}
+    await llm_log.step(f"Planned “{plan['title']}”, {len(plan['days'])} days: "
+                       + "; ".join(f"{d['day']}. {d['title']} ({d.get('source_ref', '')})" for d in plan["days"]) + ".")
     if retreat.get("build_options"):
+        await llm_log.step("Next: making each day in order. For each: the reflection for the heart, then web research "
+                           "and the deep dive (which knows the reflection), then the spoken guidance tailored to both, "
+                           "and every part recorded as soon as its script is ready.")
         retreat["status"] = "building"
         retreat["progress"] = {"done": 0, "total": len(plan["days"]), "current_day": None, "failed": []}
         await save(retreat)
@@ -322,6 +338,9 @@ async def _build_all(retreat: dict) -> None:
         await save(retreat)
     _finish_building(retreat)
     await save(retreat)
+    failed = retreat["progress"]["failed"]
+    await llm_log.step("All days made. The retreat is ready to pray." if not failed
+                       else f"Finished, but day(s) {', '.join(map(str, failed))} failed; use Try again on them.")
 
 
 def _count_progress(retreat: dict) -> None:
@@ -400,6 +419,16 @@ def _carry_cost(meter: pricing.Meter, state: dict) -> None:
     meter.usd += before.get("usd", 0.0)
 
 
+async def _log_voice(tier: str, voice: str, part: str, script: str, result: dict | None, ms: int, error: str | None = None) -> None:
+    """Each recording is logged like a model call (what was read, by which voice, the result)."""
+    await llm_log.record(
+        provider="elevenlabs" if tier == "premium" else "microsoft", model=voice, system="",
+        messages=[{"role": "user", "content": script}],
+        response_text=(f"Recorded {part}: {result['seconds']} seconds, {len(script):,} characters." if result else None),
+        response_extra={"part": part, "characters": len(script), **(result or {})},
+        usage={"usd": pricing.tts_usd(len(script), tier)}, duration_ms=ms, error=error, purpose="voice")
+
+
 def can_retry(state: dict) -> bool:
     """A failed day whose failed parts all have their scripts can be finished by
     recording just those parts again, with no new writing."""
@@ -468,15 +497,22 @@ async def _build_day(
         script, trimmed = fit(script, tts.max_chars(voice))
         clip.update(status="speaking", script=script, characters=len(script), trimmed=trimmed, voice=voice, **extra)
         await save(retreat)
+        timer = llm_log.Timer()
+        tier = tts.tier_of(voice)
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "clip.mp3"
-            seconds = await tts.synthesize(script, voice, out)
+            try:
+                seconds = await tts.synthesize(script, voice, out)
+            except Exception as exc:
+                await _log_voice(tier, voice, name, script, None, timer.ms, error=str(exc))
+                raise
             timings = tts.words_path(out)
             # [[seconds, character index], ...] so the page can follow along word by word
             words = json.loads(timings.read_text()) if timings.exists() else None
             path = f"{retreat['user_id']}/{retreat['id']}/day{day_no}_{name}.mp3"
             await store.put_file(path, out.read_bytes(), "audio/mpeg")
         clip.update(status="ready", path=path, seconds=seconds, words=words)
+        await _log_voice(tier, voice, name, script, {"seconds": seconds, "path": path, "timed_words": len(words or [])}, timer.ms)
         await save(retreat)
 
     llm_log.tag(user_id=retreat["user_id"], retreat_id=retreat["id"], day=day_no)
@@ -493,12 +529,18 @@ async def _build_day(
 
     async with _jobs:
         # The reading needs no writing: record it right away.
-        start_recording("tracks", "reading", re.sub(r"\n{3,}", "\n\n", day["passage_text"]).strip(), voices["reading"])
+        reading = re.sub(r"\n{3,}", "\n\n", day.get("passage_text") or "").strip()
+        if reading:
+            start_recording("tracks", "reading", reading, voices["reading"])
+        else:
+            errors[("tracks", "reading")] = llm.LLMError("The plan gave this day no passage to read.")
 
         # 1. For the heart.
         heart_script = ""
         try:
             llm_log.tag(purpose="heart")
+            await llm_log.step(f"Day {day_no}: {day['title']} ({day.get('source_ref', '')}). Writing the reflection for the heart with {meter.model}"
+                               + (", knowing the earlier days" if day_no > 1 else "") + ".")
             done = ready("tracks", "heart") or kept.get("heart")
             if done:
                 heart_script = done["script"]
@@ -514,6 +556,8 @@ async def _build_day(
         deep_script = ""
         try:
             llm_log.tag(purpose="deep")
+            await llm_log.step(f"Day {day_no}: researching and writing the deep dive"
+                               + (f" (web research: {search_provider})" if search_provider else "") + ".")
             done = ready("tracks", "deep") or kept.get("deep")
             if done:
                 deep_script = done["script"]
@@ -543,6 +587,7 @@ async def _build_day(
                 texts = {n: reuse[n] for n in missing}
             elif tailor:
                 llm_log.tag(purpose="guide")
+                await llm_log.step(f"Day {day_no}: tailoring the spoken guidance to what the listener will hear.")
                 texts = await llm.tailor_guide(prompts.day_context(title, day, image), heart_script, deep_script,
                                                missing, meter)
             else:
@@ -564,6 +609,7 @@ async def _build_day(
         state[group].setdefault(name, {}).update(status="failed", error=message)
         messages.append(f"{name}: {message}")
     state["status"] = "failed" if messages else "ready"
+    await llm_log.step(f"Day {day_no} ready." if not messages else f"Day {day_no} didn't finish: {'; '.join(dict.fromkeys(messages))}")
     state["error"] = "; ".join(dict.fromkeys(messages)) or None
     state["cost"] = _day_cost(state, meter)
     if retreat.get("progress"):

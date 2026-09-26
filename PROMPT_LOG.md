@@ -598,6 +598,60 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Removed every cost from the regular app (the estimate, prices in the model menus, the ElevenLabs balance, the cost section on a retreat). Added a Costs page reached from a small footer link: each retreat by part and by company, a total by company, calls not tied to a retreat, and the prices used. It's built from a new `GET /api/costs` that adds up the llm_calls log and the recorded voices.
 
+### 95. 2026-09-26, 21:10 UTC
+
+> there should be an option when making a retreat something like "watch the technical details of this retreat being built" and it should have a box that look slike a terminal window or something that shows you the details of every call to an API, what the response is, and what the next step in the process is as the build is happening live. this call/response API log should be stored in a sql table when complete  if it is not already along with the retreat so we can follow every step and in theory recreate it in the future if needed. the new retreat page should allow users to build a retreat using an example PDF. so below where it would be uploaded say use an example. make this example PDF different than the two examples that are already made. make them look very premium with verses and images etc., store them on the server. a user should be able to build the retreat and get a sense of the process (also look at the source PDF) so they can understand how to make a retreat from a PDF. also it sohudl allow a txt. file as well. also there should be more guidance as people make their first retreat, with expectations on what is going to be done once they upload and hit make my retreat.
+
+**What was done:** Added "Watch the technical details as it's made", which opens a terminal-style build log on the retreat page. It shows each step ("Next: …") and every call to a model, search service and voice (what was sent, what came back, timing and tokens), live, with a full JSON download. Everything is stored in the llm_calls table with the retreat id: steps and recordings are now logged there too, alongside the model and search calls that already were. Also added two new example source documents on the server ("Be Still", five Psalms of trust; "Blessed", the Beatitudes over six days), each with public-domain paintings, that can be opened as a PDF or used to make a retreat. Also: .txt uploads, and a "What happens when you press Make my retreat" guide, open for a first retreat.
+
+### 96. 2026-09-26, 21:12 UTC
+
+> remove this check box I own this material or have permission to use it.
+
+**What was done:** Removed the checkbox. A short "Use material you have the right to use" stays in the upload box's hint.
+
+### 97. 2026-09-26, 21:15 UTC
+
+> users should be allowed to just paste a bunch of text in to make a retreat as well.
+
+**What was done:** Added "or paste text instead" under the upload box. Pasted text is sent as a text file and planned like any other document.
+
+### 98. 2026-09-26, 21:30 UTC
+
+> do a complete audit of code reability. make sure all code is broken down to be human readable. break down large blocks of code into smaller onces, write useful comments, and generally follow "Clean Code" principles in all code written fro this .  make a markdown file when you are done noting everything you cleaned up and put it in the documentation folder
+
+**What was done:** A readability pass over both repositories, recorded in docs/CODE_CLEANUP.md.
+
+### 99. 2026-09-26, 21:32 UTC
+
+> why does it say this retreat would cost 4.24 but it actually costed $21.13 *(with a screenshot of the Costs page)*
+
+**What was done:** Explained that the estimate described the current settings (Claude Opus 5 with free voices), while the example was made with Claude Fable 5.1 (twice the price) and ElevenLabs voices ($13.87, two-thirds of its cost). Recalibrated the estimate on that real build and made it follow the choices on screen; with Fable and ElevenLabs it now comes to $21.00, against the actual $21.13.
+
+### 100. 2026-09-26, 21:35 UTC
+
+> default new retreats to opus 5.5, show estimated rates / cost when choosing the models
+
+**What was done:** New retreats default to Claude Opus 5.5 (a saved choice that was still the old default follows it). In Advanced, the model menus show their rates, and an estimate for seven days with the chosen model and voices appears under Voices. The Simple tab still shows no prices.
+
+### 101. 2026-09-26, 21:37 UTC
+
+> by default the advanced one should have different voices for the reading and the heart , add a woman's voice for one of them *(with a screenshot of the Voices settings)*
+
+**What was done:** The default voices are now Ava (guide), Andrew (reading), Emma (for the heart) and Christopher (deep dive).
+
+### 102. 2026-09-26, 21:40 UTC
+
+> by default both free and premium should default to different voices. rebuild the current free one to use three different free voices if you haven't already
+
+**What was done:** Re-recorded every day of the free example with Ava, Andrew, Emma and Christopher, keeping its words exactly (new recordings also have exact word timing). The premium example already used four different ElevenLabs voices. Added one-click "Use the free voices" and "Use the ElevenLabs voices" (Sarah, George, Brian, Alice) sets in Advanced.
+
+### 103. 2026-09-26, 21:42 UTC
+
+> is fable much better than opus 5.5 for this kind of work?
+
+**What was done:** Answered that there's no side-by-side comparison on this app's writing yet, gave the price difference (Fable $10/$50 per million tokens against Opus 5.5 $4/$20), and offered to rewrite one day both ways to compare.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

@@ -44,6 +44,8 @@ def report(retreats: list[dict], rows: list[dict]) -> dict:
     by_retreat: dict[str, list[dict]] = {}
     other: list[dict] = []
     for r in rows:
+        if r.get("purpose") in ("voice", "step"):  # voices are counted from the recordings; steps cost nothing
+            continue
         (by_retreat.setdefault(r["retreat_id"], []) if r.get("retreat_id") else other).append(r)
 
     out, all_vendors, grand = [], {}, 0.0

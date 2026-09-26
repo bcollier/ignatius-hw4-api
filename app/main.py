@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
@@ -13,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import auth, config, costs, demos, llm_log, pipeline, pricing, profile, prompts, script_pdf, search, series, talk, tts
+from . import auth, config, costs, demos, examples, llm_log, pipeline, pricing, profile, prompts, script_pdf, search, series, talk, tts
 from .auth import User, current_user
 from .extract import ExtractError, extract
 from .storage import LocalStore, StorageError, store, summary
@@ -326,6 +327,73 @@ async def list_retreats(user: User = Depends(current_user)):
     return {"retreats": mine, "examples": examples}
 
 
+@app.get("/api/examples")
+def list_examples():
+    """Example documents to build a retreat from (and to look at first)."""
+    return {"examples": [examples.public(e) for e in examples.catalog().values()]}
+
+
+@app.get("/api/examples/{slug}.{kind}")
+def example_file(slug: str, kind: str):
+    path = examples.file_for(slug, {"pdf": "pdf", "txt": "txt"}.get(kind, ""))
+    if not path:
+        raise HTTPException(404, "No such example.")
+    media = "application/pdf" if kind == "pdf" else "text/plain; charset=utf-8"
+    return FileResponse(path, media_type=media, headers={"Content-Disposition": f'inline; filename="{path.name}"'})
+
+
+@app.get("/api/examples/{slug}/cover.jpg")
+def example_cover(slug: str):
+    path = examples.file_for(slug, "cover")
+    if not path:
+        raise HTTPException(404, "No such example.")
+    return FileResponse(path, media_type="image/jpeg")
+
+
+PRIVATE_NOTES = re.compile(r"<about_the_person>.*?</about_the_person>", re.S)
+
+
+def _log_row(row: dict, full: bool, owner: bool) -> dict:
+    """One step or call for the build log. The live view gets short previews; the
+    download gets everything. The owner's About me notes (in every prompt) are hidden
+    from anyone else, e.g. people watching how an example was made."""
+    def clean(text):
+        text = text if owner or not isinstance(text, str) else PRIVATE_NOTES.sub("<about_the_person>[private]</about_the_person>", text)
+        return text if full or not isinstance(text, str) or len(text) <= 1200 else text[:1200] + f"… [{len(text) - 1200:,} more characters]"
+
+    request = row.get("request") or {}
+    messages = request.get("messages") or []
+    prompt = "\n\n".join(
+        m["content"] if isinstance(m.get("content"), str)
+        else "\n".join(b.get("text", f"[{b.get('type')}]") for b in m.get("content", []) if isinstance(b, dict))
+        for m in messages if isinstance(m, dict))
+    out = {k: row.get(k) for k in ("id", "created_at", "day", "purpose", "provider", "model", "input_tokens", "output_tokens",
+                                   "web_searches", "usd", "duration_ms", "status", "error")}
+    out.update(system=clean(request.get("system") or ""), prompt=clean(prompt), response=clean(row.get("response_text") or ""),
+               details=row.get("response") if full else None)
+    if not full:
+        out["system_chars"] = len(request.get("system") or "")
+        out.pop("system")
+    return out
+
+
+@app.get("/api/retreats/{retreat_id}/log")
+async def build_log(retreat: dict = Depends(readable_retreat), user: User = Depends(current_user), after: int = 0,
+                    full: bool = False):
+    """Every step and call in making this retreat, in order: the steps the app took,
+    each model and search call (what was sent, what came back) and each recording.
+    `after` returns only newer rows (for watching live); `full` is the complete record."""
+    owner = retreat.get("user_id") == user.id and not retreat.get("read_only")
+    rows, limit = [], 1000 if full else 200
+    while True:
+        page = await store.call_log(retreat["id"], after, limit)
+        rows += page
+        if not full or len(page) < limit:
+            break
+        after = page[-1]["id"]
+    return {"rows": [_log_row(r, full, owner) for r in rows], "busy": pipeline._busy(retreat)}
+
+
 @app.get("/api/costs")
 async def cost_report(user: User = Depends(current_user)):
     """What each of your retreats cost, by part and by company, and the prices used."""
@@ -345,7 +413,8 @@ async def cost_report(user: User = Depends(current_user)):
 
 @app.post("/api/retreats", status_code=202)
 async def create_retreat(
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(None),
+    example: str = Form(""),
     plan_prompt: str = Form(""),
     model: str = Form(""),
     series_ids: str = Form("", alias="series"),
@@ -355,7 +424,9 @@ async def create_retreat(
 ):
     """Upload and make a retreat. With `options` (the build settings as JSON, the same
     fields as a day build), every day is made right after planning: one request, and
-    the retreat comes back ready to pray. Without it, only the plan is made."""
+    the retreat comes back ready to pray. Without it, only the plan is made.
+    Instead of a file, `example` names one of the example documents (/api/examples),
+    ("be-still", or "be-still.txt" for its plain-text version)."""
     plan_prompt = check_prompt(plan_prompt, prompts.PLAN_INSTRUCTIONS, "planning")
     model = check_model(model, user)
     build_options = None
@@ -366,19 +437,29 @@ async def create_retreat(
             raise HTTPException(400, "The build options couldn't be read.") from exc
         build_options = resolve_build(body, user)  # fails here, before the upload is processed
     start = check_date(start_date)
-    data = await file.read(config.MAX_UPLOAD_MB * 1024 * 1024 + 1)
+    if example:
+        kind = "txt" if example.endswith(".txt") else "pdf"
+        path = examples.file_for(example.removesuffix(".txt"), kind)
+        if not path:
+            raise HTTPException(404, "No such example.")
+        filename, data = path.name, path.read_bytes()
+    elif file is None:
+        raise HTTPException(400, "Choose a file to upload, or an example.")
+    else:
+        filename = file.filename or "upload"
+        data = await file.read(config.MAX_UPLOAD_MB * 1024 * 1024 + 1)
     if len(data) > config.MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(413, f"File is larger than {config.MAX_UPLOAD_MB} MB.")
     if not data:
         raise HTTPException(400, "The uploaded file is empty.")
     try:
-        source = extract(file.filename or "upload", data)
+        source = extract(filename, data)
     except ExtractError as exc:
         raise HTTPException(400, str(exc)) from exc
     llm_log.tag(email=user.email or ("guest" if user.anonymous else None))  # inherited by the planning job
     ids = await check_series(series_ids, user)
     retreat = await pipeline.create_retreat(
-        user.id, file.filename or "upload", source, plan_prompt, model,
+        user.id, filename, source, plan_prompt, model,
         email=user.email or ("guest" if user.anonymous else None), series_ids=ids,
         build_options=build_options, start_date=start,
     )

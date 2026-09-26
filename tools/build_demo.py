@@ -24,7 +24,7 @@ from app.extract import extract  # noqa: E402
 
 PDF = ROOT / "samples" / "demo" / "come-and-see.pdf"
 FREE_VOICES = {"guide": "en-US-AvaMultilingualNeural", "reading": "en-US-AndrewMultilingualNeural",
-               "heart": "en-US-AndrewMultilingualNeural", "deep": "en-US-ChristopherNeural"}
+               "heart": "en-US-EmmaMultilingualNeural", "deep": "en-US-ChristopherNeural"}
 PREMIUM_VOICES = {"guide": "EXAVITQu4vr4xnSDxMaL",  # Sarah
                   "reading": "JBFqnCBsd6RMkjVDRZzb",  # George
                   "heart": "nPczCjzI2devNBz1zQrb",  # Brian

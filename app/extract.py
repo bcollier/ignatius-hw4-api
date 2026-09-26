@@ -42,8 +42,10 @@ def extract(filename: str, data: bytes) -> Extracted:
         result = _extract_pdf(data)
     elif name.endswith(".docx"):
         result = _extract_docx(data)
+    elif name.endswith((".txt", ".md", ".markdown")):
+        result = _extract_text(data)
     else:
-        raise ExtractError("Upload a PDF (.pdf) or Word document (.docx).")
+        raise ExtractError("Upload a PDF (.pdf), Word document (.docx) or text file (.txt).")
 
     if len(result.text) > config.MAX_SOURCE_CHARS:
         result.text = result.text[: config.MAX_SOURCE_CHARS]
@@ -51,6 +53,16 @@ def extract(filename: str, data: bytes) -> Extracted:
     if not result.text.strip() and not result.scanned_pages:
         raise ExtractError("No text found in this document.")
     return result
+
+
+def _extract_text(data: bytes) -> Extracted:
+    for encoding in ("utf-8-sig", "cp1252", "latin-1"):
+        try:
+            text = data.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    return Extracted(text=text.replace("\r\n", "\n"), images=[], kind="text", page_count=0)
 
 
 def _to_web_image(pix: pymupdf.Pixmap, page: int | None, fmt: str = "jpeg") -> Image | None:

@@ -51,7 +51,7 @@ def test_health(client):
 
 
 def test_rejects_non_document(client):
-    r = client.post("/api/retreats", files={"file": ("notes.txt", b"hello")})
+    r = client.post("/api/retreats", files={"file": ("notes.rtf", b"hello")})
     assert r.status_code == 400
     assert "PDF" in r.json()["error"]["message"]
 
