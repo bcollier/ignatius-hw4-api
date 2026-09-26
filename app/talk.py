@@ -281,7 +281,7 @@ async def start(user, retreat: dict | None, about: str, notes: str, provider: st
     else:
         result = await _xai_session(instructions, voice)
     sid = result["session_id"]
-    _sessions[sid] = {"user_id": user.id, "email": user.email or ("guest" if user.anonymous else None),
+    _sessions[sid] = {"user_id": user.id, "email": user.log_email,
                       "provider": provider, "voice": voice, "started": time.time(), "max": max_seconds,
                       "retreat_id": retreat["id"] if retreat else None,
                       "retreat_title": (retreat.get("plan") or {}).get("title") if retreat else None,

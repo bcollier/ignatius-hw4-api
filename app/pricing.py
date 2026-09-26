@@ -181,3 +181,22 @@ async def elevenlabs_balance() -> dict | None:
         log.warning("couldn't read the ElevenLabs balance")
         return _eleven or None
     return _eleven
+
+
+async def model_menu() -> list[dict]:
+    """Each model with its price in dollars per million tokens, for menus and estimates.
+    Jetstream models come last, marked free."""
+    table = await prices()
+    out = []
+    for model, _, label in MODELS:
+        p = table.get(model, {})
+        out.append({
+            "id": model,
+            "label": label,
+            "input_per_m": round(p.get("prompt", 0) * 1e6, 3),
+            "output_per_m": round(p.get("completion", 0) * 1e6, 3),
+            "web_search_each": p.get("web_search", 0.01),
+        })
+    for model, label in jetstream_models():
+        out.append({"id": model, "label": label, "input_per_m": 0, "output_per_m": 0, "web_search_each": 0, "free": True})
+    return out
