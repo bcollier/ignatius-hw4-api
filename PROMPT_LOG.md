@@ -808,6 +808,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** It was a leftover from the mockups, meant to show that each day's colors come from its painting. Removed the "today's colors" dots from the Today card and the day page. The colors still quietly tint each day's page.
 
+### 129. 2026-09-26, 23:12 UTC
+
+> Somewhere it should say what the scripture is by book verse and chapter it does not need to be read outloud though just on the screen somewhere
+
+**What was done:** The prayer screen now shows the scripture reference: in the player's line ("Day 3 · John 4:7–15 · 10:20 left") and above the reading in the text view. The reference is shown in its clean form ("Psalm 8", not "Psalm 8, Preparation Days Prayer Unit 2 Day 1") there, on the day page and on the Today card. The planner now writes source references that way from the start. It is never read aloud.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

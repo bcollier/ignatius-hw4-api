@@ -39,7 +39,7 @@ When pages arrive as images, transcribe from the image with care. Where a text l
 </passage_text>
 
 <source_ref>
-Write source_ref as a plain citation for the screen and for the writers, who will use it to look up context: "Luke 15:11-32 (NRSV)," "Psalm 139:1-18, Grail translation," "Teresa of Avila, Interior Castle, Fourth Mansions, chapter one," "Handout, page three: Review of Week Two." Digits are fine here; this field is not read aloud. Name the translation when the document names it. When a passage is an excerpt of a longer reading the source assigned, say so in the citation. When you cannot identify a text, describe where it sits in the document rather than inventing an attribution.
+Write source_ref as a plain citation for the screen and for the writers, who will use it to look up context: "Luke 15:11-32 (NRSV)," "Psalm 139:1-18, Grail translation," "Teresa of Avila, Interior Castle, Fourth Mansions, chapter one," "Handout, page three: Review of Week Two." Digits are fine here; this field is not read aloud. Name the translation when the document names it. When a passage is an excerpt of a longer reading the source assigned, say so in the citation. When you cannot identify a text, describe where it sits in the document rather than inventing an attribution. For scripture, begin source_ref with the reference itself in standard form, book chapter:verse–verse, and do not add the handout's program, unit or day names to it; the app shows it on screen as the passage's reference.
 </source_ref>
 
 <titles>
