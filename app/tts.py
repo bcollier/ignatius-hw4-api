@@ -35,6 +35,11 @@ EDGE_PARALLEL = 6
 # Shared by every recording in the process, so a day with many sections doesn't
 # open dozens of connections to the free service at once.
 _edge_slots = asyncio.Semaphore(EDGE_PARALLEL)
+# ElevenLabs plans cap simultaneous requests (Starter: 3); a day's many short guidance
+# clips would otherwise all start at once and be refused with 429.
+ELEVENLABS_PARALLEL = 2
+ELEVENLABS_ATTEMPTS = 5
+_eleven_slots = asyncio.Semaphore(ELEVENLABS_PARALLEL)
 
 
 class TTSError(RuntimeError):
@@ -141,14 +146,27 @@ async def _elevenlabs(text: str, voice: str, out_path: Path) -> None:
         previous = ""
         for piece in chunk_text(text, ELEVENLABS_CHUNK):
             body = {"text": piece, "model_id": config.ELEVENLABS_MODEL, "previous_text": previous[-500:]}
-            try:
-                response = await http.post(url, headers=headers, params={"output_format": "mp3_44100_128"}, json=body)
-            except httpx.HTTPError as exc:
-                raise TTSError("Couldn't reach ElevenLabs.") from exc
+            for attempt in range(ELEVENLABS_ATTEMPTS):
+                try:
+                    async with _eleven_slots:
+                        response = await http.post(url, headers=headers, params={"output_format": "mp3_44100_128"}, json=body)
+                except httpx.HTTPError as exc:
+                    if attempt == ELEVENLABS_ATTEMPTS - 1:
+                        raise TTSError("Couldn't reach ElevenLabs.") from exc
+                    await asyncio.sleep(2 * 2**attempt)
+                    continue
+                busy = response.status_code == 429 and "quota" not in response.text.lower()  # an error body, not audio
+                if busy and attempt < ELEVENLABS_ATTEMPTS - 1:
+                    await asyncio.sleep(2 * 2**attempt)  # too many at once: wait our turn
+                    continue
+                break
             if response.status_code == 401:
                 raise TTSError("ElevenLabs rejected the API key.")
-            if response.status_code in (402, 429) or "quota" in response.text.lower():
-                raise TTSError("ElevenLabs is out of credits or rate limited. Use the free tier or add credits.")
+            failed = response.status_code >= 400
+            if response.status_code == 429 and "quota" not in response.text.lower():
+                raise TTSError("ElevenLabs is busy (too many requests at once). Try again in a minute.")
+            if response.status_code == 402 or (failed and "quota" in response.text.lower()):
+                raise TTSError("ElevenLabs is out of credits. Use the free tier or add credits.")
             if response.status_code >= 400:
                 raise TTSError(f"ElevenLabs returned an error ({response.status_code}).")
             audio += response.content  # constant-bitrate MP3 pieces can be joined directly

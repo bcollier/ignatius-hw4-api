@@ -75,9 +75,9 @@ def api_model(model: str) -> str:
     return next((a for o, a, _ in MODELS if o == model), model)
 
 
-def web_search_tool(model: str) -> dict:
+def web_search_tool(model: str, max_uses: int = 5) -> dict:
     kind = "web_search_20250305" if model in BASIC_SEARCH_MODELS else "web_search_20260209"
-    return {"type": kind, "name": "web_search", "max_uses": 5}
+    return {"type": kind, "name": "web_search", "max_uses": max_uses}
 
 
 async def prices() -> dict:
@@ -116,6 +116,7 @@ class Meter:
         self.input_tokens = self.output_tokens = self.searches = 0
         self.usd = 0.0
         self.research: dict | None = None  # what the deep dive's research found, for the research page
+        self.blocks: list = []  # the last model call's content blocks, across pause_turn rounds
 
     def add(self, usage) -> None:
         if usage is None:

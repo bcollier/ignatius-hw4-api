@@ -391,6 +391,36 @@ async def start_day_build(
     return retreat["days"][str(day_no)]
 
 
+def can_retry(state: dict) -> bool:
+    """A failed day whose failed parts all have their scripts can be finished by
+    recording just those parts again, with no new writing."""
+    if state.get("status") != "failed" or not state.get("params") or not state.get("voices"):
+        return False
+    clips = list(state.get("tracks", {}).items()) + list(state.get("guide", {}).items())
+    return all(c.get("script") for _, c in clips if c.get("status") != "ready")
+
+
+async def retry_failed(retreat: dict, day_no: int) -> dict:
+    """Try again: record only the parts that failed, from their saved scripts."""
+    state = retreat["days"][str(day_no)]
+    params = state["params"]
+    kept: dict = {"guide": {}}
+    for name, clip in state.get("tracks", {}).items():
+        if clip.get("status") != "ready":
+            kept[name] = {k: v for k, v in clip.items() if k not in ("status", "error")}
+            clip.update(status="waiting", error=None)
+    for name, clip in state.get("guide", {}).items():
+        if clip.get("status") != "ready":
+            kept["guide"][name] = clip["script"]
+            clip.update(status="waiting", error=None)
+    state.update(status="building", error=None)
+    await save(retreat)
+    meter = pricing.Meter(params["model"], await pricing.prices())
+    spawn(retreat, _build_day(retreat, day_no, params["heart_prompt"], params["deep_prompt"], params["guide"], kept, meter,
+                              params.get("search_provider")))
+    return state
+
+
 async def _build_day(
     retreat: dict, day_no: int, heart_prompt: str, deep_prompt: str, guide: dict, kept: dict, meter: pricing.Meter,
     search_provider: str | None = None,

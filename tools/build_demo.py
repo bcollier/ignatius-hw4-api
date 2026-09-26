@@ -4,7 +4,7 @@ demo package, owned by the given user, and register it as a demo everyone can op
   .venv/bin/python tools/build_demo.py free    OWNER_USER_ID
   .venv/bin/python tools/build_demo.py premium OWNER_USER_ID
 
-free:    planned and written by Muse Glimmer (Jetstream), researched with Brave, Microsoft voices.
+free:    planned and written by Muse Glimmer (Jetstream), researched with every free search service combined, Microsoft voices.
 premium: planned and written by Claude Fable 5.1 with web search, recorded with ElevenLabs
          (Sarah as guide, George reading, Brian for the reflection, Alice for the deep dive).
 """

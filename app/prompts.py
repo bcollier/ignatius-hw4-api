@@ -214,6 +214,13 @@ SEARCH_QUERIES = (
     "and interpretation of the passage below: its historical setting, key words in the original language, and how the "
     "church has read it. Reply with only the three queries, one per line, no numbering."
 )
+SEARCH_BOTH = (
+    "Web search results from several search services are included below, numbered, as a head start. They vary in "
+    "quality. Use your own web search as fully as the talk deserves: to go deeper, to check specific claims (dates, "
+    "word meanings, quotations, attributions), and to find better sources (scholarly commentaries, church documents, "
+    "the Fathers) wherever the results are thin, off topic or unreliable. Don't let the results limit you. In "
+    "<sources>, list the URLs you relied on, from the results or your own searches."
+)
 SEARCH_OFF = "You cannot search the web. Make only claims you are confident are well established, and say when a point is debated."
 
 

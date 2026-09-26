@@ -218,3 +218,31 @@ def test_plan_images_per_day_are_cleaned():
     assert days[0]["image_indexes"] == [2, 0] and days[0]["image_index"] == 2
     assert days[1]["image_indexes"] == [] and days[1]["image_index"] == -1
     assert days[2]["image_indexes"] == [1]
+
+
+def test_try_again_records_only_what_failed(client, monkeypatch):
+    calls = []
+    fail = {"on": True}
+
+    async def flaky(text, voice, out_path):
+        calls.append(text[:30])
+        if fail["on"] and "silence" not in text.lower() and len(calls) % 3 == 0:
+            raise tts.TTSError("ElevenLabs is busy (too many requests at once). Try again in a minute.")
+        out_path.write_bytes(b"ID3")
+        return 2.0
+
+    monkeypatch.setattr(tts, "synthesize", flaky)
+    rid = make(client).json()["id"]
+    body = until(client, rid, finished)
+    failed = [n for n, d in body["days"].items() if d["status"] == "failed"]
+    assert failed
+    n = failed[0]
+    ready_before = {k for g in ("tracks", "guide") for k, c in body["days"][n][g].items() if c["status"] == "ready"}
+    written = sum(1 for _ in calls)
+    fail["on"] = False
+    calls.clear()
+    assert client.post(f"/api/retreats/{rid}/days/{n}/retry").status_code == 202
+    day = until(client, rid, lambda b: b["days"][n]["status"] in ("ready", "failed"))["days"][n]
+    assert day["status"] == "ready" and 0 < len(calls) < written
+    assert len(calls) == sum(1 for g in ("tracks", "guide") for k in day[g] if k not in ready_before)
+    assert client.post(f"/api/retreats/{rid}/days/{n}/retry").status_code == 409  # nothing left to retry

@@ -200,3 +200,54 @@ def test_all_services_combined(monkeypatch, keys):
     assert set(urls) == {"https://e/1", "https://e/2", "https://t/1"} and urls[-1] == "https://e/2"  # one of each first
     assert r.provider == "all" and set(r.contributors) == {"exa", "tavily"}
     assert not any("linkup/deep" in x["url"] for x in r.results)
+
+
+def test_claude_gets_free_research_first(monkeypatch, keys):
+    """Claude models: the free services search first; Claude still searches fully on its own."""
+    from types import SimpleNamespace as NS
+
+    from app import llm, pricing
+
+    monkeypatch.setattr(config, "LLM_MODE", "openrouter")
+    monkeypatch.setattr(config, "WEB_SEARCH", True)
+    seen = []
+
+    async def fake_call(meter, **params):
+        seen.append(params)
+        if params["max_tokens"] == 1000:
+            return NS(content=[NS(type="text", text="setting of Luke 15\nGreek splanchnizomai\nfathers on the prodigal")])
+        return NS(content=[
+            NS(type="server_tool_use", input={"query": "Rembrandt prodigal son date"}),
+            NS(type="web_search_tool_result", content=[NS(url="https://own/1", title="Own", page_age=None)]),
+            NS(type="text", text="<script>Talk.</script><sources>\n- A https://free/1\n- Own https://own/1\n</sources>"),
+        ])
+
+    async def fake_search(queries, provider=None):
+        r = search.Research()
+        r.add("A", "https://free/1", "text", service="exa")
+        r.provider, r.contributors = "all", ["exa"]
+        return r
+
+    monkeypatch.setattr(llm, "_call", fake_call)
+    monkeypatch.setattr(search, "search", fake_search)
+    meter = pricing.Meter("anthropic/claude-opus-5", {})
+    script, sources, searched = asyncio.run(llm.write_deep("Day 5\nWelcomed Home\nLuke 15:17-24", "Write.", 300, meter, "all"))
+    write = seen[-1]
+    assert "https://free/1" in write["messages"][0]["content"] and write["tools"][0]["max_uses"] == 5
+    assert "Don't let the results limit you" in write["system"]
+    assert searched == "all" and len(sources) == 2
+    assert meter.research["queries"][:3] == ["setting of Luke 15", "Greek splanchnizomai", "fathers on the prodigal"]
+    assert [x["url"] for x in meter.research["results"]] == ["https://free/1", "https://own/1"]
+
+
+def test_claude_citations_become_research_results():
+    from types import SimpleNamespace as NS
+
+    from app import llm
+
+    blocks = [NS(type="server_tool_use", input={"query": "splanchnizomai"}),
+              NS(type="text", text="x", citations=[NS(url="https://bh/4697", title="Strong's 4697", cited_text="to be moved"),
+                                                  NS(url="https://bh/4697", title="Strong's 4697", cited_text="compassion")])]
+    log = llm._web_search_log(blocks)
+    assert log["queries"] == ["splanchnizomai"] and len(log["results"]) == 1
+    assert "to be moved" in log["results"][0]["content"] and "compassion" in log["results"][0]["content"]

@@ -31,7 +31,7 @@ app = FastAPI(title="Ignatius at Home API", version="0.2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.ALLOWED_ORIGINS,
-    allow_methods=["GET", "POST", "DELETE"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
@@ -316,7 +316,10 @@ async def list_retreats(user: User = Depends(current_user)):
     for rid, meta in registered.items():
         retreat = None if rid in own_ids else await pipeline.get(rid)
         if retreat and retreat.get("status") == "ready":
-            examples.append({**summary(demos.personal(retreat, state.get(rid), meta)), "demo": meta, "read_only": True})
+            first = next((d.get("image_index", -1) for d in retreat["plan"]["days"] if d.get("image_index", -1) >= 0), -1)
+            cover = retreat["images"][first]["path"] if 0 <= first < len(retreat["images"]) else None
+            examples.append({**summary(demos.personal(retreat, state.get(rid), meta)), "demo": meta, "read_only": True,
+                             "cover": (await store.urls([cover])).get(cover) if cover else None})
     return {"retreats": mine, "examples": examples}
 
 
@@ -595,6 +598,18 @@ async def build_day(
                                        opts["guide"], body.keep_scripts, opts["write_model"], opts["search_provider"])
     except tts.TTSError as exc:
         raise HTTPException(400, str(exc)) from exc
+    return await pipeline.public_view(retreat)
+
+
+@app.post("/api/retreats/{retreat_id}/days/{day}/retry", status_code=202)
+async def retry_day(day: int, retreat: dict = Depends(my_retreat), user: User = Depends(current_user)):
+    """Try again after a failure: record only the parts that failed, from their saved
+    scripts, with the day's own options. Nothing is written again."""
+    state = _day_state(retreat, day)
+    if not pipeline.can_retry(state):
+        raise HTTPException(409, f"Day {day} can't be finished from its scripts; rewrite it instead.")
+    llm_log.tag(email=user.email or ("guest" if user.anonymous else None))
+    await pipeline.retry_failed(retreat, day)
     return await pipeline.public_view(retreat)
 
 
