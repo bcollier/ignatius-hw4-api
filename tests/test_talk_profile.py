@@ -75,7 +75,7 @@ def test_notes_reach_every_model_call(client):
         return llm._with_background("Write.")
 
     system = asyncio.run(job())
-    assert "<about_the_person>" in system and "grieving my father" in system and system.index("Background") < system.index("grieving")
+    assert "<about_the_person>" in system and "grieving my father" in system and system.index("<background>") < system.index("grieving")
 
 
 # ---------------------------------------------------------------- talk it over
@@ -179,3 +179,15 @@ def test_notes_do_not_leak_between_jobs(client):
 
     mine, other = asyncio.run(two_jobs())
     assert "Secret detail" in mine and "Secret detail" not in other
+
+
+def test_companion_prompt_can_be_replaced(client, monkeypatch):
+    seen = fake_openai(monkeypatch)
+    as_user(User("t-full-3", "me@x.y"))
+    assert "prayer companion" in client.get("/api/options").json()["prompts"]["companion"]
+    client.put("/api/profile", json={"companion_prompt": "You are a quiet listener. Ask one question."})
+    client.post("/api/talk/session", json={"provider": "openai", "sdp": "o"})
+    assert seen["instructions"].startswith("You are a quiet listener.") and "<background>" in seen["instructions"]
+    client.put("/api/profile", json={"companion_prompt": ""})  # back to the default
+    client.post("/api/talk/session", json={"provider": "openai", "sdp": "o"})
+    assert seen["instructions"].startswith(talk.COMPANION[:40])

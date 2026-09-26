@@ -652,6 +652,42 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Answered that there's no side-by-side comparison on this app's writing yet, gave the price difference (Fable $10/$50 per million tokens against Opus 5.5 $4/$20), and offered to rewrite one day both ways to compare.
 
+### 104. 2026-09-26, 22:10 UTC
+
+> once code review is done do a full pass for design, visuals, and animations. right now its all brown theme and looks blah. it's not fun. make movement be animated, make the visuals look compelling and beautiful. it doesn't have to look "old" or boring, but use your best judgement on how to redesign the visuals for the app.
+
+**What was done:** A visual redesign after the code review merged: a new palette, type, image-led cards and motion throughout, with calm reduced-motion fallbacks.
+
+### 105. 2026-09-26, 22:15 UTC
+
+> the deep dive prompt still doesn't mention that this could be part of a larger retreat, and it's pretty light as a prompt. use fable if possible to generate better default prompts for planning, reflection, and deep dive. I want to be able to see the prompt for the ai companion as well and to tweek it in the app somewhere (tucked away superuser settings or something) . the important thing is to have a deep and robust prompt for all of these given the overall functionality of the app. make sure they are all integrated as a wholistic experience not just a little prompt stub. it can be very long, use prompting best practices from claude guides on prompt design. I expect these prompts to be extensive and world class.
+
+**What was done:** Wrote a brief describing the whole app (what each part receives, where it sits in the listener's day, what the others do) and had Claude Fable 5.1 write every default prompt from it: the shared background, the house style, planning, both heart presets, the deep dive, the guidance tailoring and the companion (13,000 to 26,000 characters each). They now live as plain files in app/prompt_texts/, with the brief and script in docs/prompt-design/. The editable-prompt limit went from 8,000 to 60,000 characters. The companion's instructions are editable per person on the Talk page, and the background and house style are shown read only under Advanced.
+
+### 106. 2026-09-26, 22:16 UTC
+
+> make the ai companion prompt also great, using same principles
+
+**What was done:** Included the companion in the same Fable pass, from the same brief (see 105).
+
+### 107. 2026-09-26, 22:20 UTC
+
+> in the technical details I want to see the real details, like the exact prompts going up to muse/claude and the exact response that comes back. these should be SUPER VERBOSE for a technical person to troubleshoot any issues. for example do an audit that all of the previous days of the retreat were sent up as context when planning
+
+**What was done:** The build log now shows each call in full: the whole system prompt, every message exactly as sent, the whole response and its metadata, with "Copy this call as JSON". An audit of the live "Be Still" build found each day received the earlier days' full reflections and deep dives, and the coming days' readings only, and the deep dive received the day's reflection.
+
+### 108. 2026-09-26, 22:22 UTC
+
+> it should be clear what the talk it over button does, right now it is kind of hidden and i'm not sure what's going to happen when I push the button. find a clever way to let users know what it does, perhaps an animated entrance, and a tool tip that says "have a conversation with a realistic sounding voice to prompt your reflection or something like that I don't know i'm not a writer do something good
+
+**What was done:** "Talk it over" is now a warm pill button with a moving sound-wave icon. It arrives with a glow, and has an explanation card: "Say out loud what's stirring. A conversation, in a natural voice, with a companion that knows this retreat…". The card shows on hover and focus, and opens by itself the first time.
+
+### 109. 2026-09-26, 22:24 UTC
+
+> why show the "whole retreat pdf" button if it doesn't work yet, just hide until complete *(with a screenshot of "The retreat plan isn't ready yet")*
+
+**What was done:** The whole-retreat PDF button stays hidden until the retreat is finished.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

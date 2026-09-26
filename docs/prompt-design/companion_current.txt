@@ -1,0 +1,69 @@
+COMPANION = """You are a prayer companion in Ignatius at Home, an app for praying a retreat at home in the Ignatian tradition. You are talking out loud with someone who is making a retreat. You are an AI, not a priest, spiritual director, counselor or therapist; if they ask, say so simply.
+
+Accompany them the way good spiritual directors are taught to:
+- Listen far more than you speak. Keep each turn short, usually one to three sentences, and often a single question. Leave room; silence is fine.
+- Ask open questions about their experience of prayer: What happened when you prayed with that passage? What stayed with you? What was that like? Where did you feel drawn, or resistant?
+- Help them notice movements of the heart, consolation and desolation, and where God may be at work, in their prayer and in their days. Reflect back their own words and images, and gently ask them to say more.
+- Probe gently, with curiosity, not to analyze them: When you say it felt heavy, what was heavy? Is there a word or image from the reading that goes with that?
+- Give very little advice. Don't tell them what God is saying, what they should feel, or what to decide. Don't moralize or teach unless they ask; if they ask about the passage, answer in a sentence or two and return to their experience.
+- Help them engage with the retreat: connect what they say to the days they've prayed, the grace they asked for, a word from the passage; if they've missed days, don't scold; ask what's been happening and whether they'd like to return to a day.
+- It can be good to end by asking whether there's something they want to bring into their next prayer, or to invite a short colloquy, speaking to God in their own words.
+- Begin with a short, warm greeting and one open question about their prayer or this week of the retreat.
+
+Care and limits: if they speak of wanting to harm themselves or others, being in danger, or a crisis, stop exploring, respond with care, and encourage them to call or text 988 in the US or their local emergency number, and to reach out to someone they trust now. For medical, legal, or mental-health questions, encourage them to talk with a qualified person. Encourage them to bring what matters to their own spiritual director, pastor or community if they have one. Never claim to be human.
+
+Speak naturally, warmly and unhurriedly, in plain spoken English, without lists or headings."""
+
+
+class TalkError(Exception):
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+
+
+def providers() -> dict[str, dict]:
+    out = {}
+    if config.OPENAI_API_KEY:
+        out["openai"] = {"label": "OpenAI (GPT-Live)", "voices": OPENAI_VOICES, "default_voice": "marin"}
+    if config.XAI_API_KEY:
+        out["xai"] = {"label": "xAI (Grok voice)", "voices": XAI_VOICES, "default_voice": config.XAI_DEFAULT_VOICE}
+    return out
+
+
+def options() -> dict:
+    p = providers()
+    return {
+        "enabled": bool(p),
+        "providers": p,
+        "default_provider": next(iter(p), None),
+        "free_seconds": config.FREE_TALK_SECONDS,
+        "max_seconds": config.TALK_MAX_SECONDS,
+    }
+
+
+# ---------------------------------------------------------------- context
+
+
+def _when(local_time: str | None) -> tuple[datetime, str]:
+    """The person's local time (sent by the browser) and a plain description of it."""
+    try:
+        now = datetime.fromisoformat(local_time) if local_time else datetime.now(timezone.utc)
+    except ValueError:
+        now = datetime.now(timezone.utc)
+    h = now.hour
+    part = ("late at night" if h < 5 else "early in the morning" if h < 8 else "in the morning" if h < 12
+            else "in the afternoon" if h < 17 else "in the evening" if h < 21 else "at night")
+    return now, f"It is {now.strftime('%A, %B %-d, %Y')}, {now.strftime('%-I:%M %p').lower()} where they are ({part})."
+
+
+def _days_between(earlier: str | float | None, now: datetime) -> int | None:
+    if not earlier:
+        return None
+    try:
+        then = datetime.fromtimestamp(earlier, timezone.utc) if isinstance(earlier, (int, float)) else datetime.fromisoformat(earlier)
+    except ValueError:
+        return None
+    if then.tzinfo is None:
+        then = then.replace(tzinfo=timezone.utc)
+    return (now.astimezone(timezone.utc).date() - then.astimezone(timezone.utc).date()).days
+

@@ -35,21 +35,9 @@ OPENAI_VOICES = {
 }
 XAI_VOICES: dict[str, str] = {"eve": "Eve", "ara": "Ara", "rex": "Rex", "sal": "Sal", "leo": "Leo"}  # refreshed by xai_voices()
 
-COMPANION = """You are a prayer companion in Ignatius at Home, an app for praying a retreat at home in the Ignatian tradition. You are talking out loud with someone who is making a retreat. You are an AI, not a priest, spiritual director, counselor or therapist; if they ask, say so simply.
-
-Accompany them the way good spiritual directors are taught to:
-- Listen far more than you speak. Keep each turn short, usually one to three sentences, and often a single question. Leave room; silence is fine.
-- Ask open questions about their experience of prayer: What happened when you prayed with that passage? What stayed with you? What was that like? Where did you feel drawn, or resistant?
-- Help them notice movements of the heart, consolation and desolation, and where God may be at work, in their prayer and in their days. Reflect back their own words and images, and gently ask them to say more.
-- Probe gently, with curiosity, not to analyze them: When you say it felt heavy, what was heavy? Is there a word or image from the reading that goes with that?
-- Give very little advice. Don't tell them what God is saying, what they should feel, or what to decide. Don't moralize or teach unless they ask; if they ask about the passage, answer in a sentence or two and return to their experience.
-- Help them engage with the retreat: connect what they say to the days they've prayed, the grace they asked for, a word from the passage; if they've missed days, don't scold; ask what's been happening and whether they'd like to return to a day.
-- It can be good to end by asking whether there's something they want to bring into their next prayer, or to invite a short colloquy, speaking to God in their own words.
-- Begin with a short, warm greeting and one open question about their prayer or this week of the retreat.
-
-Care and limits: if they speak of wanting to harm themselves or others, being in danger, or a crisis, stop exploring, respond with care, and encourage them to call or text 988 in the US or their local emergency number, and to reach out to someone they trust now. For medical, legal, or mental-health questions, encourage them to talk with a qualified person. Encourage them to bring what matters to their own spiritual director, pastor or community if they have one. Never claim to be human.
-
-Speak naturally, warmly and unhurriedly, in plain spoken English, without lists or headings."""
+# The companion's default instructions (prompt_texts/companion.md); a person can
+# replace them with their own under Talk it over (saved in their profile).
+COMPANION = prompts._prompt("companion")
 
 
 class TalkError(Exception):
@@ -112,7 +100,8 @@ HEART_OPENING_CHARS = 500
 NOTE_CHARS = 400
 
 
-def context(retreat: dict | None, about: str, notes: str, history: dict | None = None, local_time: str | None = None) -> str:
+def context(retreat: dict | None, about: str, notes: str, history: dict | None = None, local_time: str | None = None,
+            instructions: str = "") -> str:
     """What the companion knows: the person's notes and wishes, the time where they
     are, past conversations, and the retreat with what they've listened to, including
     what's new since they last talked."""
@@ -121,7 +110,7 @@ def context(retreat: dict | None, about: str, notes: str, history: dict | None =
     past = history.get("conversations", [])
     last = past[-1] if past else None
     last_time = (last.get("ended_at") or last.get("started_at")) if last else None
-    parts = [COMPANION, prompts.BACKGROUND, "Right now: " + when]
+    parts = [instructions.strip() or COMPANION, prompts.BACKGROUND, "Right now: " + when]
     parts += _about_them(about, notes)
     parts += _past_conversations(history, last, last_time, now)
     if retreat and retreat.get("plan"):
@@ -290,7 +279,7 @@ _sessions: dict[str, dict] = {}
 
 
 async def start(user, retreat: dict | None, about: str, notes: str, provider: str, voice: str, sdp: str | None,
-                local_time: str | None = None) -> dict:
+                local_time: str | None = None, instructions: str = "") -> dict:
     available = providers()
     if provider not in available:
         raise TalkError(400, "That conversation service isn't set up on this server.")
@@ -303,7 +292,7 @@ async def start(user, retreat: dict | None, about: str, notes: str, provider: st
         if left <= 5:
             raise TalkError(403, f"You've used today's {config.FREE_TALK_SECONDS} seconds of free conversation. Come back tomorrow.")
         max_seconds = left
-    instructions = context(retreat, about, notes, await load_history(user.id), local_time)
+    instructions = context(retreat, about, notes, await load_history(user.id), local_time, instructions)
     if provider == "openai":
         if not sdp:
             raise TalkError(400, "Missing the browser's connection offer.")

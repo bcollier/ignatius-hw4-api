@@ -53,12 +53,24 @@ def log_row(row: dict, full: bool, owner: bool) -> dict:
     request = row.get("request") or {}
     system = request.get("system") or ""
     out = {k: row.get(k) for k in ROW_FIELDS}
-    out.update(system=clean(system), prompt=clean(_prompt_text(request.get("messages") or [])),
+    messages = request.get("messages") or []
+    out.update(system=clean(system), prompt=clean(_prompt_text(messages)),
                response=clean(row.get("response_text") or ""), details=row.get("response") if full else None)
+    if full:  # exactly what was sent, message by message (images appear as placeholders)
+        out["messages"] = [_clean_message(m, owner) for m in messages if isinstance(m, dict)]
     if not full:
         out["system_chars"] = len(system)
         out.pop("system")
     return out
+
+
+def _clean_message(message: dict, owner: bool) -> dict:
+    hide = (lambda t: t) if owner else _hide_private_notes
+    content = message.get("content")
+    if isinstance(content, str):
+        return {**message, "content": hide(content)}
+    blocks = [{**b, "text": hide(b["text"])} if isinstance(b, dict) and "text" in b else b for b in content or []]
+    return {**message, "content": blocks}
 
 
 def _hide_private_notes(text):

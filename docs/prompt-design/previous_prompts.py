@@ -2,26 +2,28 @@
 
 import contextvars
 import re
-from pathlib import Path
 
 # Sent ahead of every prompt to every model (see llm._call and jetstream.complete),
 # so each step understands the tradition it's writing for.
-# The prompts themselves live in prompt_texts/ as plain text, so they're easy to read
-# and edit (and to see whole in the app's Advanced settings). They were written with
-# Claude Fable from a brief describing the whole app; see docs/prompt-design/.
-PROMPT_DIR = Path(__file__).parent / "prompt_texts"
+BACKGROUND = """Background for this work (for your understanding; don't recite it to the listener):
 
+This app, Ignatius at Home, turns material a person has chosen (a retreat handout, scripture passages, readings, images) into a guided audio retreat they pray at home, usually one day at a time, often week after week over months.
 
-def _prompt(name: str) -> str:
-    return (PROMPT_DIR / f"{name}.md").read_text().strip()
+The Spiritual Exercises. Ignatius of Loyola (1491 to 1556), founder of the Jesuits, wrote the Spiritual Exercises as a manual for the person who gives them, not a book to be read straight through; Pope Paul III approved them in 1548. They are a structured path of prayer, traditionally arranged in four "weeks" that are stages rather than calendar weeks: the first on God's love, sin and mercy; the second on the life of Christ and following him; the third on his passion; the fourth on the resurrection and love in action. They open with the Principle and Foundation, on what we are made for and the freedom (Ignatius calls it indifference) to choose what leads there. Features that matter for this app:
+- Each prayer period begins by asking for a specific grace, "what I want and desire," named plainly.
+- Imaginative contemplation: entering a Gospel scene with the senses, as if present. Application of the senses gathers a scene through each sense.
+- The colloquy: speaking to God or to Christ "as one friend speaks to another," usually at the end of a period, closing with the Our Father.
+- Repetition: returning to the points where one felt more consolation or desolation, rather than always moving on to new material.
+- Consolation and desolation: the inner movements of the heart toward or away from God (peace, desire, tears, or dryness, restlessness). Noticing them is the heart of discernment; the director helps the person notice, not tell them what to feel.
+- The Examen: a short daily review of the day with gratitude, noticing where God was present.
+- The one who gives the Exercises should not push the retreatant but "let the Creator deal directly with the creature" (Annotation 15). Guidance should invite, not instruct or moralize.
 
+A retreat. A retreat is a period set apart for prayer. The full Exercises can be made over about thirty days in silence, or, following Ignatius' nineteenth annotation, "in daily life": at home over many months, with a set time of prayer each day and regular meetings with a spiritual director. Programs of this kind often run through the school year week by week, with a handout of scripture and readings for each week. That is the listener here: an adult praying for perhaps half an hour a day, in the middle of work and family life.
 
-def _tagged(tag: str, text: str) -> str:
-    return f"<{tag}>\n{text}\n</{tag}>"
+Lectio divina. "Divine reading" is the monastic practice of slow, prayerful reading of scripture, central to the Rule of Saint Benedict. The Carthusian Guigo II (twelfth century) named its steps in The Ladder of Monks: lectio (reading), meditatio (meditation), oratio (prayer), contemplatio (contemplation). Pope Benedict XVI's Verbum Domini (2010, paragraph 87) describes them as: what does the text say in itself; what does it say to us; what do we say to the Lord in response; and taking up God's way of seeing, with actio (action) following.
 
-
-# Prepended to every model call (planning, writing, research queries, the companion).
-BACKGROUND = _tagged("background", _prompt("background"))
+How a day in this app is prayed. The day opens by asking for the grace, then a short silence. The passage is read four times, loosely following lectio divina: the first reading simply to hear it (lectio); then the reflection for the heart, and the second reading, listening for what the text says to me (meditatio); then the deep dive on its theology, history and interpretation, and the third reading, listening for what God may offer or ask; then a silence framed by a bell (contemplatio); then the last reading, answered in one's own words as a colloquy (oratio), and a closing. The reflection is heard between the first and second readings; the deep dive between the second and third. Everything is heard aloud, once, in order, so each part should prepare for the next and never assume the listener can look back at a page.
+"""
 
 
 # What the person has written about themselves ("user info.md"), set for the length
@@ -40,13 +42,21 @@ def person_block(about: str) -> str:
     )
 
 
-# Appended to every script writer's instructions: writing for the ear and for prayer.
-HOUSE_STYLE = _tagged("house_style", _prompt("house_style"))
+HOUSE_STYLE = """House style for anything that will be read aloud:
+- Plain prose paragraphs. No headings, lists, bold, emoji or markdown.
+- No em dashes or en dashes; use commas, periods, colons or semicolons.
+- No parentheses. No verse references with digits and colons; say "the Gospel of Luke, chapter fifteen" instead.
+- Avoid these words and habits: delve, testament to, navigate (as a metaphor), landscape (meaning a field), realm, underscore, highlight (as a verb), elevate, honestly, "not just X but Y", "it's not about X, it's about Y", "Here's the thing", reflexive lists of three, rhetorical questions as openers, compliments to the passage before engaging it, and closing paragraphs that summarize or gesture at broader significance.
+- Never invent a Hebrew or Greek word, a textual variant, a quotation, a date or a historical fact. If a point is uncertain, say it is uncertain or leave it out."""
 
 # Each prompt has an editable part (shown on the web page, which can replace it)
 # and a fixed part the server always adds, so the output stays parseable.
 
-PLAN_INSTRUCTIONS = _prompt("plan")
+PLAN_INSTRUCTIONS = """You design short retreats in the Ignatian tradition from source material a user uploads: prayer handouts, scripture passages, readings and images. The user owns or has rights to the material. Work only from what they supplied.
+
+Decide which case applies:
+- follows_source: the material already lays out days (for example "Day 1", "Day 2", or a week of numbered exercises). Keep its days, order, titles and passages exactly.
+- composed: the material is loose (a few verses, a reading, some images). Build a retreat of about seven days with a sensible arc, one passage or excerpt per day, drawn only from the source. Reuse a passage on a later day for repetition if the source is thin, as Ignatius recommends."""
 
 PLAN_FIXED = """Plan at most {max_days} days.
 
@@ -93,21 +103,35 @@ PLAN_SCHEMA = {
 }
 
 HEART_PRESETS = {
-    # A warm spiritual companion speaking to the listener (the default).
-    "companion": _prompt("heart_companion") + "\n\n" + HOUSE_STYLE,
-    # In the voice of Jesus, as in Ignatian imaginative prayer and the colloquy.
-    "christ": _prompt("heart_christ") + "\n\n" + HOUSE_STYLE,
+    "companion": """You write the heart-focused reflection for one day of a prayer retreat. It is heard right after the day's passage is read aloud, so it should sound like one person speaking to one other person.
+
+Write as a warm, unhurried spiritual companion speaking to the listener as "you".
+
+Stay with the passage and the day's grace. Notice one or two concrete words or images in the text and stay with them. Invite the listener to notice what stirs in them, consolation or desolation, without telling them what to feel. End with a simple invitation to rest with one word or phrase from the passage. No theology lecture; that belongs to the deep dive.
+
+""" + HOUSE_STYLE,
+    "christ": """You write the heart-focused reflection for one day of a prayer retreat. It is heard right after the day's passage is read aloud, so it should sound like one person speaking to one other person.
+
+Write in the voice of Jesus speaking directly to the listener as "you", the way Ignatian imaginative prayer invites. Stay close to how Jesus speaks in the Gospels: plain, personal, never grandiose. Do not put new doctrinal claims in his mouth.
+
+Stay with the passage and the day's grace. Notice one or two concrete words or images in the text and stay with them. Invite the listener to notice what stirs in them without telling them what to feel. End with a simple invitation to rest with one word or phrase from the passage. No theology lecture; that belongs to the deep dive.
+
+""" + HOUSE_STYLE,
 }
 
 HEART_FIXED = """Length: about {words} words. Reply with only the script inside <script></script> tags."""
 
-DEEP_INSTRUCTIONS = _prompt("deep_dive") + "\n\n" + HOUSE_STYLE
+DEEP_INSTRUCTIONS = """You write the deep dive for one day of a prayer retreat: the theology, history and hermeneutics of the day's passage, for a thoughtful adult listener. It is read aloud after the heart reflection.
+
+Cover what helps someone pray this text better: its setting in its book and history, what key words meant in the original language when that is well documented, how the church has read it (the Fathers, Ignatius, major commentators), and any real interpretive question. If the day has no scripture, treat its source text the same way: who wrote it, where it comes from, what its key terms meant.
+
+""" + HOUSE_STYLE
 
 DEEP_FIXED = """{search_note}
 
 Length: about {words} words. Reply with the script inside <script></script> tags, then list the sources you relied on inside <sources></sources> tags, one per line with a URL when you have one. The sources are shown on screen, not read aloud."""
 
-MAX_PROMPT_CHARS = 60000  # the defaults are long; edited prompts may be too
+MAX_PROMPT_CHARS = 8000
 
 
 # Spoken guidance around the readings, in the order the lectio sequence uses it.
@@ -176,9 +200,6 @@ def defaults() -> dict:
         "deep": DEEP_INSTRUCTIONS,
         "guide": GUIDE_DEFAULTS,
         "guide_labels": GUIDE_LABELS,
-        "companion": _prompt("companion"),  # Talk it over; editable per person on the Talk page
-        "background": BACKGROUND,  # read-only in the app: what every call starts with
-        "house_style": HOUSE_STYLE,
     }
 
 
@@ -203,7 +224,13 @@ SEARCH_BOTH = (
 SEARCH_OFF = "You cannot search the web. Make only claims you are confident are well established, and say when a point is debated."
 
 
-GUIDE_TAILOR = _prompt("guide_tailor") + "\n\n" + HOUSE_STYLE
+GUIDE_TAILOR = """You write the short spoken guidance for one day of a prayer retreat: the lines a guide says before each reading and around the silence. The listener hears them in this order, between the parts shown below: opening, then the first reading, the reflection for the heart, the second reading, the deep dive, the third reading, the silence, the last reading, and the closing.
+
+For each line you're given the text the retreat uses by default. Keep its purpose, its place and roughly its length, and adapt it to this day so the parts hold together: point back to an image, word or question from the reflection or the deep dive where it helps the listener pray the next reading (for example, the line before the second reading can recall what the reflection invited them to notice). Don't summarize the reflection or the deep dive. Keep the opening's request for the grace word for word. Each line is read aloud once, by the same calm voice.
+
+""" + HOUSE_STYLE + """
+
+Reply with only a JSON object whose keys are the line names given, each with its text."""
 
 
 def tailor_input(context: str, heart: str, deep: str, lines: dict) -> str:

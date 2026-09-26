@@ -33,7 +33,7 @@ async def talk_session(body: TalkRequest, user: User = Depends(current_user)):
     provider = body.provider or talk.options()["default_provider"]
     try:
         return await talk.start(user, retreat, about_me["about"], about_me["companion_notes"], provider or "",
-                                body.voice or "", body.sdp, body.local_time)
+                                body.voice or "", body.sdp, body.local_time, about_me.get("companion_prompt", ""))
     except talk.TalkError as exc:
         raise HTTPException(exc.status, str(exc)) from exc
 

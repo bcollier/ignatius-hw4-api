@@ -16,6 +16,7 @@ from .storage import StorageError, store
 log = logging.getLogger(__name__)
 
 MAX_NOTES = 4000  # what they want from the companion
+MAX_COMPANION_PROMPT = 60_000  # the default companion prompt is about 21,000 characters
 MAX_INPUT = 200_000  # anything longer is cut before condensing
 
 CONDENSE = """Condense these notes a person wrote about themselves, for use by a prayer app that plans retreats and offers a spoken conversation companion. Keep what would help someone accompany them in prayer: their situation and vocation, relationships that matter, what they are carrying or hoping for, their faith background and practice, how they like to pray, images or scripture they return to, and anything they say they want or don't want. Keep their own words where they are vivid. Drop repetition and detail that doesn't serve that purpose. Write in the first person, as plain notes, in no more than {limit} characters."""
@@ -41,6 +42,8 @@ async def load(user_id: str) -> dict:
         "summarized": bool(meta.get("summarized")) and bool(about),
         "original_characters": meta.get("original_characters", len(about)),
         "companion_notes": meta.get("companion_notes", ""),
+        # The companion's instructions, if the person replaced the default (empty = default).
+        "companion_prompt": meta.get("companion_prompt", ""),
         "updated_at": meta.get("updated_at"),
         "max_characters": config.PROFILE_MAX_CHARS,
     }
@@ -53,7 +56,8 @@ async def about_text(user_id: str) -> str:
         return ""
 
 
-async def save(user_id: str, about: str | None, companion_notes: str | None, full: bool, source: str = "typed") -> dict:
+async def save(user_id: str, about: str | None, companion_notes: str | None, full: bool, source: str = "typed",
+               companion_prompt: str | None = None) -> dict:
     current = await load(user_id)
     summarized, original = current["summarized"], current["original_characters"]
     if about is not None:
@@ -64,7 +68,8 @@ async def save(user_id: str, about: str | None, companion_notes: str | None, ful
             summarized = True
         await store.put_file(_paths(user_id)[0], about.encode(), "text/markdown")
     notes = current["companion_notes"] if companion_notes is None else companion_notes.strip()[:MAX_NOTES]
-    meta = {"summarized": summarized, "original_characters": original, "companion_notes": notes,
+    prompt = current["companion_prompt"] if companion_prompt is None else companion_prompt.strip()[:MAX_COMPANION_PROMPT]
+    meta = {"summarized": summarized, "original_characters": original, "companion_notes": notes, "companion_prompt": prompt,
             "updated_at": time.time(), "source": source}
     await store.put_file(_paths(user_id)[1], json.dumps(meta).encode(), "application/json")
     return await load(user_id)

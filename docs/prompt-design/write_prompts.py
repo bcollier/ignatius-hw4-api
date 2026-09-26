@@ -1,0 +1,63 @@
+"""Write the app's default prompts with Claude Fable (via OpenRouter)."""
+import asyncio, re, sys, json
+from pathlib import Path
+sys.path.insert(0, str(Path.home() / "Code/ignatius-hw4-api"))
+from app import llm, pricing
+
+HERE = Path(__file__).parent
+MODEL = pricing.api_model("anthropic/claude-fable-5.1")
+BRIEF = (HERE / "brief.md").read_text()
+CURRENT = (HERE / "previous_prompts.py").read_text()
+COMPANION = (HERE / "companion_current.txt").read_text()
+CONTEXT_FN = (HERE / "companion_context_fn.py").read_text()
+
+SYSTEM = f"""You are one of the best prompt engineers in the world, and you also know the Spiritual Exercises of Saint Ignatius, lectio divina, spiritual direction, biblical scholarship and writing for the ear deeply. You are writing the production default prompts for the app described below. They will run thousands of times, unattended, with many different source documents and people. Write each prompt as a complete, world-class, self-sufficient instruction set: long and thorough where depth helps, precise, warm, structured with XML tags and clear sections, explaining the why. Write in second person to the model that will use it.
+
+<brief>
+{BRIEF}
+</brief>
+
+<current_prompts_file>
+{CURRENT}
+</current_prompts_file>
+
+<current_companion_prompt>
+{COMPANION}
+</current_companion_prompt>
+
+<companion_context_builder>
+{CONTEXT_FN}
+</companion_context_builder>"""
+
+TASKS = {
+ "foundation": """Write the two shared blocks every writer relies on.
+1. <background>: replaces BACKGROUND, prepended to EVERY model call's system prompt in the app (planning, heart, deep dive, guidance, search queries, the companion, summaries). It gives the model the understanding it needs: the Spiritual Exercises and their four weeks, the Annotations (esp. 18, 19, 20), graces, composition of place and Ignatian contemplation, repetition, colloquy, consolation and desolation, discernment, the Examen; what a retreat in daily life is; lectio divina (Guigo II's ladder, Verbum Domini 86-87 incl. actio); how a day is prayed IN THIS APP (the exact sequence); who the listener is; the spirit of the whole thing. It is for understanding, not to be recited. Accurate; no invented citations.
+2. <house_style>: replaces HOUSE_STYLE, appended to every script writer's instructions (heart, deep dive, guidance). How to write for the ear and for prayer: sentence rhythm, pace, silence-friendly phrasing, second person, concreteness, how to refer to the painting and the passage, numbers and references spoken in words, what to avoid (the AI tics, clichés, sentimentality, piety-speak, moralizing), faithfulness rules.
+Output exactly: <background>…</background> then <house_style>…</house_style>. Nothing else.""",
+ "plan": """Write <prompt> = the new PLAN_INSTRUCTIONS (the editable planning instructions; the fixed PLAN_FIXED and JSON schema are appended by the app, so don't restate the schema's format, but do explain how to fill each field well: title, summary, mode, image descriptions, and per day title, source_ref, passage_text verbatim, grace, focus, image_indexes). Cover: reading the whole document first; recognizing its structure (explicit days, weeks, headings, numbered sessions, a single long reading to divide, random verses to compose into an arc, a handout mixing instructions with passages — which text is for reading aloud vs. which is commentary); following the source faithfully when it has days; composing an Ignatian movement when it doesn't (and how: e.g. from God's love to call to trust, or following the Exercises' weeks when it fits); choosing and sizing passages for being read aloud four times (neither a fragment nor a chapter); verbatim copying rules (fix only hyphenation/line-break/page-number artifacts; keep verse numbers out of the spoken text; keep the translation the user supplied); writing graces in Ignatius's style (a real desire, specific to the passage, "to know…, to feel…, to be…", not moralistic); focus lines; describing images for someone praying (what is depicted, where the eye goes, light, gesture, mood; which day each belongs to; no guessing names of artworks unless the document says); series context (continue the arc; don't repeat passages from earlier weeks unless the document does); edge cases (scanned pages, non-scripture, other languages, too little material → fewer days rather than padding; too much → choose well and say so in the summary). Output exactly <prompt>…</prompt>.""",
+ "heart_companion": """Write <prompt> = the new default "companion" preset for the REFLECTION FOR THE HEART (it is followed by <house_style> automatically — don't duplicate it; refer to it). This is the voice most listeners hear most. It helps them enter the passage with the heart: imaginative entry (composition of place, the senses, where they stand in the scene, the painting they're looking at), noticing what stirs (desire, resistance, consolation, desolation), relating it to the grace, leaving room rather than filling it, one or two openings to stay with, ending in a way that hands them gently into the second reading (no summary). It must use <retreat_so_far> (don't repeat yesterday's moves; grow; notice the arc; occasionally recall a word or image from an earlier day), glance at <coming_days> only lightly, use <series> when present, and let <about_the_person> shape tone without quoting or presuming. Different days should feel different (first day: arriving; middle: deepening; last day: gathering and sending). Handle non-scripture sources, passages with violence or hard sayings, very short passages, no image. Output exactly <prompt>…</prompt>.""",
+ "heart_christ": """Write <prompt> = the new "christ" preset for the REFLECTION FOR THE HEART: the reflection spoken in the voice of Jesus addressing the listener, as in Ignatian imaginative prayer and colloquy (followed automatically by <house_style>). It must be reverent, intimate and restrained; grounded strictly in the day's passage and the Gospel portrait of Jesus; never adding new doctrine, predictions, private revelations or promises beyond scripture; never manipulative; invites rather than commands; leaves space for the listener's own response; handles Old Testament and non-Gospel passages sensibly (Jesus praying the Psalm with them, or speaking of the Father), and passages where Jesus is absent. Same retreat-awareness rules (<retreat_so_far>, <coming_days>, <series>, <about_the_person>). Explain the tradition (Ignatius's colloquy, SE 53-54, 'as one friend speaks to another') and the risks so the model understands why the restraint matters. Output exactly <prompt>…</prompt>.""",
+ "deep": """Write <prompt> = the new DEEP_DIVE_INSTRUCTIONS (followed automatically by <house_style>, then the app's search note and the length/tags suffix). Make it a deep, rigorous, beautiful brief for the intellectual heart of the app: the passage's literary and historical setting, its place in the book and canon, key words in the original language only when well documented (with how to say them aloud: transliterated, explained, never invented), the world behind the text (customs, geography, politics) when it opens the text, how the Fathers, medieval and modern commentators and the liturgy have read it, Ignatius and the Exercises where genuinely relevant, real interpretive questions and debates (named fairly, not resolved by fiat), and always a turn back to prayer: how this knowledge changes how they'll hear the third reading. Explicitly: this is one day of a larger retreat and maybe of a series — use <retreat_so_far> to avoid repeating background already given (e.g. don't reintroduce the Gospel of Luke on day four), to connect ('on the first day we heard…'), to build a cumulative understanding across the week; use <coming_days> only to foreshadow lightly; use <series> the same way. Build on <heart_reflection> rather than repeating it. Research rules: prefer scholarly, church and primary sources; weigh the numbered search results critically (they vary in quality); never cite a URL not in the results or your own searches; the sources list is shown on screen; say 'scholars disagree' when they do; never fabricate a quotation, date, Greek or Hebrew word, manuscript detail or attribution; if unsure, leave it out. Structure for the ear: one clear arc, maybe three movements, signposted in speech not headings; concrete over abstract; no lecture voice. Edge cases: non-scripture sources (a saint's letter, a poem) — treat author, context, key terms the same way; very familiar passages — find what's fresh without novelty for its own sake; hard passages. Output exactly <prompt>…</prompt>.""",
+ "guide": """Write <prompt> = the new GUIDE_TAILOR instructions (the model receives the day context, the heart reflection and the deep dive, and the default guidance lines as JSON, and returns JSON with the same keys; keep that contract). Explain each line's job in the sequence (opening: presence and the grace request, which must keep 'Ask for the grace…' in substance; first: simply listen; second: listen for what it says to you, perhaps echoing an image from the heart reflection; third: listen for what God may offer or ask, perhaps echoing an insight from the deep dive; silence: rest with one word, between the bells; last: receive it once more; closing: colloquy in your own words, the Our Father, a word to carry into the day). Tone: calm, sparse, a guide not a lecturer; one to three short sentences each; no new teaching; vary from the defaults only where tailoring truly helps; day-aware (first day welcomes; last day gathers the retreat; a series continues). Output exactly <prompt>…</prompt>.""",
+ "companion": """Write <prompt> = the new COMPANION instructions for 'Talk it over', the live spoken AI prayer companion. It will be followed by the server-built context (time of day, last conversation, memory, recent transcripts, the retreat's days and what they've prayed, journal words, About me, what they want from the companion). Make it world class: modeled on the best practice of Ignatian spiritual directors and prayer companions (the Annotations on the one giving the Exercises: SE 15, 17, 22; contemplative listening; 'what did you notice?'; 'where was the consolation?'; attending to desire, movement, resistance; helping them savor rather than analyze; noticing God's action; not solving; bringing it back to prayer; the Examen), while being explicit that it is an AI companion and not a spiritual director, priest, counselor or therapist, and never calling what it does spiritual direction. Voice-first behavior: short turns, one question at a time, silence is okay, let them lead, reflect their words back, no lists or markdown, natural spoken language, never lecture, never overwhelm; how to open (greet by time of day, reference the retreat and what's new since last time gently, never a checklist); how to use memory tactfully (don't surprise them with private details; follow their lead); what to do in one minute (free tier); how to close (offer a word to take into prayer, remind of the next day gently). Handle: silence, dryness/desolation (normalize, Ignatius's rules for desolation: don't change resolutions), scrupulosity, grief, doubt, anger at God, people of other or no faith, questions about doctrine (answer briefly and point back to prayer), requests for advice or decisions (help discern, don't decide), sexual content or harassment (decline kindly), crisis and self-harm (warmly and clearly encourage calling or texting 988 in the US or local emergency services, and a trusted person; stay kind; don't try to counsel), medical/legal questions (don't advise), and confidentiality honesty (their conversations are saved to their account so it can remember; it's an AI). Output exactly <prompt>…</prompt>.""",
+}
+
+async def run(name, extra=""):
+    out = HERE / f"{name}.txt"
+    if out.exists():
+        return out.read_text()
+    msgs = [{"role": "user", "content": (extra + "\n\n" if extra else "") + TASKS[name]}]
+    async with llm.client().messages.stream(model=MODEL, max_tokens=32000, system=SYSTEM, messages=msgs) as s:
+        m = await s.get_final_message()
+    text = "".join(b.text for b in m.content if b.type == "text")
+    out.write_text(text)
+    u = m.usage
+    print(name, len(text), "chars", u.input_tokens, "in", u.output_tokens, "out", flush=True)
+    return text
+
+async def main():
+    foundation = await run("foundation")
+    extra = "Here are the new shared blocks, already written; build on them and keep the same voice:\n" + foundation
+    await asyncio.gather(*(run(n, extra) for n in ["plan", "heart_companion", "heart_christ", "deep", "guide", "companion"]))
+
+asyncio.run(main())

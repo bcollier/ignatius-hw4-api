@@ -37,7 +37,7 @@ def test_jetstream_call_is_logged_with_context(monkeypatch):
     row = log_rows()[before]
     assert (row["user_id"], row["email"], row["retreat_id"], row["day"], row["purpose"]) == ("u-1", "guest", "r-1", 2, "heart")
     assert row["provider"] == "jetstream" and row["model"] == "jetstream/muse-glimmer" and row["status"] == "ok"
-    assert row["request"]["system"].startswith("Background for this work") and row["request"]["system"].endswith("SYSTEM")
+    assert row["request"]["system"].startswith("<background>") and row["request"]["system"].endswith("SYSTEM")
     assert row["request"]["messages"][0]["content"][1] == {"type": "image", "media_type": "image/jpeg", "bytes": 3000}
     assert row["response_text"] == "<script>Hi.</script>" and row["response"]["reasoning"] == "thinking…"
     assert (row["input_tokens"], row["output_tokens"]) == (40, 9) and row["duration_ms"] >= 0

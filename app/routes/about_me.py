@@ -15,6 +15,7 @@ TEXT_SUFFIXES = (".txt", ".md", ".markdown")
 class ProfileRequest(BaseModel):
     about: str | None = None
     companion_notes: str | None = None
+    companion_prompt: str | None = None  # the companion's instructions; "" restores the default
 
 
 @router.get("")
@@ -26,7 +27,7 @@ async def read_profile(user: User = Depends(current_user)):
 @router.put("")
 async def write_profile(body: ProfileRequest, user: User = Depends(current_user)):
     llm_log.tag(user_id=user.id, email=user.log_email)  # a long text is condensed by a model
-    return await profile.save(user.id, body.about, body.companion_notes, user.full)
+    return await profile.save(user.id, body.about, body.companion_notes, user.full, companion_prompt=body.companion_prompt)
 
 
 @router.post("/upload")
