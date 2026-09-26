@@ -354,11 +354,11 @@ flowchart TD
     F --> G{Open an existing<br/>retreat?}
     G -- yes --> K
     G -- no --> H["Upload PDF or .docx<br/>choose model · optional planning prompt<br/>tick 'I have rights'"]
-    H --> I["Planning… (about a minute)"]
+    H --> I["Planning… (a few minutes)"]
     I -- failed --> I1["Reason shown, try again"]
     I --> K["Retreat: plan, gallery, days"]
     K --> L["Choose voices for guide, reading,<br/>reflection, deep dive · choose model<br/>see estimated cost"]
-    L --> M["Build audio for a day<br/>(about 2–3 minutes)"]
+    L --> M["Build audio for a day<br/>(a few minutes)"]
     M -- "some sections failed" --> M1["Reasons shown, rebuild"]
     M --> N["Day shows total length,<br/>last build cost, track players"]
     N --> O["Pray this day"]
