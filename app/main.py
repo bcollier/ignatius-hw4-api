@@ -13,7 +13,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import config
 from .routes import (about_me, build_log, conversation, cost_report, days, example_documents, local_files, meta,
-                     practice_journal, retreats)
+                     my_examen, practice_journal, retreats)
 from .storage import LocalStore, StorageError, store
 
 logging.basicConfig(level=logging.INFO)
@@ -56,7 +56,7 @@ async def storage_error(_: Request, exc: StorageError):
     return _error(503, str(exc))
 
 
-for area in (meta, conversation, about_me, retreats, example_documents, build_log, cost_report, days, practice_journal):
+for area in (meta, conversation, about_me, retreats, example_documents, build_log, cost_report, days, practice_journal, my_examen):
     app.include_router(area.router)
 if isinstance(store, LocalStore):
     app.include_router(local_files.router)

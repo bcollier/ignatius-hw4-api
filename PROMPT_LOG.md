@@ -868,6 +868,42 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Answered: a file of papers about a person; here, a written summary of your life's faith story (people, places, turning points, where God seemed near or far) that you bring into a retreat.
 
+### 139. 2026-09-27, 01:59 UTC
+
+> I put $5 monthly subscription and then 20 for api for those credits how much money is 30 minute s
+
+**What was done:** Checked the ElevenLabs account (Starter, 139,020 credits this month, about $0.18 per 1,000). Thirty minutes of continuous narration is about 25,000 characters, about 12,500 credits, about $2.25; the thirty-minute dossier session is mostly silence, so its 3,585 spoken characters cost about $0.32, once.
+
+### 140. 2026-09-27, 02:52 UTC
+
+> *(a long pasted explanation of the Ignatian Examen: presence, gratitude, reviewing the day and its inner movements, consolation and desolation, forgiveness and "what was I actually seeking?", looking toward tomorrow, and the two-question variation)* Build an audio for ignitian examine at end of day. Use a British man's voice if possible use Microsoft tts and option for elevenlabs premium . Have a premium version that rights your own customized version based on your life guided audio tour of your day where was god in your teaching today with tour family in the car etc but in your art or in nature or whatever customized to the person
+
+**What was done:** A fourth guided session, "The Examen" (about fifteen minutes, written by Claude Opus 5.5 from the pasted notes), recorded once in two British men's voices: Ryan (Microsoft, free) and George (ElevenLabs). Mostly silences, two optional writing pauses, and the Our Father at the end. Premium accounts can also have "Your own Examen": Opus writes one around their life from their About me notes and what they add about their days (work, the drive with the family, art, nature), and it's recorded for them (about $0.13 for the script and about 2,500 ElevenLabs credits in George's voice, or free in Ryan's). New: `POST/GET /api/practice/examen`, app/my_examen.py, app/prompt_texts/my_examen.md.
+
+### 141. 2026-09-27, 02:56 UTC
+
+> Build a quiet visual image of a candle or animation or relevant icons paintings religious art that may be relevant to be played during the examine while the person visualizing and responds to the prompts
+
+**What was done:** During the Examen a painting for each step drifts slowly and cross-fades to the next (La Tour's Magdalen with the Smoking Flame, Millet's Angelus, Rembrandt's Supper at Emmaus and Return of the Prodigal Son, Friedrich's Moonrise over the Sea, Van Gogh's Starry Night; public domain, from Wikimedia Commons), with a small animated candle. A switch changes it to the candle alone or to nothing.
+
+### 142. 2026-09-27, 02:57 UTC
+
+> Build an advanced option to have music or chanting playing in the background. Find a service that does ai generated music or does sourcing of open commons chanting or religious music that is very simple
+
+**What was done:** Advanced, on the Practice page: background music, off by default. Gregorian chant is five open-licence recordings from Wikimedia Commons (credited on the page). A quiet organ and strings piece was made with the ElevenLabs Music API (2 minutes for 1,500 credits, about $0.27). The music dips while the voice speaks and comes back up in the silences, with a volume slider. It goes through Web Audio, because iPhones ignore an audio element's volume.
+
+### 143. 2026-09-27, 03:03 UTC
+
+> When I try to do my save as desktop icon and open it I get a mostly blank screen *(with screenshots of the Home Screen icon and the blank app)*
+
+**What was done:** The page drew nothing until the server answered, and the server (on Render) sleeps after a quiet spell and takes up to a minute to wake. The Home Screen app also has its own storage, so it starts signed out with nothing saved. Now a waiting screen appears after a second, and the sign-in settings are remembered so the sign-in page can show at once. Because the sign-in email's link opens in Safari rather than in the Home Screen app, the sign-in page also takes a pasted link ("Using it from your Home Screen? Paste the link").
+
+### 144. 2026-09-27, 03:08 UTC
+
+> This finally showed up I guess the back end was idle we should show a simple waiting for servers to wake up from rest to give you a time of escaped or something similar a fun and random phrase for first warm up or the days. We run on cheap hardware that sometimes need a moment to warm back up. Take a moment to breath through the bottom of your belly why you wait a moment
+
+**What was done:** The waiting screen has a random gentle phrase ("The sacristan is finding the keys…", "Brother Server is putting on his sandals…"), a note that the app runs on modest hardware that rests when no one is praying, a seconds counter, and a golden circle that grows and shrinks for slow belly breathing (in for four seconds, out for six).
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

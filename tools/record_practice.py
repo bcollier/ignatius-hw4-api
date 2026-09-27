@@ -18,6 +18,13 @@ VOICES = {
     "standard": ("en-US-AvaMultilingualNeural", "Ava, Microsoft (free)"),
     "deluxe": ("EXAVITQu4vr4xnSDxMaL", "Sarah, ElevenLabs"),
 }
+# A session can have its own voices (the Examen is led by a British man).
+SESSION_VOICES = {
+    "examen": {
+        "standard": ("en-GB-RyanNeural", "Ryan, Microsoft (free)"),
+        "deluxe": ("JBFqnCBsd6RMkjVDRZzb", "George, ElevenLabs"),
+    },
+}
 
 
 async def _balance() -> dict:
@@ -30,9 +37,12 @@ async def main(folder: Path) -> None:
     practice = json.loads(path.read_text())
     before = await _balance()
     practice["voices"] = {k: label for k, (_, label) in VOICES.items()}
-    for tier, (voice, _) in VOICES.items():
+    for tier in VOICES:
         (folder / tier).mkdir(exist_ok=True)
         for session in practice["sessions"]:
+            voices = SESSION_VOICES.get(session["id"], VOICES)
+            voice = voices[tier][0]
+            session["voices"] = {k: label for k, (_, label) in voices.items()}
             for n, seg in enumerate(session["segments"], start=1):
                 if seg["kind"] != "speak":
                     continue

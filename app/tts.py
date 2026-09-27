@@ -19,6 +19,8 @@ FREE_VOICES = {
     "en-US-EmmaMultilingualNeural": "Emma (clear, female)",
     "en-US-ChristopherNeural": "Christopher (steady, male)",
     "en-US-AriaNeural": "Aria (confident, female)",
+    "en-GB-RyanNeural": "Ryan (calm, British male)",
+    "en-GB-SoniaNeural": "Sonia (gentle, British female)",
 }
 
 # ElevenLabs premade voices suited to prayer and teaching.
