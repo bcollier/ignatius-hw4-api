@@ -25,3 +25,4 @@ The facts on them match the code as of September 27, 2026, including:
 - the storage paths in `app/pipeline.py`, `app/talk.py`, `app/my_examen.py` and `app/profile.py`.
 
 If one of those changes, the slide should change with it.
+- `08-agents`: every agent in the app, what it's given, its tools and capabilities, and where its output goes (a tall slide, rendered full page).

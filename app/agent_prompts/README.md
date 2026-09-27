@@ -4,6 +4,8 @@ Every prompt the app sends to an AI model is a plain-text file in this folder. T
 
 **In the app, without touching code:** Settings → **Agents** (`?agents`) lists every agent below with its prompt. Anyone can read them, make their own version (saved to their account and used wherever that agent runs, for them only), go back to the default, and, where it makes sense, choose a different model. Editing a file here changes the default for everyone; the Agents page changes it for one person.
 
+A diagram of every agent and its tools: [docs/feature-flows/08-agents.png](../../docs/feature-flows/08-agents.png).
+
 Three kinds of file:
 
 - **Instructions**: how an agent thinks and writes. Safe to rewrite freely.

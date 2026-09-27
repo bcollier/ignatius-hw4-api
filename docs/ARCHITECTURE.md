@@ -1325,3 +1325,9 @@ The sources and notes are in [feature-flows/](feature-flows/).
 ![Talk it over and Talk now](feature-flows/05-talk.png)
 ![Your own Examen](feature-flows/06-my-examen.png)
 ![A retreat from an idea or a photo](feature-flows/07-idea.png)
+
+### Every agent and its tools
+
+![Every agent in the app and the tools it has](feature-flows/08-agents.png)
+
+Only the deep dive calls a tool itself (Anthropic's `web_search`, Claude models only). The other agents get structured output, image reading, or tools the app runs around them (the search services, bible-api.com, the voices). Every prompt is in [`app/agent_prompts/`](../app/agent_prompts/README.md), and people can read and change them on the Agents page.

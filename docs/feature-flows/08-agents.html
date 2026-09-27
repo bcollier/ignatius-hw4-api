@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Agents and their tools</title>
+<link rel="stylesheet" href="slides.css">
+<style>
+html,body{height:auto;overflow:visible}
+.slide{height:auto;padding-bottom:30px}
+.legend{display:flex;flex-wrap:wrap;gap:10px 18px;margin:16px 0 4px;font-size:15px;color:var(--muted);align-items:center}
+.chip{display:inline-block;font-family:var(--serif);font-size:12.5px;letter-spacing:.06em;padding:2px 8px;border-radius:3px;margin:2px 4px 2px 0;white-space:nowrap;border:1px solid transparent}
+.chip.call{background:#f6d9d2;color:#7d1f12;border-color:#d99a8c}
+.chip.json{background:#e3ddf1;color:#43357a;border-color:#b9ade0}
+.chip.vision{background:#d9e6f2;color:#1f4e79;border-color:#9fbfdc}
+.chip.app{background:#dcead5;color:#2d5a2c;border-color:#a9c9a0}
+.chip.none{background:#ece5d6;color:var(--muted);border-color:var(--line)}
+.group{margin-top:18px}
+.group h2{font-family:var(--display);font-size:26px;font-weight:600;color:var(--rubric);margin-bottom:8px;display:flex;gap:14px;align-items:baseline}
+.group h2 span{font-family:var(--serif);font-size:15px;color:var(--muted);font-weight:400}
+.head,.row{display:grid;grid-template-columns:300px 290px 1fr 250px;gap:14px}
+.head{font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:0 4px 6px}
+.row{background:var(--page);border:1px solid var(--line);border-left:5px solid var(--gold);border-radius:4px;padding:11px 14px;margin-bottom:8px;align-items:start}
+.row.free{border-left-color:var(--free)}
+.row.dev{border-left-color:var(--line-strong);background:#f3eee3}
+.row h3{font-family:var(--display);font-size:22px;font-weight:600;line-height:1.05}
+.row .model{border:0;padding:0;background:none;font-size:14px;line-height:1.3;color:var(--muted);margin-top:4px}
+.row .model b{color:#5a2a1c;font-family:var(--mono);font-size:12.5px;font-weight:400}
+.row p,.row li{font-size:15.5px;line-height:1.3;color:#3a3026}
+.row ul{list-style:none;display:flex;flex-direction:column;gap:5px}
+.out{font-size:15px;line-height:1.3}
+.out .to{display:block;color:var(--muted);font-size:14px;margin-top:3px}
+.shared{margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.shared .box h3{font-family:var(--display);font-size:21px;font-weight:600;margin-bottom:6px}
+.shared .box p,.shared .box li{font-size:15.5px;line-height:1.35}
+.shared ul{padding-left:18px}
+</style></head>
+<body><div class="slide">
+<header>
+  <div class="kicker">Architecture</div>
+  <h1>Every agent, and the tools it has</h1>
+  <div class="lede">Twelve agents in the app, plus the eval judges used in development. Only one of them calls a tool itself; the rest work with what the app gathers and does around them.</div>
+</header>
+
+<div class="legend">
+  <span class="chip call">MODEL-CALLED TOOL</span> the model decides when to use it &nbsp;
+  <span class="chip json">STRUCTURED OUTPUT</span> reply forced into a JSON schema &nbsp;
+  <span class="chip vision">VISION</span> reads images &nbsp;
+  <span class="chip app">APP-RUN TOOL</span> the server or browser does it, before or after the model &nbsp;
+  <span class="chip none">TEXT ONLY</span> text in, text out
+</div>
+
+<div class="group"><h2>Making a retreat <span>background jobs on Render; model = the retreat's planning or writing model (Claude Opus 5.5 by default, Muse Glimmer free)</span></h2>
+<div class="head"><div>Agent · model</div><div>Given</div><div>Tools and capabilities</div><div>Produces → where it goes</div></div>
+
+<div class="row"><div><h3>The planner</h3><div class="model">Planning model · <b>plan.md</b> + <b>plan_rules.md</b></div></div>
+<p>The document's text, its images and scanned pages, earlier retreats in a series</p>
+<ul><li><span class="chip vision">VISION</span> matches paintings to days, transcribes scanned pages</li>
+<li><span class="chip json">STRUCTURED OUTPUT</span> the plan schema (Claude); free models reply in JSON text</li>
+<li><span class="chip app">APP-RUN</span> if a free model's plan is too long, it marks each passage's first and last words and the app copies the passage from the document</li></ul>
+<div class="out">Days, passages, graces, focus, image choices<span class="to">→ retreats.data (the plan)</span></div></div>
+
+<div class="row"><div><h3>Idea to passages</h3><div class="model">Planning model · <b>inspiration.md</b></div></div>
+<p>The idea in words, the number of days, an optional photo</p>
+<ul><li><span class="chip vision">VISION</span> reads verses in the photo</li>
+<li><span class="chip json">STRUCTURED OUTPUT</span> one reference a day</li>
+<li><span class="chip app">APP-RUN</span> <b>bible-api.com</b> fetches the World English Bible text, so no scripture is written by a model</li></ul>
+<div class="out">A source document<span class="to">→ the planner</span></div></div>
+
+<div class="row"><div><h3>For the heart</h3><div class="model">Writing model · <b>heart_companion.md</b> or <b>heart_christ.md</b></div></div>
+<p>The day's passage, grace, focus, painting description; what earlier days said; the coming readings</p>
+<ul><li><span class="chip none">TEXT ONLY</span> script inside &lt;script&gt; tags, length set by the voice</li></ul>
+<div class="out">The reflection script<span class="to">→ recorded; read by the deep dive and the guidance</span></div></div>
+
+<div class="row"><div><h3>Search query writer</h3><div class="model">Free model (Muse Glimmer) · <b>research.md</b> (queries)</div></div>
+<p>The day's context</p>
+<ul><li><span class="chip none">TEXT ONLY</span> three search queries</li>
+<li><span class="chip app">APP-RUN</span> the six search services run them at once: Brave Search, Brave Answers, Exa, Tavily, Firecrawl, Linkup; results interleaved, deduplicated, up to 20</li></ul>
+<div class="out">Web research<span class="to">→ the deep dive; logged; the research page</span></div></div>
+
+<div class="row"><div><h3>The deep dive</h3><div class="model">Writing model · <b>deep_dive.md</b> + <b>deep_format.md</b></div></div>
+<p>The day, the heart reflection, the web research, earlier days</p>
+<ul><li><span class="chip call">MODEL-CALLED TOOL</span> <b>web_search</b> (Anthropic server tool, up to 5 searches), Claude only, to check claims and find better sources</li>
+<li><span class="chip none">FREE MODELS</span> no tool: they write only from the research given, and cite only pages that came back</li></ul>
+<div class="out">Script and sources<span class="to">→ recorded; sources and searches on the research page</span></div></div>
+
+<div class="row"><div><h3>The spoken guidance</h3><div class="model">Writing model · <b>guide_tailor.md</b> + <b>guide_lines.md</b></div></div>
+<p>The default guiding lines, the heart reflection, the deep dive</p>
+<ul><li><span class="chip json">STRUCTURED OUTPUT</span> one line per slot</li>
+<li><span class="chip app">APP-RUN</span> checks each line: the grace kept word for word, a sensible length, else the default line</li></ul>
+<div class="out">Tailored lines<span class="to">→ recorded</span></div></div>
+</div>
+
+<div class="group"><h2>Talking it over <span>Talk now and Talk it over</span></h2>
+<div class="row"><div><h3>The companion, live voice</h3><div class="model">OpenAI <b>gpt-live-1</b> (WebRTC) or xAI <b>grok-voice-latest</b> (WebSocket) · <b>companion.md</b></div></div>
+<p>Built by talk.context: your notes and wishes, the time where you are, when you last talked, its memory, recent transcripts, the retreat day by day</p>
+<ul><li><span class="chip none">NO FUNCTION TOOLS</span> speech in, speech out, in one model</li>
+<li><span class="chip app">APP-RUN</span> the provider detects turns and lets you interrupt; the server starts the session (the key stays on the server) and hangs up at the time limit</li></ul>
+<div class="out">The conversation, spoken<span class="to">→ transcript saved; memory</span></div></div>
+
+<div class="row free"><div><h3>The companion, taking turns</h3><div class="model">Brain: Muse Glimmer (free), Claude Fable 5.1 / Opus 5.5 / Haiku 4.5, or OpenAI GPT-5.5 / 5.4 mini · + <b>companion_spoken.md</b></div></div>
+<p>The same context, and the conversation so far</p>
+<ul><li><span class="chip none">TEXT ONLY</span> one short reply per turn (Claude's context is cached)</li>
+<li><span class="chip app">APP-RUN</span> the browser's speech recognition hears you; Microsoft voices (edge-tts) speak each sentence</li></ul>
+<div class="out">One reply at a time<span class="to">→ spoken; transcript saved</span></div></div>
+
+<div class="row"><div><h3>The companion's memory</h3><div class="model">Claude Opus 5.5 or free model · <b>companion_memory.md</b></div></div>
+<p>The existing memory and older transcripts</p>
+<ul><li><span class="chip none">TEXT ONLY</span> a condensed memory</li></ul>
+<div class="out">Memory notes<span class="to">→ conversations.json; the next conversation</span></div></div>
+</div>
+
+<div class="group"><h2>Practices and profile</h2>
+<div class="row"><div><h3>Your own Examen</h3><div class="model">Claude Opus 5.5 · <b>my_examen.md</b></div></div>
+<p>Your About me notes and what you add about your days</p>
+<ul><li><span class="chip json">STRUCTURED OUTPUT</span> spoken segments, silences and journal pauses</li>
+<li><span class="chip app">APP-RUN</span> recorded in George (ElevenLabs) or Ryan (Microsoft)</li></ul>
+<div class="out">A recorded Examen<span class="to">→ your folder in storage</span></div></div>
+
+<div class="row"><div><h3>About me condenser</h3><div class="model">Claude Opus 5.5 or free model · <b>about_me_condense.md</b></div></div>
+<p>Long notes you typed, uploaded or linked (Google Doc)</p>
+<ul><li><span class="chip none">TEXT ONLY</span> a summary under the size limit</li></ul>
+<div class="out">user info.md<span class="to">→ every agent's calls for you</span></div></div>
+
+<div class="row dev"><div><h3>Practice writer (build tool)</h3><div class="model">Claude Opus 5.5 · <b>practice_*.md</b></div></div>
+<p>A handout, summarized</p>
+<ul><li><span class="chip json">STRUCTURED OUTPUT</span> sessions of segments</li><li><span class="chip app">APP-RUN</span> recorded once with record_practice.py</li></ul>
+<div class="out">practice.json<span class="to">→ the Practice page, for everyone</span></div></div>
+
+<div class="row dev"><div><h3>Eval judges (development)</h3><div class="model">A: Claude Opus 5.5 + GPT-6 Sol · B: DeepEval G-Eval (Grok 4.7) + Jev · <b>eval_judge*.md</b></div></div>
+<p>A piece or conversation written by a contestant model, blind</p>
+<ul><li><span class="chip json">STRUCTURED OUTPUT</span> 1-7 scores on the rubric</li><li><span class="chip app">APP-RUN</span> Jev answers with calibrated probabilities (not an LLM)</li></ul>
+<div class="out">Scores<span class="to">→ evals/runs, the comparison report</span></div></div>
+</div>
+
+<div class="shared">
+  <div class="box"><h3>Every agent also gets</h3><ul>
+    <li>The <b>background</b> (background.md): the Exercises, retreats, lectio divina, how a day is prayed here</li>
+    <li>Your <b>About me</b> notes (about_the_person.md), unless you asked for a general retreat</li>
+    <li>Your <b>own version</b> of its prompt, if you made one on the Agents page</li>
+    <li>Writers also get the <b>house style</b>: writing for the ear and for prayer</li></ul></div>
+  <div class="box"><h3>Around every call</h3><ul>
+    <li>Logged to <b>llm_calls</b>: what was sent, what came back, tokens, cost, time</li>
+    <li>Keys stay on the server; the browser never sees them</li>
+    <li>Voices are tools of the app, not the agents: Microsoft (edge-tts, free) and ElevenLabs, with word timings</li>
+    <li>Prompts live in <b>app/agent_prompts/</b>; the Agents page lets each person read and change them</li></ul></div>
+</div>
+
+<footer><span class="prompts">Prompts: <code>app/agent_prompts/README.md</code> is the index · code: <code>app/llm.py</code>, <code>app/talk.py</code>, <code>app/talk_turns.py</code>, <code>app/inspiration.py</code>, <code>app/my_examen.py</code></span><span>Ignatius at Home · ignatius-hw4-api</span></footer>
+</div></body></html>
