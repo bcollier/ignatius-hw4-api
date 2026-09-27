@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 196 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 198 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1216,6 +1216,16 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 > i'm trying to build my own examine using the iphone web app, but I weirdly can't scroll down past this picture to see if it's running *(with a screenshot of the Practice page in the Home Screen app, its text running under the status bar)*
 
 **What was done:** A known iPhone bug in Home Screen apps: when the keyboard closes while the box you were typing in disappears (here the "What are your days like?" form, hidden once the Examen is being made), the page can stay shifted and stop short of the bottom. Now Write my Examen closes the keyboard first and scrolls to "Writing your Examen…", and in a Home Screen app any text box losing focus nudges the page back into place. Checking the server showed the Examen had started but then been cut off: pushing to the API repository redeploys Render, which restarts the server and ended the job, leaving it "making" for twenty minutes. Now an Examen interrupted by a restart starts again by itself with the same notes and voice (at most twice), and one that can't is marked failed at once rather than after twenty minutes.
+
+### 197. 2026-09-27, 20:18 UTC
+
+> I was using the home screen app and on this screen it was playing but would not let me scroll down to reach the buttons below *(with a screenshot of the Examen player)*
+
+### 198. 2026-09-27, 20:19 UTC
+
+> I have the same problem here, it will not let me scroll down any further than this *(with a screenshot of the Practice page)*
+
+**What was done (197 and 198):** Scrolling froze in the Home Screen app on more than one page, with no keyboard involved, so the earlier keyboard explanation wasn't the whole story. The prime suspect is the cross-fade between views (the browser's view transitions): the app is a single page, so if WebKit on an iPhone leaves scrolling broken after one transition, every later page is stuck until the app is reopened, and Chrome on an iPhone uses the same engine. Views now switch without the cross-fade on iPhones and iPads. And the guided practice's controls (Back, Pause, Next, the picture switch and End the exercise) are now pinned to the bottom of the screen on a solid bar, like the prayer screen's player, so they're always within reach.
 
 ---
 
