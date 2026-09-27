@@ -996,6 +996,18 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Most likely the phone still held the broken page (GitHub Pages lets it be kept ten minutes, and Home Screen apps sometimes longer), and that page crashes before it can check for an update. Added a start-up guard written into the page itself: any error while opening shows a note with a Reload button and is reported to the server (`POST /api/client-error`, kept per day; `tools/client_errors.py` prints them), and a page that hasn't started after eight seconds checks for a newer version and reloads into it, once.
 
+### 160. 2026-09-27, 14:05 UTC
+
+> I can't sign in on home screen app *(with a screenshot: "Couldn't sign in: Email link is invalid or has expired")*
+
+**What was done:** Sign-in links work once, and on an iPhone even pressing and holding a link can preview it, which uses it up. New way into a Home Screen app: tap the link in the email as usual; the browser signs in and, on an iPhone, shows an eight-digit code; type the code into the Home Screen app. The server exchanges the code for a fresh one-time sign-in token made by Supabase for that person without sending any email (admin generate_link), and the app signs in with it. Codes work once, last ten minutes, and wrong guesses are limited (`POST /api/handoff`, `POST /api/handoff/redeem`). Anyone signed in can also get a code from About me ("Sign in on another device"). Pasting the link stays as a fallback.
+
+### 161. 2026-09-27, 14:07 UTC
+
+> Ok chrome is my default on iOS is that a problem
+
+**What was done:** No: the email's link then opens in Chrome instead of Safari, and the code works the same from either. The wording now says "your browser (Safari or Chrome)".
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
