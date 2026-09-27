@@ -67,11 +67,16 @@ async def _with_heartbeat(retreat: dict, coro) -> None:
             retreat["heartbeat"] = time.time()
             await save(retreat)
 
+    def show(text: str) -> None:  # the page reads the retreat from memory while the job runs
+        retreat["activity"] = {"text": text, "at": time.time()}
+
+    llm_log.activity_hook.set(show)
     beater = asyncio.create_task(beat())
     try:
         await coro
     finally:
         beater.cancel()
+        retreat.pop("activity", None)
 
 
 async def save(retreat: dict) -> None:
@@ -319,6 +324,17 @@ async def series_context(retreat: dict, model: str) -> str:
     return text
 
 
+def _plan_watcher():
+    """As the plan streams in, say which day is being planned, and its title."""
+    def watch(text: str) -> None:
+        days = re.findall(r'"day"\s*:\s*(\d+)', text)
+        if not days:
+            return llm_log.activity("Deciding how the days will go")
+        titles = re.findall(r'"title"\s*:\s*"((?:[^"\\]|\\.)*)"', text[text.rfind('"day"'):])
+        llm_log.activity(f"Planning day {days[-1]}" + (f": {titles[0]}" if titles else ""))
+    return watch
+
+
 async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
     """Plan the retreat, then (when made in one go) make every day."""
     meter = pricing.Meter(retreat["model"], await pricing.prices())
@@ -326,6 +342,8 @@ async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
     await profile.use_for_job(retreat["user_id"])  # "user info.md" informs every call
     series_text = await series_context(retreat, retreat["model"])
     await _log_planning_start(retreat)
+    llm_log.activity("Reading your document")
+    watching = llm.stream_watch.set(_plan_watcher())
     async with _jobs:
         try:
             plan = await llm.plan_retreat(source, retreat["filename"], plan_prompt, meter, series_text)
@@ -338,6 +356,8 @@ async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
             log.exception("planning failed")
             retreat.update(status="failed", error="Something went wrong while planning the retreat.")
             return await save(retreat)
+        finally:
+            llm.stream_watch.reset(watching)  # the days' writing isn't planning
     await _apply_plan(retreat, plan, meter)
     if retreat.get("build_options"):
         await llm_log.step("Next: making each day in order. For each: the reflection for the heart, then web research "
@@ -613,6 +633,7 @@ class _DayBuild:
             await llm_log.step(f"Day {self.day_no}: {self.day['title']} ({self.day.get('source_ref', '')}). "
                                f"Writing the reflection for the heart with {self.meter.model}"
                                + (", knowing the earlier days" if self.day_no > 1 else "") + ".")
+            llm_log.activity(f"Day {self.day_no}: writing the reflection for the heart")
             done = self._ready("tracks", "heart") or self.kept.get("heart")
             if done:
                 heart_script = done["script"]
@@ -633,6 +654,7 @@ class _DayBuild:
             llm_log.tag(purpose="deep")
             await llm_log.step(f"Day {self.day_no}: researching and writing the deep dive"
                                + (f" (web research: {self.search_provider})" if self.search_provider else "") + ".")
+            llm_log.activity(f"Day {self.day_no}: researching the passage and writing the deep dive")
             done = self._ready("tracks", "deep") or self.kept.get("deep")
             if done:
                 deep_script = done["script"]
@@ -696,6 +718,7 @@ class _DayBuild:
         clip = self.state[group][name]
         script, trimmed = fit(script, tts.max_chars(voice))
         clip.update(status="speaking", script=script, characters=len(script), trimmed=trimmed, voice=voice, **extra)
+        llm_log.activity(f"Day {self.day_no}: turning {_part_words(group, name)} into voice")
         await save(self.retreat)
         timer = llm_log.Timer()
         tier = tts.tier_of(voice)
@@ -747,6 +770,13 @@ class _DayBuild:
         message = str(exc) if known else "Unexpected error."
         self.state[group].setdefault(name, {}).update(status="failed", error=message)
         return f"{name}: {message}"
+
+
+def _part_words(group: str, name: str) -> str:
+    """A recorded part as the page names it."""
+    if group == "guide":
+        return "the spoken guidance"
+    return {"reading": "the reading", "heart": "the reflection for the heart", "deep": "the deep dive"}.get(name, name)
 
 
 def _image_descriptions(retreat: dict, day: dict) -> str | None:

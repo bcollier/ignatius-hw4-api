@@ -19,6 +19,17 @@ context: contextvars.ContextVar[dict] = contextvars.ContextVar("llm_call_context
 MAX_TEXT = 200_000  # characters kept per prompt or response
 
 
+# What a job is doing right now, as one short line for the page ("Day 3: recording the
+# deep dive"). The pipeline sets a hook per retreat; steps and recordings call activity().
+activity_hook: contextvars.ContextVar = contextvars.ContextVar("activity_hook", default=None)
+
+
+def activity(text: str) -> None:
+    hook = activity_hook.get()
+    if hook:
+        hook(text)
+
+
 def tag(**fields) -> None:
     """Add to the current task's log context."""
     context.set({**context.get(), **fields})
@@ -102,6 +113,8 @@ async def record(
 
 async def step(text: str, **details) -> None:
     """A step in making a retreat ("Day 2: writing the deep dive..."), logged alongside
-    the calls so a build can be watched live and followed afterwards."""
+    the calls so a build can be watched live and followed afterwards, and shown (its
+    first sentence) as the retreat's current activity."""
+    activity(text.split(". ")[0].rstrip("."))
     await record(provider="app", model="pipeline", system="", messages=[], response_text=text,
                  response_extra=details or None, usage={}, duration_ms=0, purpose="step")

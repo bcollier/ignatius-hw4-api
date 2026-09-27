@@ -6,6 +6,7 @@ API is called, which keeps tests and frontend work free.
 """
 
 import base64
+import contextvars
 import json
 import logging
 import re
@@ -73,12 +74,25 @@ async def _call(meter: pricing.Meter, **params) -> anthropic.types.Message:
         await _log_call(meter, params, request_messages, exchange, before, timer, error)
 
 
+# Called with the reply so far as it streams in (planning uses it to say which day it's on).
+stream_watch: contextvars.ContextVar = contextvars.ContextVar("stream_watch", default=None)
+WATCH_EVERY = 400  # characters between calls
+
+
 async def _stream_turns(meter: pricing.Meter, messages: list, params: dict, exchange: _Exchange) -> None:
+    watch = stream_watch.get()
     try:
         for _ in range(MAX_TURNS):
             async with client().messages.stream(
                 model=pricing.api_model(meter.model), messages=messages, **params
             ) as stream:
+                if watch:
+                    text, seen = "", 0
+                    async for chunk in stream.text_stream:
+                        text += chunk
+                        if len(text) - seen >= WATCH_EVERY:
+                            seen = len(text)
+                            watch(text)
                 message = await stream.get_final_message()
             exchange.message = message
             meter.add(message.usage)
