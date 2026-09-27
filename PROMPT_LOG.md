@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 201 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 203 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1244,6 +1244,18 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 > I really liked these "heart" examples as well as the "deep dive" examples. I wonder if it would help the prompt to have written examples like N-shot learning in the context *(with the author's document "Bridges PU2 - Close Reading and Reflections")*
 
 **What was done:** Yes, with care: the prompts are shared by everyone and public, so the examples must carry no personal details, models copy long examples closely (and would repeat them when someone prays the same psalm), and an example's facts travel with it (the document had one slip: "heavenly beings" in Psalm 8:5 is the ESV, not the NIV). Added short excerpts rather than whole reflections, labelled as register and not content: the Psalm 104 "fenced sea" passage to the voice-of-Jesus prompt, beside the Psalm 139 excerpt, and the Psalm 104:26 Leviathan passage (facts checked) to the deep dive prompt.
+
+### 202. 2026-09-27, 20:34 UTC
+
+> could we make a free version of the ai companion in the app? it would probably require TTS and STT models that are free and maybe lower quality, or if it was an iPhone app we could use the built in tools
+
+**What was done:** Answered with a plan, not yet built: the browser's own speech recognition (free, in Chrome and in Safari on iPhone) for listening, the free Jetstream model with the same companion instructions and context for the replies, and Microsoft's free voices sentence by sentence for speaking; turn-taking rather than live interruption, with a few seconds before each reply. A native iPhone app could use Apple's on-device speech instead, but that is a much larger project.
+
+### 203. 2026-09-27, 20:36 UTC
+
+> when I mark a day as prayed "Mark a Day as Prayed" there is no good visual queue that it succeeded. Put something simple that says Day marked as prayed
+
+**What was done:** Marking a day now shows a short message at the bottom of the screen, "Day 3 marked as prayed." (or "marked as complete" for an exercise day, and "marked as not prayed" when undone), wherever it's done: the day's page, after praying, or the Today card.
 
 ---
 
