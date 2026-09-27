@@ -77,7 +77,7 @@ async def reply(session: dict, text: str | None) -> str:
     said = "\n".join(f"{who}: {words}" for who, words in session["turns"])
     ask = (f"The conversation so far:\n{said}\n\nReply with only what you say next." if said
            else "The person has just started the conversation. Greet them and ask your first question. Reply with only what you say.")
-    system = session["instructions"] + "\n\n" + SPOKEN
+    system = session["instructions"] + "\n\n" + (session.get("spoken") or SPOKEN)
     llm_log.tag(user_id=session["user_id"], email=session["email"], retreat_id=session["retreat_id"], purpose="talk_turn")
     words, usd = await _think(session["brain"], system, ask)
     words = words.strip().strip('"')

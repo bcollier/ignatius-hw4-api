@@ -70,7 +70,7 @@ async def _outline(idea: str, photo: Image | None, days: int, model: str, meter:
     ask = (f"<idea>\n{idea.strip() or '(No words; the photo is the inspiration.)'}\n</idea>\n\n"
            f"Make {days} days.")
     if pricing.is_jetstream(model):
-        system = SYSTEM + "\n\nReply with only a JSON object, no other text, matching this schema:\n" + json.dumps(SCHEMA)
+        system = prompts.custom("inspiration", SYSTEM) + "\n\nReply with only a JSON object, no other text, matching this schema:\n" + json.dumps(SCHEMA)
         images = [(photo.data, photo.mime)] if photo else []
         try:
             reply = await jetstream.complete(pricing.api_model(model), system, ask, meter, images=images, max_tokens=4000)
@@ -83,7 +83,7 @@ async def _outline(idea: str, photo: Image | None, days: int, model: str, meter:
     else:
         content = ([{"type": "text", "text": "The photo:"}, llm._image_block(photo.data, photo.mime)] if photo else [])
         content.append({"type": "text", "text": ask})
-        message = await llm._call(meter, system=SYSTEM, max_tokens=8000, messages=[{"role": "user", "content": content}],
+        message = await llm._call(meter, system=prompts.custom("inspiration", SYSTEM), max_tokens=8000, messages=[{"role": "user", "content": content}],
                                   output_config={"format": {"type": "json_schema", "schema": SCHEMA}})
         outline = llm._parse_json(llm._text(message))
     outline["days"] = [d for d in outline.get("days", []) if d.get("reference") or d.get("from_photo")][: config.MAX_DAYS]

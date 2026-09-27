@@ -26,7 +26,7 @@ from datetime import date, datetime, timezone
 
 import httpx
 
-from . import config, llm_log, prompts, talk_turns
+from . import config, llm_log, profile, prompts, talk_turns
 from .storage import StorageError, store
 
 log = logging.getLogger(__name__)
@@ -251,11 +251,15 @@ async def _remember(user_id: str, full: bool) -> None:
 
     free_models = [m for m, _ in pricing.jetstream_models()]
     model = config.LLM_MODEL if full or not free_models else free_models[0]
+    mine = await profile.agent_settings(user_id)
+    if mine["models"].get("companion_memory") in ([m for m, _, _ in pricing.MODELS] if full else []) + free_models:
+        model = mine["models"]["companion_memory"]
+    remember = mine["prompts"].get("companion_memory") or REMEMBER
     text = "Existing memory:\n" + (history.get("memory") or "(none)") + "\n\nOlder conversations:\n" + "\n\n".join(
         f"[{str(c.get('started_at'))[:16]}]\n{c.get('transcript') or ''}" for c in older)
     llm_log.tag(user_id=user_id, purpose="talk_memory")
     try:
-        memory = await llm.condense_text(REMEMBER.format(limit=6000), text, pricing.Meter(model, await pricing.prices()))
+        memory = await llm.condense_text(remember.replace("{limit}", "6000"), text, pricing.Meter(model, await pricing.prices()))
     except Exception:
         log.warning("couldn't update conversation memory for %s", user_id)
         return
@@ -374,6 +378,7 @@ async def _start_turns(user, retreat, about, notes, voice, local_time, instructi
     instructions = context(retreat, about, notes, await load_history(user.id), local_time, instructions)
     sid = _new_id()
     _sessions[sid] = talk_turns.new_session(user, retreat, instructions, voice, brain)
+    _sessions[sid]["spoken"] = (await profile.agent_settings(user.id))["prompts"].get("companion_spoken")
     greeting = await _turn_reply(sid, None)
     return {"session_id": sid, "provider": talk_turns.PROVIDER, "voice": voice, "brain": brain,
             "max_seconds": config.TALK_MAX_SECONDS, "greeting": greeting}

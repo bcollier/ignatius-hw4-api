@@ -272,6 +272,7 @@ async def create_retreat(
 async def _compose_then_plan(retreat: dict, compose, plan_prompt: str) -> None:
     """A retreat from an idea: choose the passages and fetch their text, then plan as usual."""
     llm_log.tag(user_id=retreat["user_id"], retreat_id=retreat["id"])
+    await profile.use_agents(retreat["user_id"])
     try:
         filename, source = await compose()
     except (inspiration.InspirationError, llm.LLMError) as exc:
@@ -327,7 +328,9 @@ async def series_context(retreat: dict, model: str) -> str:
 
 async def _use_notes(retreat: dict) -> None:
     """The person's About me notes ("user info.md") inform every call, unless they asked
-    for a generic retreat (made without them)."""
+    for a generic retreat (made without them). The person's own agent prompts (the Agents
+    page) apply either way."""
+    await profile.use_agents(retreat["user_id"])
     if retreat.get("personal", True):
         await profile.use_for_job(retreat["user_id"])
     else:

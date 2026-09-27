@@ -499,13 +499,13 @@ async def tailor_guide(context: str, heart: str, deep: str, lines: dict, meter: 
               "required": list(lines), "additionalProperties": False}
     try:
         if pricing.is_jetstream(meter.model):
-            reply = await jetstream.complete(pricing.api_model(meter.model), prompts.GUIDE_TAILOR, user, meter)
+            reply = await jetstream.complete(pricing.api_model(meter.model), prompts.custom("guide_tailor", prompts.GUIDE_TAILOR), user, meter)
         else:
             try:
-                message = await _call(meter, system=prompts.GUIDE_TAILOR, max_tokens=16000, messages=[{"role": "user", "content": user}],
+                message = await _call(meter, system=prompts.custom("guide_tailor", prompts.GUIDE_TAILOR), max_tokens=16000, messages=[{"role": "user", "content": user}],
                                       output_config={"format": {"type": "json_schema", "schema": schema}})
             except anthropic.BadRequestError:
-                message = await _call(meter, system=prompts.GUIDE_TAILOR, max_tokens=16000, messages=[{"role": "user", "content": user}])
+                message = await _call(meter, system=prompts.custom("guide_tailor", prompts.GUIDE_TAILOR), max_tokens=16000, messages=[{"role": "user", "content": user}])
             reply = _text(message)
         tailored = _parse_json(reply)
     except Exception:  # LLMError, JetstreamError, bad JSON: keep the defaults

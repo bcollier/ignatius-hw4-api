@@ -34,6 +34,17 @@ BACKGROUND = _tagged("background", _prompt("background"))
 PERSON: contextvars.ContextVar[str] = contextvars.ContextVar("person", default="")
 
 
+# The person's own versions of agent prompts ({agent id: text}, from the Agents page),
+# set for the length of a job like PERSON (profile.use_agents). An agent without one
+# uses the default.
+CUSTOM: contextvars.ContextVar[dict] = contextvars.ContextVar("custom", default={})
+
+
+def custom(agent: str, default: str) -> str:
+    """The person's version of an agent's prompt in the current job, or the default."""
+    return CUSTOM.get().get(agent) or default
+
+
 def person_block(about: str) -> str:
     if not about.strip():
         return ""

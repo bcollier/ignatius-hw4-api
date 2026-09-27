@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 222 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 224 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1380,6 +1380,18 @@ The seven features: sign-in, new retreat, building a day, praying, Talk it over 
 > put a turn on debug mode in the settings page
 
 **What was done:** The Settings switch is now labeled "Debug mode" (it shows the build logs and costs), and turning it on or off also shows or hides the Debug badge in the header.
+
+### 223. 2026-09-27, 22:15 UTC
+
+> There needs to be a place in the app you can read the prompts for all of the agents in the app and edit them into a custom user prompt . For example you want your spiritual ai companion to have a different prompt. Or a different model altogether
+
+**What was done:** A new Agents page (Settings → Agents, `?agents`) lists all ten agents: the planner, idea to passages, both heart voices, the deep dive, the spoken guidance, the companion, its turn-taking addendum, its memory, and your own Examen. Each shows what it does, when it runs, what it's given and its default file. You can read the full prompt, make your own version (saved to your account and used wherever that agent runs, for you only) and go back to the default. You can also choose a model: New retreat's planning and writing models, the companion's live voice or turn-taking brain, and the Examen's and the memory's model on the server. The fixed blocks (background, house style, format rules) are shown read only. New retreat starts from your versions, the Talk page shares the companion's, and one person's versions are cleared on sign-out. New `GET/PUT /api/agents`, `app/agents.py`, and 7 tests.
+
+### 224. 2026-09-27, 22:30 UTC
+
+> Have a section of the app that explains in detail the technical differences between how a voice like grok or the OpenAI live voice do voice to voice so you can interrupt them and they make small sounds that ar me human but not words. It is the most conversational. Of the natural language models but it won't have the model reasoning and tools of something like when you have a tts then model then stt pipeline of talking to an agent like Claude does
+
+**What was done:** Pending.
 
 ---
 

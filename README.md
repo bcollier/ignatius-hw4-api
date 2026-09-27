@@ -72,7 +72,7 @@ Every prompt the app sends to a model is a plain-text file in **[`app/agent_prom
 
 Edit the file, run the tests, and push; Render redeploys and the next call uses it. Keep `{placeholders}`, `## section` headings and the reply tags the code parses (the index says which files have them).
 
-Without touching code, a person can also override some prompts in the app, for their own account:
+Without touching code, anyone can read every agent's prompt and make their own version on the **Agents** page (Settings → Agents), saved to their account and used wherever that agent runs, with a model choice where it makes sense. Some prompts can also be changed for one retreat or conversation:
 - **New retreat → Advanced** (planning, the heart, the deep dive, the spoken guidance), saved with that retreat;
 - **Talk it over → "The companion's instructions (advanced)"**, saved to their account.
 

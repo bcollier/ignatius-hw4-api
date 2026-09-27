@@ -22,7 +22,7 @@ def test_free_accounts_cannot_make_one():
 
 
 def test_it_is_written_recorded_and_served(monkeypatch):
-    async def write(days):
+    async def write(days, model):
         assert "I teach" in days
         return {**SESSION, "segments": [dict(g) for g in SESSION["segments"]], "id": "my-examen"}, 0.1
 

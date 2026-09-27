@@ -2,6 +2,8 @@
 
 Every prompt the app sends to an AI model is a plain-text file in this folder. To change how an agent behaves, edit its file here, run the tests (`.venv/bin/python -m pytest -q`), and push: Render redeploys and the new wording is used from the next call. Nothing else needs to change. The code loads the files through `app/prompts.py` (`_prompt("name")` reads `name.md`).
 
+**In the app, without touching code:** Settings → **Agents** (`?agents`) lists every agent below with its prompt. Anyone can read them, make their own version (saved to their account and used wherever that agent runs, for them only), go back to the default, and, where it makes sense, choose a different model. Editing a file here changes the default for everyone; the Agents page changes it for one person.
+
 Three kinds of file:
 
 - **Instructions**: how an agent thinks and writes. Safe to rewrite freely.

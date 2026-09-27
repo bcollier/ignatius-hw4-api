@@ -118,7 +118,9 @@ async def _make(user_id: str, email: str | None, state: dict) -> None:
     llm_log.tag(user_id=user_id, email=email, purpose="my_examen")
     try:
         await profile.use_for_job(user_id)
-        session, script_usd = await _write(state["days"])
+        await profile.use_agents(user_id)
+        model = (await profile.agent_settings(user_id))["models"].get("my_examen") or config.LLM_MODEL
+        session, script_usd = await _write(state["days"], model)
         voice_usd = await _record(user_id, session, state["voice"])
         state.update(status="ready", session=session, made_at=datetime.now(timezone.utc).isoformat(),
                      usd={"script": round(script_usd, 4), "voice": round(voice_usd, 4)})
@@ -128,12 +130,12 @@ async def _make(user_id: str, email: str | None, state: dict) -> None:
     await _save(user_id, state)
 
 
-async def _write(days: str) -> tuple[dict, float]:
+async def _write(days: str, model: str) -> tuple[dict, float]:
     """Claude writes the session around the person's life."""
-    meter = pricing.Meter(config.LLM_MODEL, await pricing.prices())
+    meter = pricing.Meter(model, await pricing.prices())
     added = days.strip() or "(They haven't added anything; use their notes, if any.)"
     message = await llm._call(
-        meter, system=SYSTEM, max_tokens=16000,
+        meter, system=prompts.custom("my_examen", SYSTEM), max_tokens=16000,
         messages=[{"role": "user", "content": f"<about_their_days>\n{added}\n</about_their_days>\n\nWrite their Examen."}],
         output_config={"format": {"type": "json_schema", "schema": SCHEMA}})
     session = llm._parse_json(llm._text(message))

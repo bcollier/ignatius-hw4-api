@@ -49,6 +49,49 @@ async def load(user_id: str) -> dict:
     }
 
 
+async def _meta(user_id: str) -> dict:
+    try:
+        return json.loads(await store.get_file(_paths(user_id)[1]))
+    except (StorageError, ValueError):
+        return {}
+
+
+async def agent_settings(user_id: str) -> dict:
+    """The person's own agent prompts and models, from the Agents page:
+    {"prompts": {agent id: text}, "models": {agent id: model id}}. The companion's
+    prompt is kept where it always was (companion_prompt) and appears here as "companion"."""
+    meta = await _meta(user_id)
+    custom = dict(meta.get("agents") or {})
+    if meta.get("companion_prompt"):
+        custom["companion"] = meta["companion_prompt"]
+    return {"prompts": custom, "models": dict(meta.get("agent_models") or {})}
+
+
+async def save_agent(user_id: str, agent_id: str, prompt: str | None, model: str | None) -> None:
+    """Set the person's prompt and model for one agent: None leaves it as it is, ""
+    goes back to the default."""
+    meta = await _meta(user_id)
+    if prompt is None:
+        pass
+    elif agent_id == "companion":
+        meta["companion_prompt"] = prompt.strip()[:MAX_COMPANION_PROMPT]
+    else:
+        agents = dict(meta.get("agents") or {})
+        if prompt.strip():
+            agents[agent_id] = prompt.strip()
+        else:
+            agents.pop(agent_id, None)
+        meta["agents"] = agents
+    models = dict(meta.get("agent_models") or {})
+    if model:
+        models[agent_id] = model
+    elif model is not None:
+        models.pop(agent_id, None)
+    meta["agent_models"] = models
+    meta["updated_at"] = time.time()
+    await store.put_file(_paths(user_id)[1], json.dumps(meta).encode(), "application/json")
+
+
 async def about_text(user_id: str) -> str:
     try:
         return (await store.get_file(_paths(user_id)[0])).decode()
@@ -69,7 +112,8 @@ async def save(user_id: str, about: str | None, companion_notes: str | None, ful
         await store.put_file(_paths(user_id)[0], about.encode(), "text/markdown")
     notes = current["companion_notes"] if companion_notes is None else companion_notes.strip()[:MAX_NOTES]
     prompt = current["companion_prompt"] if companion_prompt is None else companion_prompt.strip()[:MAX_COMPANION_PROMPT]
-    meta = {"summarized": summarized, "original_characters": original, "companion_notes": notes, "companion_prompt": prompt,
+    meta = {**await _meta(user_id),  # keeps the agent prompts and models
+            "summarized": summarized, "original_characters": original, "companion_notes": notes, "companion_prompt": prompt,
             "updated_at": time.time(), "source": source}
     await store.put_file(_paths(user_id)[1], json.dumps(meta).encode(), "application/json")
     return await load(user_id)
@@ -93,6 +137,16 @@ async def condense(text: str, full: bool) -> str:
         cut = text[:limit]
         summary = cut[: cut.rfind("\n") if cut.rfind("\n") > limit // 2 else limit]
     return summary[: limit + 500]
+
+
+async def use_agents(user_id: str) -> None:
+    """Make the person's own agent prompts apply to every model call in the current job.
+    Never fails the job: without them, the defaults are used."""
+    try:
+        prompts.CUSTOM.set((await agent_settings(user_id))["prompts"])
+    except Exception:
+        log.warning("couldn't load the agent prompts for %s", user_id)
+        prompts.CUSTOM.set({})
 
 
 async def use_for_job(user_id: str) -> None:
