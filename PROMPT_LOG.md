@@ -1082,6 +1082,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done (173 and 174):** Both `redesign` branches are fully merged into `main` (no commits of their own), so they can be deleted without losing anything; squashing isn't needed.
 
+### 175. 2026-09-27, 18:04 UTC
+
+> walk me through setting up a simple login flow smtp thing we didn't have time to do before
+
+**What was done:** Checked collier.phd: its mail already runs on Google Workspace and its SPF record authorizes Google, so the simplest setup is Supabase sending through the owner's Google account with an app password (smtp.gmail.com, port 465), with no DNS changes; Resend stays documented as the alternative. `docs/email-templates.md` now has the setup steps, and the Magic Link and Confirm templates include the six-digit code (`{{ .Token }}`) beside the link. The app's code box takes that six-digit code (checked by Supabase with the email address it went to), so a Home Screen app can sign in straight from the email, as well as the eight-digit code from a signed-in browser.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
