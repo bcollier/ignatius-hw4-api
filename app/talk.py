@@ -38,7 +38,7 @@ OPENAI_VOICES = {
 }
 XAI_VOICES: dict[str, str] = {"eve": "Eve", "ara": "Ara", "rex": "Rex", "sal": "Sal", "leo": "Leo"}  # refreshed by xai_voices()
 
-# The companion's default instructions (prompt_texts/companion.md); a person can
+# The companion's default instructions (agent_prompts/companion.md); a person can
 # replace them with their own under Talk it over (saved in their profile).
 COMPANION = prompts._prompt("companion")
 
@@ -132,12 +132,26 @@ def _about_them(about: str, notes: str) -> list[str]:
     return parts
 
 
+def _how_long_ago(then, now: datetime) -> str:
+    """"about 3 hours ago", "yesterday", "5 days ago": precise enough to pick up from."""
+    try:
+        t = datetime.fromtimestamp(then, timezone.utc) if isinstance(then, (int, float)) else datetime.fromisoformat(str(then))
+        hours = (now - t.astimezone(now.tzinfo or timezone.utc)).total_seconds() / 3600
+    except (ValueError, TypeError, OverflowError):
+        return "some time ago"
+    if hours < 1:
+        return "less than an hour ago"
+    if hours < 20:
+        return f"about {round(hours)} hour{'s' if round(hours) != 1 else ''} ago"
+    gap = _days_between(then, now)
+    return "yesterday" if gap is not None and gap <= 1 else f"{gap} days ago" if gap is not None else "some time ago"
+
+
 def _past_conversations(history: dict, last: dict | None, last_time, now: datetime) -> list[str]:
     """When they last talked, the memory of older talks, and the latest transcripts."""
     parts = []
     if last:
-        gap = _days_between(last_time, now)
-        ago = "earlier today" if gap == 0 else "yesterday" if gap == 1 else f"{gap} days ago"
+        ago = _how_long_ago(last_time, now)
         parts.append(f"Your last conversation with them was {ago} ({str(last_time)[:10]}), about {last.get('retreat_title') or 'their prayer'}. "
                      "Pick up naturally from it if it helps; don't recite it back.")
     else:
@@ -205,7 +219,7 @@ def _day_status(st: dict) -> str:
 HISTORY_KEEP = 3  # full transcripts given to the companion
 HISTORY_CONDENSE_OVER = 16_000  # characters of older transcripts before they're folded into memory
 
-REMEMBER = """You keep the memory of a prayer companion who has spoken with this person before. Combine the existing memory and the older conversation transcripts below into one updated memory, at most {limit} characters, written as plain notes: what they've shared about their life and prayer, graces and movements they noticed (consolation, desolation), questions they're carrying, words or images that mattered, what they said they'd bring to prayer next, and anything they asked you to remember or not to raise. Include dates where useful. Nothing else."""
+REMEMBER = prompts._prompt("companion_memory")
 
 
 def _history_path(user_id: str) -> str:

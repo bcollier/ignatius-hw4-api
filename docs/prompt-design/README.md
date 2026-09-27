@@ -1,6 +1,6 @@
 # How the prompts were written
 
-The app's default prompts live in [`app/prompt_texts/`](../../app/prompt_texts/), one plain-text file each:
+The app's default prompts live in [`app/agent_prompts/`](../../app/agent_prompts/), one plain-text file each:
 
 | File | Used for |
 | --- | --- |

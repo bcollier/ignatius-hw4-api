@@ -52,6 +52,32 @@ This is the **CMU 15-113 Homework 4** submission: server-side code deployed on R
 23. [Building the example retreats](#23-building-the-example-retreats)
 24. [Rights and copyright](#24-rights-and-copyright)
 
+Also: [Changing how the agents behave](#changing-how-the-agents-behave), the one place to edit every prompt.
+
+---
+
+## Changing how the agents behave
+
+Every prompt the app sends to a model is a plain-text file in **[`app/agent_prompts/`](app/agent_prompts/)**. Its [README](app/agent_prompts/README.md) is the index: for each agent, the file, when it runs, what it's given, which model runs it, and whether it can also be changed in the app.
+
+| To change… | Edit |
+| --- | --- |
+| The live companion (Talk it over, Talk now) | [`companion.md`](app/agent_prompts/companion.md); how it speaks in turn-taking mode: [`companion_spoken.md`](app/agent_prompts/companion_spoken.md) |
+| The reflection for the heart | [`heart_companion.md`](app/agent_prompts/heart_companion.md) (a companion's voice) or [`heart_christ.md`](app/agent_prompts/heart_christ.md) (Jesus speaking) |
+| The deep dive (the book study) | [`deep_dive.md`](app/agent_prompts/deep_dive.md), and how it uses research: [`research.md`](app/agent_prompts/research.md) |
+| How a retreat is planned | [`plan.md`](app/agent_prompts/plan.md) |
+| The spoken guidance | [`guide_lines.md`](app/agent_prompts/guide_lines.md) and [`guide_tailor.md`](app/agent_prompts/guide_tailor.md) |
+| Your own Examen | [`my_examen.md`](app/agent_prompts/my_examen.md) |
+| What every agent knows about the tradition, or how every script sounds | [`background.md`](app/agent_prompts/background.md), [`house_style.md`](app/agent_prompts/house_style.md) |
+
+Edit the file, run the tests, and push; Render redeploys and the next call uses it. Keep `{placeholders}`, `## section` headings and the reply tags the code parses (the index says which files have them).
+
+Without touching code, a person can also override some prompts in the app, for their own account:
+- **New retreat → Advanced** (planning, the heart, the deep dive, the spoken guidance), saved with that retreat;
+- **Talk it over → "The companion's instructions (advanced)"**, saved to their account.
+
+Models, voices and lengths are settings, not prompts; the index lists where each lives.
+
 ---
 
 ## 1. The system at a glance
@@ -204,9 +230,9 @@ flowchart LR
 | Part | What it is | Written by | Default voice (free · premium) |
 | --- | --- | --- | --- |
 | **The reading** | The day's passage, copied word for word from the uploaded material (or the World English Bible, for a retreat made from an idea), read four times in the lectio divina pattern | Nobody: it's the source text | [Andrew](https://bcollier.github.io/ignatius-hw4-web/samples/voices/free-andrew.mp3) · [George](https://bcollier.github.io/ignatius-hw4-web/samples/voices/premium-george.mp3) |
-| **For the heart** | A short reflection spoken to the listener, about what God may want them to know in their heart through this passage: in a companion's voice, or, if chosen, the voice of Jesus in the manner of Ignatian imaginative prayer ([prompt](app/prompt_texts/heart_companion.md), [Jesus version](app/prompt_texts/heart_christ.md)) | Claude Opus 5.5 by default (premium) or an open model on Jetstream2 (free) | [Andrew](https://bcollier.github.io/ignatius-hw4-web/samples/voices/free-andrew.mp3) · [Brian](https://bcollier.github.io/ignatius-hw4-web/samples/voices/premium-brian.mp3) |
-| **Deep dive** | A close reading for the mind: where and when the passage was written, key words in the original Hebrew or Greek, how the Church and its teachers have read it, and the real open questions; written knowing what the reflection said, from web research ([prompt](app/prompt_texts/deep_dive.md)) | The same model, with the research below | [Christopher](https://bcollier.github.io/ignatius-hw4-web/samples/voices/free-christopher.mp3) · [Alice](https://bcollier.github.io/ignatius-hw4-web/samples/voices/premium-alice.mp3) |
-| **Spoken guidance** | The short lines that lead the prayer: asking for the day's grace, introducing each reading, the silence between two bells, the colloquy and closing, tailored to the day's reflection and deep dive ([prompt](app/prompt_texts/guide_tailor.md)) | The same model | [Ava](https://bcollier.github.io/ignatius-hw4-web/samples/voices/free-ava.mp3) · [Sarah](https://bcollier.github.io/ignatius-hw4-web/samples/voices/premium-sarah.mp3) |
+| **For the heart** | A short reflection spoken to the listener, about what God may want them to know in their heart through this passage: in a companion's voice, or, if chosen, the voice of Jesus in the manner of Ignatian imaginative prayer ([prompt](app/agent_prompts/heart_companion.md), [Jesus version](app/agent_prompts/heart_christ.md)) | Claude Opus 5.5 by default (premium) or an open model on Jetstream2 (free) | [Andrew](https://bcollier.github.io/ignatius-hw4-web/samples/voices/free-andrew.mp3) · [Brian](https://bcollier.github.io/ignatius-hw4-web/samples/voices/premium-brian.mp3) |
+| **Deep dive** | A close reading for the mind: where and when the passage was written, key words in the original Hebrew or Greek, how the Church and its teachers have read it, and the real open questions; written knowing what the reflection said, from web research ([prompt](app/agent_prompts/deep_dive.md)) | The same model, with the research below | [Christopher](https://bcollier.github.io/ignatius-hw4-web/samples/voices/free-christopher.mp3) · [Alice](https://bcollier.github.io/ignatius-hw4-web/samples/voices/premium-alice.mp3) |
+| **Spoken guidance** | The short lines that lead the prayer: asking for the day's grace, introducing each reading, the silence between two bells, the colloquy and closing, tailored to the day's reflection and deep dive ([prompt](app/agent_prompts/guide_tailor.md)) | The same model | [Ava](https://bcollier.github.io/ignatius-hw4-web/samples/voices/free-ava.mp3) · [Sarah](https://bcollier.github.io/ignatius-hw4-web/samples/voices/premium-sarah.mp3) |
 
 **The six web research services** (all at once by default, results interleaved and deduplicated; see [section 5](#5-research-all-the-free-services-at-once)): [Brave Search](https://brave.com/search/api/) (Brave's own independent index), [Brave Answers](https://brave.com/search/api/) (a cited AI answer from that index), [Exa](https://exa.ai) (search by meaning, good for essays and commentary), [Tavily](https://tavily.com) (cleaned page extracts for AI agents), [Firecrawl](https://www.firecrawl.dev) (reads whole pages), and [Linkup](https://www.linkup.so) (standard search, and a slower deep mode offered on its own). Premium deep dives also use [Claude's own web search](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/web-search-tool), up to five searches.
 
@@ -291,6 +317,8 @@ Samples of all twelve: the web app's [About page](https://bcollier.github.io/ign
 ## 7. Talk it over
 
 A live spoken conversation with an AI prayer companion, modeled on how spiritual directors are taught to listen (mostly questions, little advice, noticing consolation and desolation and where God may be at work), which never calls itself spiritual direction and gives the 988 lifeline in a crisis.
+
+**Talk now**, the first button on the home page, opens it in one tap and starts talking at once (on today's retreat, with the voice and way of talking they chose last time; free accounts take turns with the free model). The companion's instructions always include **the time where the person is** when they pressed it ("It is Sunday, September 27, 2026, 9:12 pm where they are (in the evening).") and **when they last talked** ("Your last conversation with them was about 3 hours ago (2026-09-27), about Be Still"), followed by the memory of older talks and the latest transcripts. That context is built in `app/talk.py` (`context()`); the companion's own instructions are [`app/agent_prompts/companion.md`](app/agent_prompts/companion.md).
 
 ```mermaid
 sequenceDiagram
@@ -587,7 +615,8 @@ Names only; values go in `.env` or Render's dashboard.
 | `app/extract.py` | PDF and Word extraction: text, images scaled to fit, scanned pages |
 | `app/llm.py` | Claude through OpenRouter (streaming, structured output, web search, caching, fallbacks) and the Jetstream paths; planning, heart, deep dive, tailoring, condensing |
 | `app/jetstream.py` | Jetstream2 client |
-| `app/prompts.py` | Background, house style, default prompts, guidance, schemas |
+| `app/agent_prompts/` | Every prompt sent to a model, one plain-text file each, with an [index](app/agent_prompts/README.md) |
+| `app/prompts.py` | Loads the prompts; builds each day's context, the retreat so far, and the plan schema |
 | `app/search.py` | The six research services, combined mode, pausing, logging |
 | `app/tts.py` | Voices, tiers, chunking, Microsoft (with retries) and ElevenLabs recording |
 | `app/talk.py` | Talk it over: companion instructions, context, sessions, memory, free allowance |

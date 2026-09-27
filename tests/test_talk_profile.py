@@ -141,7 +141,7 @@ def test_companion_knows_what_is_new_since_last_talk(client, monkeypatch):
                                            "local_time": "2026-09-27T07:10:00-04:00"})
     text = seen["instructions"]
     assert "Since your last conversation they have listened to or prayed Day 2" in text
-    assert "earlier today" in text or "yesterday" in text or "days ago" in text
+    assert any(w in text for w in ("hour ago", "hours ago", "less than an hour", "yesterday", "days ago"))
     assert "early in the morning" in text and "Here I am" in text and "You: hello" in text
 
 

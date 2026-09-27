@@ -19,7 +19,7 @@ MAX_NOTES = 4000  # what they want from the companion
 MAX_COMPANION_PROMPT = 60_000  # the default companion prompt is about 21,000 characters
 MAX_INPUT = 200_000  # anything longer is cut before condensing
 
-CONDENSE = """Condense these notes a person wrote about themselves, for use by a prayer app that plans retreats and offers a spoken conversation companion. Keep what would help someone accompany them in prayer: their situation and vocation, relationships that matter, what they are carrying or hoping for, their faith background and practice, how they like to pray, images or scripture they return to, and anything they say they want or don't want. Keep their own words where they are vivid. Drop repetition and detail that doesn't serve that purpose. Write in the first person, as plain notes, in no more than {limit} characters."""
+CONDENSE = prompts._prompt("about_me_condense")
 
 
 def _paths(user_id: str) -> tuple[str, str]:

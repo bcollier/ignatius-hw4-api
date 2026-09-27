@@ -45,7 +45,7 @@ flowchart LR
 
     subgraph SUPA["Supabase project"]
         AUTH["Auth<br/>email sign-in links"]
-        DB[("Postgres<br/>public.retreats")]
+        DB[("Postgres table: retreats<br/>private, row-level security,<br/>server key only")]
         ST[("Storage<br/>private bucket 'retreats'")]
     end
 
@@ -227,7 +227,7 @@ flowchart LR
     REQ["Upload or build request<br/>(tags email)"] --> JOB["Background job<br/>(tags user, retreat, day, purpose)"]
     JOB --> CALL["Model call<br/>llm._call or jetstream.complete"]
     CALL --> ROW["llm_log.record()"]
-    ROW --> DB[("public.llm_calls")]
+    ROW --> DB[("llm_calls table<br/>private, server key only")]
     DB --> VIEW[("llm_usage_by_user view")]
 ```
 

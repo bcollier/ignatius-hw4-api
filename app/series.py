@@ -8,16 +8,11 @@ then passages), so recent weeks stay complete, while every day's title, source a
 grace always stays.
 """
 
-from . import config
+from . import config, prompts
 
 MAX_PREVIOUS = 60  # retreats in one series
 
-INSTRUCTIONS = (
-    "This retreat is part of a series the listener has been praying week by week. The earlier retreats are "
-    "below in order, inside <series>. Build on them: continue the arc, refer back where it helps the listener "
-    "(\"last week you prayed with…\"), keep the voice and themes continuous, and don't repeat explanations "
-    "already given in earlier deep dives. Some older material may be shortened; don't mention that."
-)
+INSTRUCTIONS = prompts._prompt("series")
 
 
 def _entry(retreat: dict) -> dict:

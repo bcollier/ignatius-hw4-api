@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 209 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 211 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1293,13 +1293,29 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Added the author's notes as a Google Doc in the same folder ("Example: What I'm looking for in the conversation companion", with a line saying to write one's own in one's own words), linked as "See an example" under that box on About me.
 
+### 210. 2026-09-27, 21:05 UTC
+
+> there should be a clear call to action on the home page, right now it is unreachable to go to the ai companion to talk, make it a simple one-push button on the iphone from the home page that says Talk Now and it pipes you into your spiritual director. spiritual directors / ai companion should know what time it is when the person pushed to talk, and they should know when their last conversation was. so it should go into the prompt as we prompt the companion / how do I access the prompts within the app? I want the code to be structured in such a way that the default prompts for all the LLM calls are stored in a 'agent prompts' or something folder so if we want to change the behavior of the agent like the book study person or heart talk or the live spirtual director I want one place or an easy index/guide in the readme to say how to edit the prompts and app behaviors / it looks weird in this diagram that retreats would be a public database
+
+**What was done:**
+- **Talk now.** A full-width "Talk now" button now sits at the top of the home page. One tap unlocks the phone's audio, opens Talk it over on today's retreat and starts the conversation. The companion's instructions already carried the local time when the person started ("Right now: It is Sunday… 9:12 pm… (in the evening)"). The last conversation is now given precisely too ("about 3 hours ago", "yesterday", "5 days ago"). Tried locally: the first reply came in two seconds, greeting the evening and picking up that morning's prayer.
+- **Agent prompts in one folder.** Every prompt sent to a model now lives in [`app/agent_prompts/`](app/agent_prompts), renamed from prompt_texts. The prompts that were still inside the code moved there too: the planner's format rules, the heart and deep-dive formats, the research notes, the spoken guidance lines, the retreat-so-far and series notes, About me condensing, the companion's memory, the turn-taking addendum, and the practice writer. A check showed every prompt the app sends is word for word the same as before.
+- **The index.** The folder's README lists each agent: file, when it runs, what it's given, which model runs it, and where it can also be edited in the app. Both READMEs gained a "Changing how the agents behave" section.
+- **The diagram.** It now says "Postgres table: retreats, private, row-level security, server key only". "public" was only the name of Postgres's default schema; no one can read the table without the server's key.
+
+### 211. 2026-09-27, 21:12 UTC
+
+> explain how this works, the jsonb is just a link to a json object with a bucket id *(with a screenshot of the data model diagram)*
+
+**What was done:** Explained that the `data` jsonb column is the whole retreat, not a link. It holds the plan, days, scripts, status and costs. Each image and recording inside it carries a Storage `path` (`{user_id}/{retreat_id}/…`) in the one private bucket; no bucket id is stored. The API turns those paths into short-lived signed URLs when a retreat is opened. Deleting a retreat deletes the files by walking those paths (`storage.file_paths`), since Postgres has no link to Storage.
+
 ---
 
 *End of the log. The original design came from an earlier, separate session (September 24–25; see [docs/original-spec](docs/original-spec/)); every change made to these two repositories after it came from one of the prompts above. Account settings the author changed by hand, such as the Supabase email settings, are described where they came up.*
 
 ## Prompts the app sends to models
 
-The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
+The defaults are plain-text files in `app/agent_prompts/` (its README is the index), and most are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
 
 - **Planning:** decide whether the material already has days or needs a composed arc; copy passages word for word; choose a grace, a focus and images for each day. Constrained to a JSON schema.
 - **For the heart:** a spiritual companion, or the voice of Jesus in Ignatian imaginative prayer, in a house style written for listening.

@@ -1,0 +1,1 @@
+Your full plan would be too long to write in one reply. Write the same plan, but for each day put "PASSAGE" in passage_text, and add two fields: passage_start, the first ten words of that day's passage exactly as they appear in the source, and passage_end, the last ten words exactly as they appear. The app copies everything between them from the source.

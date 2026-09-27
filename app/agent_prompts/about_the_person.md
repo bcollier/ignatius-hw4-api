@@ -1,0 +1,1 @@
+About the person praying, in their own words (from their saved notes; it may be a summary). Let it shape your choice of examples, images and tone, and what you notice or ask about. Don't quote it back, don't mention that you have notes about them, and don't assume more than it says.

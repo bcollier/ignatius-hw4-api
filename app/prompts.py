@@ -4,16 +4,21 @@ import contextvars
 import re
 from pathlib import Path
 
-# Sent ahead of every prompt to every model (see llm._call and jetstream.complete),
-# so each step understands the tradition it's writing for.
-# The prompts themselves live in prompt_texts/ as plain text, so they're easy to read
-# and edit (and to see whole in the app's Advanced settings). They were written with
-# Claude Fable from a brief describing the whole app; see docs/prompt-design/.
-PROMPT_DIR = Path(__file__).parent / "prompt_texts"
+# Every prompt the app sends to a model lives in agent_prompts/ as a plain-text file,
+# so there is one place to read and change how the agents behave; its README is the
+# index (which agent, when it runs, what it receives). This module loads them.
+PROMPT_DIR = Path(__file__).parent / "agent_prompts"
 
 
 def _prompt(name: str) -> str:
     return (PROMPT_DIR / f"{name}.md").read_text().strip()
+
+
+def _sections(name: str) -> dict[str, str]:
+    """A prompt file split at its "## key" headings, as {key: text}."""
+    parts = re.split(r"^## +(\w+) *$", _prompt(name), flags=re.M)[1:]
+    return {key: " ".join(text.split()) if name == "guide_lines" else text.strip()
+            for key, text in zip(parts[::2], parts[1::2])}
 
 
 def _tagged(tag: str, text: str) -> str:
@@ -32,12 +37,7 @@ PERSON: contextvars.ContextVar[str] = contextvars.ContextVar("person", default="
 def person_block(about: str) -> str:
     if not about.strip():
         return ""
-    return (
-        "About the person praying, in their own words (from their saved notes; it may be a summary). Let it shape "
-        "your choice of examples, images and tone, and what you notice or ask about. Don't quote it back, don't "
-        "mention that you have notes about them, and don't assume more than it says.\n<about_the_person>\n"
-        + about.strip() + "\n</about_the_person>"
-    )
+    return _prompt("about_the_person") + "\n<about_the_person>\n" + about.strip() + "\n</about_the_person>"
 
 
 # Appended to every script writer's instructions: writing for the ear and for prayer.
@@ -48,11 +48,7 @@ HOUSE_STYLE = _tagged("house_style", _prompt("house_style"))
 
 PLAN_INSTRUCTIONS = _prompt("plan")
 
-PLAN_FIXED = """Plan at most {max_days} days.
-
-For each day, passage_text is the text the listener will hear read aloud. Copy it word for word from the source, including the translation's wording. Remove only page numbers, running headers and footers, line-break hyphens, and verse numbers. If a day has no scripture (a consideration, a review day), use the source's own words for that day. Scanned pages are included as images; transcribe from them exactly.
-
-grace is the grace to ask for that day, in one sentence, taken from the source when it names one. focus is one or two sentences telling the writers what the day is about. image_indexes lists every supplied image that belongs with the day, best first (the listener sees them while praying), or is empty; image_index is the first of them, or -1 for none. An image may serve several days. In images, describe each supplied image briefly for the writers; this text is never shown to the listener."""
+PLAN_FIXED = _prompt("plan_rules")
 
 PLAN_SCHEMA = {
     "type": "object",
@@ -101,43 +97,18 @@ HEART_PRESETS = {
     "christ": _prompt("heart_christ") + "\n\n" + HOUSE_STYLE,
 }
 
-HEART_FIXED = """Length: about {words} words. Reply with only the script inside <script></script> tags."""
+HEART_FIXED = _prompt("heart_format")
 
 DEEP_INSTRUCTIONS = _prompt("deep_dive") + "\n\n" + HOUSE_STYLE
 
-DEEP_FIXED = """{search_note}
-
-Length: about {words} words. Reply with the script inside <script></script> tags, then list the sources you relied on inside <sources></sources> tags, one per line with a URL when you have one. The sources are shown on screen, not read aloud."""
+DEEP_FIXED = _prompt("deep_format")
 
 MAX_PROMPT_CHARS = 60000  # the defaults are long; edited prompts may be too
 
 
 # Spoken guidance around the readings, in the order the lectio sequence uses it.
-# Placeholders: {day}, {title}, {grace}. These are read aloud as written (no model).
-GUIDE_DEFAULTS = {
-    "opening": (
-        "Day {day}. {title}. Settle yourself, and become aware that God is present with you now. "
-        "{grace} Stay with that desire for a few moments."
-    ),
-    "first": (
-        "We will hear today's reading four times. On this first reading, simply listen. "
-        "Notice any word or phrase that catches your attention."
-    ),
-    "second": (
-        "Now the reading a second time. Listen for how these words touch your own life. "
-        "Notice what stirs in you: a memory, a desire, consolation or desolation."
-    ),
-    "third": "The third reading. Listen for what God may be offering you, or asking of you, in these words.",
-    "silence": (
-        "Now rest in silence with the word or phrase that stayed with you. "
-        "Let it pray in you. A bell will mark the end of the silence."
-    ),
-    "last": (
-        "The last reading. Let the words rest in you, then speak to God in your own words, "
-        "as one friend speaks to another."
-    ),
-    "closing": "Thank God for this time of prayer, and close with the Our Father. Amen.",
-}
+# Placeholders: {day}, {title}, {grace}. Read aloud as written, or tailored by GUIDE_TAILOR.
+GUIDE_DEFAULTS = _sections("guide_lines")
 GUIDE_LABELS = {
     "opening": "Opening: asking for the grace",
     "first": "Before the first reading",
@@ -184,25 +155,9 @@ def defaults() -> dict:
     }
 
 
-SEARCH_ON = "Use web search to check specific claims (dates, word meanings, quotations, attributions) before you make them. Prefer scholarly and church sources."
-SEARCH_RESULTS = (
-    "Web search results for this passage are included below, numbered. Check specific claims (dates, word meanings, "
-    "quotations, attributions) against them. In <sources>, list only URLs that appear in the results and that you relied on. "
-    "If the results don't support a claim, leave the claim out or say it is uncertain."
-)
-SEARCH_QUERIES = (
-    "Write three web search queries that would help a writer check facts for a short talk on the theology, history "
-    "and interpretation of the passage below: its historical setting, key words in the original language, and how the "
-    "church has read it. Reply with only the three queries, one per line, no numbering."
-)
-SEARCH_BOTH = (
-    "Web search results from several search services are included below, numbered, as a head start. They vary in "
-    "quality. Use your own web search as fully as the talk deserves: to go deeper, to check specific claims (dates, "
-    "word meanings, quotations, attributions), and to find better sources (scholarly commentaries, church documents, "
-    "the Fathers) wherever the results are thin, off topic or unreliable. Don't let the results limit you. In "
-    "<sources>, list the URLs you relied on, from the results or your own searches."
-)
-SEARCH_OFF = "You cannot search the web. Make only claims you are confident are well established, and say when a point is debated."
+_RESEARCH = _sections("research")  # how the deep dive writer is told to use web research
+SEARCH_ON, SEARCH_RESULTS, SEARCH_QUERIES, SEARCH_BOTH, SEARCH_OFF = (
+    _RESEARCH[k] for k in ("on", "results", "queries", "both", "off"))
 
 
 GUIDE_TAILOR = _prompt("guide_tailor") + "\n\n" + HOUSE_STYLE
@@ -218,13 +173,7 @@ def tailor_input(context: str, heart: str, deep: str, lines: dict) -> str:
     return "\n\n".join(parts)
 
 
-RETREAT_SO_FAR_NOTE = (
-    "This day is one day of a larger retreat, prayed one day at a time. Inside <retreat_so_far> is what the "
-    "listener has already heard on earlier days (most recent first). Don't explain again what was explained "
-    "there. Build on it, and where it helps, connect to it briefly (\"yesterday we heard...\"). Inside "
-    "<coming_days> are the readings for the days still ahead, readings only: you may point lightly toward one "
-    "when it truly connects, but don't preview or explain them. Today's passage stays the center."
-)
+RETREAT_SO_FAR_NOTE = _prompt("retreat_so_far")
 SO_FAR_CHARS = 24000
 
 
