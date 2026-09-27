@@ -990,6 +990,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** New retreat has "Make it personal: shape the reflections with what I've told you in About me", ticked by default; untick it for a general retreat. The choice is kept with the retreat (`personal`), so rebuilding a day later follows it; a general retreat's model calls leave the About me notes out entirely. If About me is empty, the page says it will be a general retreat for now.
 
+### 159. 2026-09-27, 04:15 UTC
+
+> I can't get the screen to render on iOS still
+
+**What was done:** Most likely the phone still held the broken page (GitHub Pages lets it be kept ten minutes, and Home Screen apps sometimes longer), and that page crashes before it can check for an update. Added a start-up guard written into the page itself: any error while opening shows a note with a Reload button and is reported to the server (`POST /api/client-error`, kept per day; `tools/client_errors.py` prints them), and a page that hasn't started after eight seconds checks for a newer version and reloads into it, once.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

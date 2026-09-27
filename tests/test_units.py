@@ -163,3 +163,14 @@ def test_verse_numbers_are_taken_out_of_the_reading():
     assert not any(ch.isdigit() for ch in got) and "in hope that the creation" in got and got.startswith("For I consider")
     assert strip_verse_numbers("He fed about 5000 with five loaves, and 12 baskets were left") == "He fed about 5000 with five loaves, and 12 baskets were left"
     assert strip_verse_numbers("7He gathers the waters.\n8Let all the earth fear") == "He gathers the waters.\nLet all the earth fear"
+
+
+def test_client_errors_are_kept_without_sign_in():
+    from fastapi.testclient import TestClient
+
+    from app import main
+
+    with TestClient(main.app) as client:
+        r = client.post("/api/client-error", json={"message": "x is null", "where": "start.js:12", "version": "61"})
+        assert r.status_code == 204
+        assert client.post("/api/client-error", json={"message": "y" * 5000}).status_code == 422
