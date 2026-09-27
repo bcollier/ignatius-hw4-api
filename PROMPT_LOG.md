@@ -1018,6 +1018,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done (162 and 163):** The close button (top right) had been pushed off the screen: a long part name in the player ("Opening: asking for the grace") couldn't shrink inside its row, so it widened the whole prayer screen (to 439px on a 393px iPhone), cutting off the close button, the text and the third button. The name's box can now shrink, so the name wraps, and the prayer screen can't scroll sideways. Also, every text box is now at least 16px, since iPhone browsers zoom into smaller ones.
 
+### 164. 2026-09-27, 17:28 UTC
+
+> i only see the design spec in the readme linked to IMPROVEMENTS.md, but there was an extensive design spec when the project started. link to the original design spec and build plan in the readme
+
+**What was done:** Found the original documents (September 25, before any code) in the private planning repository, bcollier/ignatius-at-home, which also holds the retreat handout PDFs. With the owner's go-ahead, copied the design spec, technical spec and build plan unchanged into `docs/original-spec/` here (after checking they hold no keys, personal details or quoted handout text), with a short README on where they came from and how the project changed; linked them at the top of both READMEs, in the docs table, and at the start of the build journal. The redesign spec (IMPROVEMENTS.md) is now labelled as such.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
