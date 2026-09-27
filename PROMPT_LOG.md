@@ -922,6 +922,18 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Yes: the painting was cropped to fill a wide frame, so a tall painting lost its top (the Magdalen's face). Now the whole painting shows, never cropped, over a soft blurred copy of itself that fills the frame, and the slow drift is gentler. Also fixed: the header's links ran off the right edge on phones (they now sit on their own row under the name), text could hide behind the buttons, and skipping quickly through the steps left old paintings stacked up underneath.
 
+### 148. 2026-09-27, 03:27 UTC
+
+> Can you install a developer kit that lets you test on a software drive iPhone harness
+
+**What was done:** Checked the Mac: it has Apple's command-line tools but not Xcode, which the iPhone Simulator needs. Xcode comes from the App Store with the owner's Apple ID, so the owner installs it and accepts the licence; after that the iOS runtime can be downloaded and a simulated iPhone driven from the command line (opening pages in iPhone Safari, screenshots, dark mode). Waiting on the Xcode install.
+
+### 149. 2026-09-27, 03:34 UTC
+
+> The screen shows it stopped but it seemed to be still playing . Turning off the screen sometimes stops progress *(with a screenshot of the lock screen, paused at 0:13)*
+
+**What was done:** With the screen off, an iPhone stops a page's timers unless audio is playing, and a page that isn't playing can't start a new sound on its own. The silences and writing pauses played nothing, so the countdown froze and the next clip was refused. Now one audio player plays the whole session in sequence: the narration, then a near-silent track looped through each silence, then the bell, then the next narration. The countdowns run on the clock, so they're right when the screen comes back. The Play/Pause button and the lock screen follow what's really playing; the lock screen shows the step and has play, pause, next and back.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
