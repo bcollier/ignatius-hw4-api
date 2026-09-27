@@ -6,7 +6,7 @@
 >
 > The full documentation, with 26 diagrams: the system and hosting on Render and Supabase, the database ERD, sign-in and guest flows, how a retreat is made step by step, the research services, the prayer player, Talk it over, example retreats, the research page, status lifecycles, every API endpoint with example requests and responses, costs, security, and failure handling.
 >
-> **Live app:** https://bcollier.github.io/ignatius-hw4-web/ · **Frontend repo, with screenshots and the full story:** [ignatius-hw4-web](https://github.com/bcollier/ignatius-hw4-web) · **Every prompt used to build it:** [PROMPT_LOG.md](PROMPT_LOG.md) · **Original design spec and build plan:** [docs/original-spec](docs/original-spec/) ([design](docs/original-spec/design-spec.md), [technical](docs/original-spec/technical-spec.md), [build plan](docs/original-spec/staging-plan.md)) · **Redesign spec:** [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md)
+> **Live app:** https://bcollier.github.io/ignatius-hw4-web/ · **Frontend repo, with screenshots and the full story:** [ignatius-hw4-web](https://github.com/bcollier/ignatius-hw4-web) · **Every prompt used to build it:** [PROMPT_LOG.md](PROMPT_LOG.md) · **Original design spec and build plan:** [docs/original-spec](docs/original-spec/) ([design](docs/original-spec/design-spec.md), [technical](docs/original-spec/technical-spec.md), [build plan](docs/original-spec/staging-plan.md)) · **Redesign spec:** [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) · **Visual redesign spec:** [docs/VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md) · **Code review guidance:** [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md)
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/bcollier/ignatius-hw4-web/main/docs/screenshots/iphone-hero.png" alt="Ignatius at Home on three iPhones" width="820">
@@ -603,7 +603,7 @@ Names only; values go in `.env` or Render's dashboard.
 | `samples/demo/` | The "Come and See" package and `make_demo.py` |
 | `samples/` | Other public-domain sample uploads |
 | `sql/` | `001_retreats.sql`, `002_llm_calls.sql` |
-| `docs/` | `original-spec/` (the design spec, technical spec and build plan written before any code), `ARCHITECTURE.md`, `IMPROVEMENTS.md` (the redesign spec), `CODE_CLEANUP.md` (how the code is organized and kept readable) |
+| `docs/` | `original-spec/` (the design spec, technical spec and build plan written before any code), `ARCHITECTURE.md`, `IMPROVEMENTS.md` (the redesign spec), `VISUAL_REDESIGN.md` (the visual redesign spec, with its mockups), `CODE_CLEANUP.md` (how the code is organized and kept readable), `CODE_REVIEW.md` (how to review a change) |
 
 ---
 

@@ -1054,6 +1054,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** The build journal now opens with "The method: spec-driven, in phases": spec first; building to the spec; a large spec-driven revision (IMPROVEMENTS.md); a deep Clean Code cleanup (with its real numbers from CODE_CLEANUP.md); the prompts rewritten from a brief; a visual redesign from approved mockups; then testing on a real iPhone, every fix logged here.
 
+### 170. 2026-09-27, 17:42 UTC
+
+> add visual redesign spec and code review guidance
+
+**What was done:** Two new documents. [docs/VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md) is the visual redesign spec, assembled from the design conversation: why the earlier look read as AI-made, the "modern book of hours" direction and its eight moves, what was stripped out, the seven approved mockups (rendered from the Claude Design boards into images in `docs/visual-redesign/`), the decisions made on them ("books" became "retreats"; keep the drifting paintings), and a table of what was built and what wasn't ("Look closer" zooms). [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md) is code review guidance: how a change should arrive (from a spec, logged), the Clean Code principles, and checklists for the API and for the web app on iPhones, each tied to a real bug found in this project. Both are linked from the READMEs and the build method; the design section no longer mentions the "today's colors" dots, which were removed.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
