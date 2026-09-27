@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 194 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 195 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1204,6 +1204,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 > the sign up email give me an 8 digit code, the sign in box says it is looking for a 6 digit code. when I put the code in just now it was rejected
 
 **What was done:** This Supabase project issues eight-digit email codes, and the app sent every eight-digit code to the browser-code exchange (whose codes are also eight digits), so the email's code was rejected. Now any code is first checked with Supabase against the email address it went to, and only if that fails is an eight-digit code tried as a browser code; the page asks for "the code from the email" without a length.
+
+### 195. 2026-09-27, 19:53 UTC
+
+> in the web repo none of the screenshots show the talking to a companion screen
+
+**What was done:** Took two screenshots of Talk it over with the Come and See example: on a laptop before a conversation (what the companion knows, the voice, Start talking), and on an iPhone during one, with the orb in its speaking state and a short sample exchange (labelled as a sample, since a live call can't be captured headless). Added them to the frontend README's screenshots and to its Talk it over section.
 
 ---
 
