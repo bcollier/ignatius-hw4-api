@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from .. import llm_log, profile
+from .. import google_docs, llm_log, profile
 from ..auth import User, current_user
 from ..extract import ExtractError, extract
 from .uploads import read_upload
@@ -39,6 +39,25 @@ async def upload_profile(file: UploadFile = File(...), user: User = Depends(curr
         raise HTTPException(400, "No text found in that file.")
     llm_log.tag(user_id=user.id, email=user.log_email)
     return await profile.save(user.id, text, None, user.full, source=file.filename or "upload")
+
+
+class GoogleDocRequest(BaseModel):
+    link: str
+
+
+@router.post("/google-doc")
+async def profile_from_google_doc(body: GoogleDocRequest, user: User = Depends(current_user)):
+    """Replace the about-me notes with a Google Doc shared as "Anyone with the link can
+    view" (on a phone, Google Docs can't be picked as files)."""
+    try:
+        filename, data = await google_docs.fetch(body.link)
+    except google_docs.GoogleDocError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    text = _text_of(filename, data)
+    if not text.strip():
+        raise HTTPException(400, "That Google Doc has no text in it.")
+    llm_log.tag(user_id=user.id, email=user.log_email)
+    return await profile.save(user.id, text, None, user.full, source=filename)
 
 
 def _text_of(filename: str, data: bytes) -> str:

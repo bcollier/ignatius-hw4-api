@@ -946,6 +946,22 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Sign-in is now two steps on one card: email me a sign-in link, then "Then paste the link here" appears at once, with how to copy the link on a phone ("Already have a sign-in link? Paste it" opens it directly). On the guest card, an email that already has an account now offers "Sign in to that account instead", which leaves the guest session, sends the link and shows the paste box; the card also has "I already have an account: sign in".
 
+### 152. 2026-09-27, 03:50 UTC
+
+> Do a web search for screen names that would be good for this app and cheap
+
+*(and, a moment later, at 03:50 UTC:)* 
+
+> I mean web address url like ignatiusretreat.com
+
+**What was done:** Searched current registrar prices (a .com is about $10 to $11 a year at Porkbun or Cloudflare, the same at renewal; .app about $10, then about $15 a year) and checked about forty names against the registries themselves. Available: ignatiusretreat.com, ignatiusathome.com, ignatiusathome.app, pocketretreat.com, eveningexamen.com and more; taken: retreatathome.com, ignatianretreat.com, examen.app, comeandsee.app and others. Suggested ignatiusathome.com with ignatiusretreat.com pointing to it (about $21 a year); GitHub Pages can serve the site at a custom address for free.
+
+### 153. 2026-09-27, 03:54 UTC
+
+> On iPhone this pops up iCloud I can't choose Google Docs or drive *(with a screenshot of the About me page)*
+
+**What was done:** An iPhone's file picker shows Google Drive only when the Drive app is installed and turned on in Files, and even then Google Docs often can't be picked as files. About me now also takes a Google Doc link (shared as "Anyone with the link can view"), read the same way as a retreat's Google Doc source: `POST /api/profile/google-doc`.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

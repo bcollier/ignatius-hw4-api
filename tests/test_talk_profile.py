@@ -191,3 +191,20 @@ def test_companion_prompt_can_be_replaced(client, monkeypatch):
     client.put("/api/profile", json={"companion_prompt": ""})  # back to the default
     client.post("/api/talk/session", json={"provider": "openai", "sdp": "o"})
     assert seen["instructions"].startswith(talk.COMPANION[:40])
+
+
+def test_about_me_from_a_google_doc(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app import google_docs, main
+
+    async def fetch(link):
+        if "bad" in link:
+            raise google_docs.GoogleDocError(google_docs.NOT_SHARED)
+        return "About me.txt", b"I teach, and I pray best at dawn."
+
+    monkeypatch.setattr(google_docs, "fetch", fetch)
+    with TestClient(main.app) as client:
+        assert client.post("/api/profile/google-doc", json={"link": "https://docs.google.com/document/d/bad/edit"}).status_code == 400
+        r = client.post("/api/profile/google-doc", json={"link": "https://docs.google.com/document/d/abc/edit"})
+        assert r.status_code == 200 and "pray best at dawn" in r.json()["about"]
