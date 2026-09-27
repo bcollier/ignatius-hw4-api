@@ -1060,6 +1060,28 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Two new documents. [docs/VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md) is the visual redesign spec, assembled from the design conversation: why the earlier look read as AI-made, the "modern book of hours" direction and its eight moves, what was stripped out, the seven approved mockups (rendered from the Claude Design boards into images in `docs/visual-redesign/`), the decisions made on them ("books" became "retreats"; keep the drifting paintings), and a table of what was built and what wasn't ("Look closer" zooms). [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md) is code review guidance: how a change should arrive (from a spec, logged), the Clean Code principles, and checklists for the API and for the web app on iPhones, each tied to a real bug found in this project. Both are linked from the READMEs and the build method; the design section no longer mentions the "today's colors" dots, which were removed.
 
+### 171. 2026-09-27, 17:47 UTC
+
+> is all this pushed to github main?
+
+**What was done:** Checked: both repositories on `main`, nothing uncommitted, local and GitHub at the same commit.
+
+### 172. 2026-09-27, 17:55 UTC
+
+> check both repos for any API keys, secrets, or other security concerns
+
+**What was done:** Scanned the full history of both repositories with gitleaks (84 and 70 commits: no leaks), and searched every commit for the actual values of the twelve secret keys in `.env` (none appear; `.env` has always been ignored). The only personal data is the owner's own email (the premium allowlist), in the prompt log, ARCHITECTURE.md and a test. Reviewed the code: the nine routes open without sign-in are the intended ones (health, public settings, examples, error reports, the code exchange); the local file server isn't present in production; example files can't be read outside their folder; `/api/options` exposes only the public Supabase settings; other people see an example's build log with the owner's About me notes replaced by "[private]"; the printable PDF escapes all text; CORS allows only the real site; and pip-audit finds no known vulnerabilities. One fix: links on the research page came straight from web search results, so a result with a `javascript:` address could have run code when clicked; now only http and https addresses become links.
+
+### 173. 2026-09-27, 17:56 UTC
+
+> if htey are merged they can be squashed right ? *(with a screenshot of GitHub's branches page showing `redesign`)*
+
+### 174. 2026-09-27, 17:56 UTC
+
+> same here *(the other repository's branches page)*
+
+**What was done (173 and 174):** Both `redesign` branches are fully merged into `main` (no commits of their own), so they can be deleted without losing anything; squashing isn't needed.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
