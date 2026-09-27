@@ -844,6 +844,30 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** The app asks for the microphone right on the tap, so the refusal comes from the phone or browser. On an iPhone the browser asks only once per site; after that, or when the phone blocks the microphone for the browser, it refuses without asking. The message now says exactly where to allow it for the browser in use (for Chrome on iPhone: Settings, Apps, Chrome, Microphone), and shows the error name in small print.
 
+### 135. 2026-09-27, 01:22 UTC
+
+> Create a feature that narrates the user though these steps of a prayer practiced. The voice narrates and leaves blank time like 2 minutes and a two minute timer to journal answer to a question. So choice of audio model that is deluxe like eleven labs and a standard model like the Microsoft text to speech. Compare prices of eleven labs credit for tts vs free for the voice of narrating this much text . Use Claude opus 5.5 model to generate narration script and calculate how much time to wait in between each question to journal answer. *(with a photo of the "Creating a Prayer Practice" handout)*
+
+**What was done:** A new Practice page (in the header once signed in). Claude Opus 5.5 wrote two guided sessions from the handout, a daily prayer practice (about 17 minutes) and a weekly review (about 11 minutes), and chose the length of every silence and journaling pause. The narration was recorded once in a free Microsoft voice (Ava) and an ElevenLabs voice (Sarah), and the person picks between them. Silences show a countdown ring and end with a soft bell; journaling pauses give a writing box, and each answer is saved to the account. The weekly review shows the week's notes. Cost: the narration for all three sessions is 7,071 characters, which ElevenLabs charged at 3,535 credits (about 2.5% of a month's credits, roughly $1 to $2); the Microsoft voice is free; the Opus scripts cost about $0.30, once.
+
+### 136. 2026-09-27, 01:24 UTC
+
+> Create an exercise in the app that narrates me through these steps while I write. Put a timer on how long it things I should write in response to each question to get 30 minutes total of a session of reflection *(with a photo of the "Disposition Days, Unit 2, Day 3" dossier handout)*
+
+**What was done:** A third session, "Your Life's Faith Story", paraphrased from the handout (adapted from Margaret Silf's *Inner Compass*, credited). Opus 5.5 set the writing time for each question so that the whole session comes to about 30 minutes: 3:00, 3:00, 4:50, 4:50, 3:00 and 3:00, with two minutes of silence with God at the end. A retreat's dossier exercise day now has a "Do the guided exercise" button.
+
+### 137. 2026-09-27, 01:25 UTC
+
+> This one only needs to be made once since it will be the same each day
+
+**What was done:** The sessions are generated and recorded once and shipped with the web app, so every person and every day uses the same audio and nothing is paid for again.
+
+### 138. 2026-09-27, 01:27 UTC
+
+> What is a dossier
+
+**What was done:** Answered: a file of papers about a person; here, a written summary of your life's faith story (people, places, turning points, where God seemed near or far) that you bring into a retreat.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
