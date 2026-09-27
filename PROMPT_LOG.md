@@ -1088,6 +1088,34 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Checked collier.phd: its mail already runs on Google Workspace and its SPF record authorizes Google, so the simplest setup is Supabase sending through the owner's Google account with an app password (smtp.gmail.com, port 465), with no DNS changes; Resend stays documented as the alternative. `docs/email-templates.md` now has the setup steps, and the Magic Link and Confirm templates include the six-digit code (`{{ .Token }}`) beside the link. The app's code box takes that six-digit code (checked by Supabase with the email address it went to), so a Home Screen app can sign in straight from the email, as well as the eight-digit code from a signed-in browser.
 
+### 176. 2026-09-27, 18:11 UTC
+
+> I don't see templates, take over browser https://supabase.com/dashboard/project/…/auth/templates
+
+**What was done:** Opened the page in Chrome; Supabase asked to sign in, which the owner does (Claude doesn't sign in to accounts). Explained that Supabase keeps the templates locked until custom SMTP is on, so SMTP comes first.
+
+### 177. 2026-09-27, 18:13 UTC
+
+> i do'nt see docs/emial-templatse on github
+
+**What was done:** It's in the backend repository: `ignatius-hw4-api/docs/email-templates.md`.
+
+### 178. 2026-09-27, 18:16 UTC
+
+> ok all done we good to try now?
+
+### 179. 2026-09-27, 18:17 UTC
+
+> oh you are on the mac mini, I'm on the laptop
+
+**What was done (178 and 179):** The owner set up SMTP and the templates on the laptop; the Mac mini's Chrome isn't signed in to Supabase, so the settings were tested by trying a sign-in instead. Closed the tab.
+
+### 180. 2026-09-27, 18:19 UTC
+
+> i still got the paste a link sign in page *(with a screenshot of the sign-in page on a laptop)*
+
+**What was done:** The code box was shown only on iPhones. Now that the sign-in email carries a six-digit code, the code box shows on every device ("Then enter the code from the email", or just click the link), and pasting the link is folded away as a last resort.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
