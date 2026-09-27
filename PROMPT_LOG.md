@@ -934,6 +934,18 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** With the screen off, an iPhone stops a page's timers unless audio is playing, and a page that isn't playing can't start a new sound on its own. The silences and writing pauses played nothing, so the countdown froze and the next clip was refused. Now one audio player plays the whole session in sequence: the narration, then a near-silent track looped through each silence, then the bell, then the next narration. The countdowns run on the clock, so they're right when the screen comes back. The Play/Pause button and the lock screen follow what's really playing; the lock screen shows the step and has play, pause, next and back.
 
+### 150. 2026-09-27, 03:45 UTC
+
+> Why are follow me and come and see using the same cover art we need more variety of striking images not duplicate *(with screenshots of the home page)*
+
+**What was done:** "Follow Me" is Day 1 of Come and See, and a retreat's cover was its first day's painting, so with Come and See in the Today card the same painting showed twice. The retreat list now sends every day's painting, and a cover never repeats the painting in the Today card: it uses another day's (for Come and See on Day 1, Day 2's).
+
+### 151. 2026-09-27, 03:46 UTC
+
+> Should just switch to a login and send magic link with option to paste magic link *(with a screenshot of the guest card: "A user with this email address has already been registered")*
+
+**What was done:** Sign-in is now two steps on one card: email me a sign-in link, then "Then paste the link here" appears at once, with how to copy the link on a phone ("Already have a sign-in link? Paste it" opens it directly). On the guest card, an email that already has an account now offers "Sign in to that account instead", which leaves the guest session, sends the link and shows the paste box; the card also has "I already have an account: sign in".
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

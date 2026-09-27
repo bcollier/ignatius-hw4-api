@@ -58,6 +58,10 @@ def summary(retreat: dict) -> dict:
         "start_date": retreat.get("start_date"),
         "progress": retreat.get("progress"),
         "cover_path": images[first]["path"] if first is not None else None,  # the API turns this into a URL
+        # Each day's first painting, so the library can choose a cover that isn't the
+        # painting already shown for today's day (the API turns these into URLs too).
+        "day_cover_paths": [{"day": int(n), "path": images[i]["path"]} for n, d in sorted(plan_days.items(), key=lambda kv: int(kv[0]))
+                            for i in (d.get("image_indexes") or [d.get("image_index", -1)])[:1] if 0 <= i < len(images)],
         # One entry per day, for the library's day chips and the Continue card.
         "day_states": [
             {

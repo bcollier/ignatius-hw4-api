@@ -47,10 +47,13 @@ async def _example_summaries(user: User, registered: dict) -> list[dict]:
 
 
 async def _add_cover_urls(summaries: list[dict]) -> None:
-    """Each summary's cover image path becomes a URL (one batch of signed URLs)."""
-    urls = await store.urls([p for r in summaries if (p := r.get("cover_path"))])
+    """Each summary's cover image paths become URLs (one batch of signed URLs)."""
+    paths = {p for r in summaries if (p := r.get("cover_path"))}
+    paths |= {c["path"] for r in summaries for c in r.get("day_cover_paths", [])}
+    urls = await store.urls(sorted(paths))
     for r in summaries:
         r["cover"] = urls.get(r.pop("cover_path", None))
+        r["day_covers"] = [{"day": c["day"], "url": urls.get(c["path"])} for c in r.pop("day_cover_paths", []) if urls.get(c["path"])]
 
 
 # ---------------------------------------------------------------- making a retreat
