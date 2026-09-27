@@ -1024,6 +1024,18 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** Found the original documents (September 25, before any code) in the private planning repository, bcollier/ignatius-at-home, which also holds the retreat handout PDFs. With the owner's go-ahead, copied the design spec, technical spec and build plan unchanged into `docs/original-spec/` here (after checking they hold no keys, personal details or quoted handout text), with a short README on where they came from and how the project changed; linked them at the top of both READMEs, in the docs table, and at the start of the build journal. The redesign spec (IMPROVEMENTS.md) is now labelled as such.
 
+### 165. 2026-09-27, 17:34 UTC
+
+> add links and specifics, which web research servcies (six web research services) , links to elevenlabs voices , on this diagram specify wht "for the heart" is and "deep dive"
+
+**What was done:** The backend README's "Inside a day" diagram now says what each part is (the reading; For the heart, a short spoken reflection on what God may want the listener to know in their heart, in a companion's voice or Jesus speaking; the deep dive, a close reading of setting, original-language words, how the Church has read it and open questions), names the six research services and the default voices, and is followed by a table with each part's prompt, model and default voices (linked to their samples) and linked lists of the research services (Brave Search, Brave Answers, Exa, Tavily, Firecrawl, Linkup, and Claude's own web search) and voice providers (Microsoft through edge-tts, ElevenLabs and its voice library). The "system at a glance" diagram and table name them too, with links.
+
+### 166. 2026-09-27, 17:34 UTC
+
+> make sure opus 5.5 is hte default *(quoting the README's model table, which called Claude Opus 5 the premium default)*
+
+**What was done:** The live server already defaulted to Opus 5.5 (`LLM_MODEL`), but the documents said Opus 5. Fixed the model tables in both READMEs, the settings tables, the architecture diagram and the example API responses in ARCHITECTURE.md (their costs recalculated at Opus 5.5's $4 / $20 per million tokens), and the model menu now lists "Claude Opus 5.5 (default)" first. Opus 5.5 is also cheaper than Opus 5 ($5 / $25).
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

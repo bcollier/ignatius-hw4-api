@@ -17,8 +17,8 @@ log = logging.getLogger(__name__)
 
 # (OpenRouter id, Anthropic API id, label). Older models use the basic web search tool.
 MODELS = [
+    ("anthropic/claude-opus-5.5", "claude-opus-5-5", "Claude Opus 5.5 (default)"),
     ("anthropic/claude-opus-5", "claude-opus-5", "Claude Opus 5"),
-    ("anthropic/claude-opus-5.5", "claude-opus-5-5", "Claude Opus 5.5"),
     ("anthropic/claude-fable-5.1", "claude-fable-5-1", "Claude Fable 5.1 (most capable)"),
     ("anthropic/claude-sonnet-5", "claude-sonnet-5", "Claude Sonnet 5 (faster, cheaper)"),
     ("anthropic/claude-haiku-4.5", "claude-haiku-4-5", "Claude Haiku 4.5 (fastest, cheapest)"),

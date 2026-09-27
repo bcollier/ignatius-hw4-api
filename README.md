@@ -72,13 +72,13 @@ flowchart LR
         ST[("Storage<br/>private bucket")]
     end
     subgraph WRITE["Writing"]
-        OR["OpenRouter<br/>Claude + web search"]
+        OR["OpenRouter<br/>Claude Opus 5.5 (default)<br/>+ Claude web search"]
         JS["Jetstream2<br/>Muse Glimmer, Llama 4 Scout"]
         RS["Research services<br/>Brave, Brave Answers, Exa,<br/>Tavily, Firecrawl, Linkup"]
     end
     subgraph VOICE["Voices"]
-        EDGE["Microsoft voices<br/>(edge-tts, free)"]
-        ELEVEN["ElevenLabs<br/>(premium)"]
+        EDGE["Microsoft voices (edge-tts, free)<br/>Ava, Andrew, Christopher, Emma,<br/>Brian, Aria, Ryan, Sonia"]
+        ELEVEN["ElevenLabs (premium)<br/>Sarah, George, Brian, Alice,<br/>Bill, Lily"]
     end
     subgraph LIVE["Live conversation"]
         GPT["OpenAI GPT-Live<br/>(WebRTC)"]
@@ -110,8 +110,8 @@ flowchart LR
 | Database | Supabase Postgres | One row per retreat (the retreat is a JSON document), and a row per model call. |
 | Files | Supabase Storage | Images, every MP3, research records, notes about the person, conversation memory. Private; signed URLs. |
 | Writing | Claude through OpenRouter (premium); Jetstream2 open models (free) | Planning, reflections, deep dives, tailoring the guidance, condensing notes. |
-| Research | Six web search services | Research for deep dives: all of it for free models, a head start before Claude's own web search for premium. |
-| Voices | Microsoft (free), ElevenLabs (premium) | Scripts to MP3. |
+| Research | Six web search services: [Brave Search](https://brave.com/search/api/), [Brave Answers](https://brave.com/search/api/), [Exa](https://exa.ai), [Tavily](https://tavily.com), [Firecrawl](https://www.firecrawl.dev), [Linkup](https://www.linkup.so) | Research for deep dives: all of it for free models, a head start before [Claude's own web search](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/web-search-tool) for premium. |
+| Voices | [Microsoft neural voices](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support) through [edge-tts](https://github.com/rany2/edge-tts) (free); [ElevenLabs](https://elevenlabs.io) premade voices (premium). [Hear every voice](https://github.com/bcollier/ignatius-hw4-web#7-voices-hear-them-and-compare). | Scripts to MP3. |
 | Conversation | OpenAI GPT-Live, xAI Grok voice | Talk it over. |
 
 ---
@@ -184,15 +184,33 @@ The parts are written in the order they are heard, and each sees what came befor
 
 ```mermaid
 flowchart LR
-    READ["The reading<br/>(recorded at once)"]
-    HEART["For the heart<br/>written first"] --> DEEP["Deep dive<br/>sees the reflection,<br/>researched on the web"]
-    DEEP --> GUIDE["Spoken guidance<br/>tailored to both"]
-    HEART -. recorded when written .-> REC[("MP3s in Storage")]
-    DEEP -. recorded .-> REC
-    GUIDE -. recorded .-> REC
-    READ -.-> REC
+    READ["<b>The reading</b><br/>the day's passage, word for word<br/>from the source (recorded at once)"]
+    HEART["<b>For the heart</b><br/>a short spoken reflection to the listener:<br/>what God may want them to know in their heart<br/>(a companion's voice, or Jesus speaking,<br/>in Ignatian imaginative prayer)<br/>written first"]
+    DEEP["<b>Deep dive</b><br/>a close reading of the passage: its setting,<br/>original-language words, how the Church<br/>has read it, open questions<br/>sees the reflection"]
+    WEB["<b>Web research</b><br/>six services at once: Brave Search, Brave Answers,<br/>Exa, Tavily, Firecrawl, Linkup<br/>+ Claude's own web search (premium)"]
+    GUIDE["<b>Spoken guidance</b><br/>the grace, the four readings, silence, colloquy<br/>tailored to both"]
+    VOICES["<b>Voices</b><br/>free: Microsoft Ava, Andrew, Christopher<br/>premium: ElevenLabs Sarah, George, Brian, Alice"]
+    HEART --> DEEP
+    WEB --> DEEP
+    DEEP --> GUIDE
+    READ -.-> VOICES
+    HEART -. recorded when written .-> VOICES
+    DEEP -. recorded .-> VOICES
+    GUIDE -. recorded .-> VOICES
+    VOICES --> REC[("MP3s in Storage")]
     DEEP -. research record .-> RJ[("day n research.json")]
 ```
+
+| Part | What it is | Written by | Default voice (free · premium) |
+| --- | --- | --- | --- |
+| **The reading** | The day's passage, copied word for word from the uploaded material (or the World English Bible, for a retreat made from an idea), read four times in the lectio divina pattern | Nobody: it's the source text | [Andrew](https://bcollier.github.io/ignatius-hw4-web/samples/voices/free-andrew.mp3) · [George](https://bcollier.github.io/ignatius-hw4-web/samples/voices/premium-george.mp3) |
+| **For the heart** | A short reflection spoken to the listener, about what God may want them to know in their heart through this passage: in a companion's voice, or, if chosen, the voice of Jesus in the manner of Ignatian imaginative prayer ([prompt](app/prompt_texts/heart_companion.md), [Jesus version](app/prompt_texts/heart_christ.md)) | Claude Opus 5.5 by default (premium) or an open model on Jetstream2 (free) | [Andrew](https://bcollier.github.io/ignatius-hw4-web/samples/voices/free-andrew.mp3) · [Brian](https://bcollier.github.io/ignatius-hw4-web/samples/voices/premium-brian.mp3) |
+| **Deep dive** | A close reading for the mind: where and when the passage was written, key words in the original Hebrew or Greek, how the Church and its teachers have read it, and the real open questions; written knowing what the reflection said, from web research ([prompt](app/prompt_texts/deep_dive.md)) | The same model, with the research below | [Christopher](https://bcollier.github.io/ignatius-hw4-web/samples/voices/free-christopher.mp3) · [Alice](https://bcollier.github.io/ignatius-hw4-web/samples/voices/premium-alice.mp3) |
+| **Spoken guidance** | The short lines that lead the prayer: asking for the day's grace, introducing each reading, the silence between two bells, the colloquy and closing, tailored to the day's reflection and deep dive ([prompt](app/prompt_texts/guide_tailor.md)) | The same model | [Ava](https://bcollier.github.io/ignatius-hw4-web/samples/voices/free-ava.mp3) · [Sarah](https://bcollier.github.io/ignatius-hw4-web/samples/voices/premium-sarah.mp3) |
+
+**The six web research services** (all at once by default, results interleaved and deduplicated; see [section 5](#5-research-all-the-free-services-at-once)): [Brave Search](https://brave.com/search/api/) (Brave's own independent index), [Brave Answers](https://brave.com/search/api/) (a cited AI answer from that index), [Exa](https://exa.ai) (search by meaning, good for essays and commentary), [Tavily](https://tavily.com) (cleaned page extracts for AI agents), [Firecrawl](https://www.firecrawl.dev) (reads whole pages), and [Linkup](https://www.linkup.so) (standard search, and a slower deep mode offered on its own). Premium deep dives also use [Claude's own web search](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/web-search-tool), up to five searches.
+
+**The voices:** free voices are [Microsoft neural voices](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support) through [edge-tts](https://github.com/rany2/edge-tts); premium voices are [ElevenLabs](https://elevenlabs.io) premade voices ([voice library](https://elevenlabs.io/voice-library)). Every voice the app offers can be heard in the [frontend README's voice samples](https://github.com/bcollier/ignatius-hw4-web#7-voices-hear-them-and-compare), and each part's voice can be changed when making a retreat.
 
 - **Background for every call.** Every prompt to every model starts with `prompts.BACKGROUND` (the Exercises and their four weeks, the Principle and Foundation, asking for a grace, imaginative contemplation, colloquy, repetition, consolation and desolation, the Examen, Annotations 15 and 19, lectio divina per Guigo II and *Verbum Domini* 87, and how a day is prayed in this app), then the person's About me notes. It is added where calls go out (`llm._call`, `jetstream.complete`), so nothing can skip it.
 - **House style for listening:** plain paragraphs, no lists, parentheses or dashes, no verse numbers, and never inventing a Hebrew or Greek word, a variant, a quotation or a fact.
@@ -418,7 +436,7 @@ The full shape of the retreat document is diagrammed in [ARCHITECTURE.md §3.2](
 | | Full mode (emails on `ALLOWED_EMAILS`) | Free mode (everyone else, and guests) |
 | --- | --- | --- |
 | Sign-in | Email link | Email link, or **Try it without an account** (anonymous; add an email later to keep the retreats) |
-| Models | Claude via OpenRouter: Opus 5 (default), Opus 5.5, Fable 5.1, Sonnet 5, Haiku 4.5 | Jetstream2: Muse Glimmer (default) or Llama 4 Scout |
+| Models | Claude via OpenRouter: Opus 5.5 (default), Opus 5, Fable 5.1, Sonnet 5, Haiku 4.5 | Jetstream2: Muse Glimmer (default) or Llama 4 Scout |
 | Deep-dive research | The six free services combined as a head start, then Claude's own web search at full depth | Six services, combined by default |
 | Voices | Microsoft and ElevenLabs, mixed freely | Microsoft |
 | Talk it over | Up to 30 minutes a call | 60 seconds a day |
@@ -530,7 +548,7 @@ Names only; values go in `.env` or Render's dashboard.
 | `OPENROUTER_API_KEY` | | Claude through OpenRouter |
 | `ANTHROPIC_API_KEY` | | Claude directly, if no OpenRouter key |
 | `LLM_MODE` | from keys | `openrouter`, `anthropic` or `stub` |
-| `LLM_MODEL` | `anthropic/claude-opus-5` | Default model |
+| `LLM_MODEL` | `anthropic/claude-opus-5.5` | Default model |
 | `WEB_SEARCH` | `1` | Web search for the deep dive |
 | `ELEVENLABS_API_KEY`, `ELEVENLABS_MODEL`, `ELEVENLABS_USD_PER_1K_CHARS` | / `eleven_multilingual_v2` / `0.30` | Premium voices |
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_BUCKET` | / / / `retreats` | Sign-in, database, storage |

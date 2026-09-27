@@ -58,7 +58,7 @@ flowchart LR
         OR["OpenRouter<br/>Anthropic-compatible API"]
         JS["Jetstream2 inference<br/>(Open WebUI proxy, OpenAI-compatible)<br/>free mode"]
         TV["Research services<br/>Brave Search · Exa · Tavily · Firecrawl<br/>Linkup · Brave Answers<br/>free mode"]
-        CLAUDE["Claude<br/>(Opus 5 by default)<br/>+ web search"]
+        CLAUDE["Claude<br/>(Opus 5.5 by default)<br/>+ web search"]
         EDGE["Microsoft neural voices<br/>(edge-tts, free)"]
         ELEVEN["ElevenLabs<br/>(premium voices)"]
     end
@@ -900,7 +900,7 @@ Base URL: `https://ignatius-hw4-api.onrender.com` (production) or `http://localh
 ### `GET /api/health`
 
 ```json
-{"ok": true, "llm": "openrouter", "model": "anthropic/claude-opus-5", "tiers": ["free", "premium"], "sign_in": true}
+{"ok": true, "llm": "openrouter", "model": "anthropic/claude-opus-5.5", "tiers": ["free", "premium"], "sign_in": true}
 ```
 
 ### `GET /api/options`
@@ -922,10 +922,11 @@ Everything the page needs before sign-in.
   },
   "limits": {"max_upload_mb": 15, "max_pages": 40},
   "models": [
+    {"id": "anthropic/claude-opus-5.5", "label": "Claude Opus 5.5 (default)", "input_per_m": 4.0, "output_per_m": 20.0, "web_search_each": 0.01},
     {"id": "anthropic/claude-opus-5", "label": "Claude Opus 5", "input_per_m": 5.0, "output_per_m": 25.0, "web_search_each": 0.01},
     {"id": "anthropic/claude-haiku-4.5", "label": "Claude Haiku 4.5 (fastest, cheapest)", "input_per_m": 1.0, "output_per_m": 5.0, "web_search_each": 0.01}
   ],
-  "default_model": "anthropic/claude-opus-5",
+  "default_model": "anthropic/claude-opus-5.5",
   "web_search": true,
   "elevenlabs": {"usd_per_1k_chars": 0.3, "balance": {"tier": "free", "used": 523, "limit": 10000, "remaining": 9477}},
   "auth": {"url": "https://<project>.supabase.co", "publishable_key": "sb_publishable_…"}
@@ -975,8 +976,8 @@ The whole retreat, with signed URLs. A trimmed example of a built day; the token
   "id": "2e048ec8-…",
   "filename": "loose-passages-web.pdf",
   "status": "ready",
-  "model": "anthropic/claude-opus-5",
-  "costs": {"plan": {"model": "anthropic/claude-opus-5", "input_tokens": 3120, "output_tokens": 5410, "web_searches": 0, "usd": 0.1509}},
+  "model": "anthropic/claude-opus-5.5",
+  "costs": {"plan": {"model": "anthropic/claude-opus-5.5", "input_tokens": 3120, "output_tokens": 5410, "web_searches": 0, "usd": 0.1207}},
   "source": {"kind": "pdf", "pages": 2, "characters": 2543, "images": 1, "scanned_pages": 0, "truncated": false},
   "images": [{"index": 0, "page": 2, "description": "Rembrandt, The Return of the Prodigal Son…", "path": "…/image0.jpg", "url": "https://…supabase.co/storage/v1/object/sign/retreats/…/image0.jpg?token=…"}],
   "plan": {
@@ -1002,7 +1003,7 @@ The whole retreat, with signed URLs. A trimmed example of a built day; the token
         "first":   {"status": "ready", "script": "We will hear today's reading four times…", "seconds": 9.4, "url": "…"}
       },
       "cost": {
-        "llm": {"model": "anthropic/claude-opus-5", "input_tokens": 52340, "output_tokens": 6120, "web_searches": 5, "usd": 0.4647},
+        "llm": {"model": "anthropic/claude-opus-5.5", "input_tokens": 52340, "output_tokens": 6120, "web_searches": 5, "usd": 0.3818},
         "voice_characters": {"free": 6630, "premium": 2310},
         "voice_usd": 0.693,
         "total_usd": 1.1577
@@ -1039,7 +1040,7 @@ Deletes the row and all its files. **409** while a job is running for it.
 {
   "voices": {"guide": "en-US-AvaMultilingualNeural", "reading": "en-US-AndrewMultilingualNeural",
              "heart": "nPczCjzI2devNBz1zQrb", "deep": "en-US-ChristopherNeural"},
-  "model": "anthropic/claude-opus-5",
+  "model": "anthropic/claude-opus-5.5",
   "heart_prompt": "…optional…",
   "deep_prompt": "…optional…",
   "guide": {"closing": ""},
@@ -1267,7 +1268,7 @@ flowchart LR
 | `OPENROUTER_API_KEY` | | Claude through OpenRouter |
 | `ANTHROPIC_API_KEY` | | Claude directly, if no OpenRouter key |
 | `LLM_MODE` | from keys | `openrouter`, `anthropic` or `stub` |
-| `LLM_MODEL` | `anthropic/claude-opus-5` | Default model |
+| `LLM_MODEL` | `anthropic/claude-opus-5.5` | Default model |
 | `WEB_SEARCH` | `1` | Web search for the deep dive |
 | `ELEVENLABS_API_KEY` | | Enables premium voices |
 | `ELEVENLABS_MODEL` | `eleven_multilingual_v2` | ElevenLabs voice model |
