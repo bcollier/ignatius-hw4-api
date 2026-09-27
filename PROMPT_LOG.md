@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 206 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 209 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1274,6 +1274,24 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 > add a "Save my defaults" button so that once I choose these voices when I make the next retreat I have these the same way *(with a screenshot of the Voices menus)*
 
 **What was done:** "Save my defaults" (under the voices, and at the end of Advanced) saves every choice in Advanced (voices, models, research, the reflection's voice, prompts, guidance) to the account (`GET`/`PUT /api/profile/defaults`). Signing in on any device applies the saved defaults once whenever they're newer; changes after that stay on the device until saved again. Tested by wiping a browser's storage and seeing the saved voices come back.
+
+### 207. 2026-09-27, 20:52 UTC
+
+> generate a Google docs version of a retreat, create it using google docs, then have a "see example" link below the google doc which would open to a google doc example of a retreat. a short one, a long one, etc.
+
+**What was done:** Created four example source documents as Google Docs in a Drive folder, "Ignatius at Home: example retreat documents", all public-domain World English Bible text: a short three-day handout (Called by Name), loose passages with no days (Rest and Return, for the app to plan), a five-day handout with graces and focus (Be Still), and a six-day longer handout (I Am). Each begins with a line on what it shows. New retreat now has "or use a Google Doc" (the server already read Google Docs; the page never had a place for the link) with "See an example" listing the four. The folder must be shared as "Anyone with the link can view" for the links, and for trying them in the app, to work; the Drive tools available can't set link sharing, so the owner does that once.
+
+### 208. 2026-09-27, 20:55 UTC
+
+> for this "sign in using your phone" with a QR code that gives instant access *(with a screenshot of the browser's sign-in code)*
+
+**What was done:** The code box is now "Sign in on your phone", with a QR code beside the eight-digit code: a link to the app carrying the code, so scanning it with the phone's camera opens the app in the phone's browser and signs in at once (the code is then taken out of the address). A Home Screen app can't be opened by a link, so there the code is still typed. "On your phone" in the header opens it from any page on the laptop, as does About me. The QR library, qrcode-generator 2.0.4 (MIT), is served with the app; the rendered code was decoded to check it carries the right link.
+
+### 209. 2026-09-27, 20:57 UTC
+
+> give people an example of a "what i'm looking for in a conversation companion, link to a google doc public with some form of mine is pretty good *(followed by the author's own companion notes)*
+
+**What was done:** Added the author's notes as a Google Doc in the same folder ("Example: What I'm looking for in the conversation companion", with a line saying to write one's own in one's own words), linked as "See an example" under that box on About me.
 
 ---
 
