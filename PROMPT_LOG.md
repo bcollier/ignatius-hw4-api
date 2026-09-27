@@ -1036,6 +1036,24 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** The live server already defaulted to Opus 5.5 (`LLM_MODEL`), but the documents said Opus 5. Fixed the model tables in both READMEs, the settings tables, the architecture diagram and the example API responses in ARCHITECTURE.md (their costs recalculated at Opus 5.5's $4 / $20 per million tokens), and the model menu now lists "Claude Opus 5.5 (default)" first. Opus 5.5 is also cheaper than Opus 5 ($5 / $25).
 
+### 167. 2026-09-27, 17:38 UTC
+
+> I don't see much in the doc about render as a server, on here. somewhere in the doc list a table of all the free services used take make this come together and what they are. list micorosoft voice api, even though i use the free model from Jetstream since this is an academic project for a class, you can also use the free models from OpenRouter (list some that are free right now) or host your own model (ollama, etc). you could also easily switch to an openai key. also list paid services (openai live 1 and elevenlabs)
+
+**What was done:** A new section in the frontend README, "Services: what runs it, free and paid": a table of the free services (GitHub Pages, Render, Supabase, Jetstream2, Microsoft's voices through edge-tts, the six research services, bible-api.com, Wikimedia Commons, Google Docs export, Google Fonts), each with what it is, what it does here and why it's free; a table of the paid ones (Claude through OpenRouter with prices, ElevenLabs voices and music, OpenAI GPT-Live-1, xAI Grok voice); and how to swap the free model by changing three settings: OpenRouter's free models (listed live from OpenRouter's catalog: Nemotron 3 Ultra and Super, Gemma 4 31B, Qwen3.8 27B, Inkling, or the free router), your own model with Ollama, or an OpenAI key. The backend README's hosting section now describes Render as the server in detail.
+
+### 168. 2026-09-27, 17:38 UTC
+
+> when was the original design from my private repo made? add that as a step in the how it was built phase
+
+**What was done:** From the private repository's history: the design grew out of a session on September 24 to 25 (daily documents for a 19th Annotation retreat, then the design spec, voices and director, technical spec, twenty screen designs and the build plan); its first commit was at 1:27 a.m. Eastern on Thursday, September 25, and it was renamed Ignatius at Home at 4:54 p.m. that day. Added as the first step of the build journal.
+
+### 169. 2026-09-27, 17:39 UTC
+
+> in the how it was made, stress that I did spec driven development first, then a large spec driven revision, then a deep code cleanup with clean code principles, then a visual redesign based on a spec, etc.
+
+**What was done:** The build journal now opens with "The method: spec-driven, in phases": spec first; building to the spec; a large spec-driven revision (IMPROVEMENTS.md); a deep Clean Code cleanup (with its real numbers from CODE_CLEANUP.md); the prompts rewritten from a brief; a visual redesign from approved mockups; then testing on a real iPhone, every fix logged here.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
