@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 211 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 214 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1308,6 +1308,30 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 > explain how this works, the jsonb is just a link to a json object with a bucket id *(with a screenshot of the data model diagram)*
 
 **What was done:** Explained that the `data` jsonb column is the whole retreat, not a link. It holds the plan, days, scripts, status and costs. Each image and recording inside it carries a Storage `path` (`{user_id}/{retreat_id}/…`) in the one private bucket; no bucket id is stored. The API turns those paths into short-lived signed URLs when a retreat is opened. Deleting a retreat deletes the files by walking those paths (`storage.file_paths`), since Postgres has no link to Storage.
+
+### 212. 2026-09-27, 21:16 UTC
+
+> in the technical architecture I want slides or images diagrams clearly showing a screen of the app on one side or a feature-flow, and show the server that is behind that feature (data) and the models being used AI models
+
+**What was done:** Seven slides, one per feature, in [docs/feature-flows](docs/feature-flows/README.md), embedded in [ARCHITECTURE.md](docs/ARCHITECTURE.md) under "Feature by feature". Each slide shows:
+- **the screen:** a real iPhone screenshot on the left;
+- **the server and data:** the FastAPI endpoints and modules on Render, and what they read and write in Supabase (table, bucket paths, llm_calls);
+- **the models and services:** on the right, with the real model ids and whether each is free or paid;
+- **the prompt files** it uses, in the footer.
+
+The seven features: sign-in, new retreat, building a day, praying, Talk it over and Talk now, your own Examen, and a retreat from an idea. Each claim was checked against the code, and the slides are HTML rendered to PNG so they can be regenerated.
+
+### 213. 2026-09-27, 21:18 UTC
+
+> I think About Me should just be called Settings, and the top thing will be setting the About Me. settings could be more hidden at the bottom.
+
+**What was done:** About me is now Settings, linked in small type at the bottom of every page, and the top menu is Practice and About. Settings opens with About me, then the account (sign out, sign in on your phone), then a "Show technical details" switch for build logs and costs, which replaces `?debug=true`.
+
+### 214. 2026-09-27, 21:20 UTC
+
+> *(the About page's research services text)* these should all have links to the sites where people can sign in and get a free API key for those services, actually a few links into the best documentation about how to setup those services yourself with an API key
+
+**What was done:** Each research service on the About page shows its free allowance and four links: sign up for a key, getting started, the reference for the exact endpoint the app calls, and pricing. It also names the environment variable for the key. Both READMEs gained a "Set up the research services yourself" table with the same links. A subagent opened every link on September 27; three sign-in dashboards (Exa, Tavily, Linkup) load only in a browser, so only their addresses were confirmed.
 
 ---
 

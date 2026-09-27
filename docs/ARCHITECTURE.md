@@ -1300,3 +1300,28 @@ flowchart LR
 | `FREE_TALK_SECONDS` / `TALK_MAX_SECONDS` | 60 / 1800 | Free seconds a day; longest premium conversation |
 | `PROFILE_MAX_CHARS` | 6,000 | Longer notes about the person are condensed |
 | `SERIES_MAX_CHARS` / `SERIES_MAX_CHARS_FREE` | 600,000 / 80,000 | How much of an earlier series is sent to Claude / to Jetstream models |
+
+## 16. Feature by feature
+
+The same system, one feature at a time. Each slide shows:
+- the screen on the phone;
+- the server endpoints and the data behind it;
+- the AI models and services it uses.
+
+The sources and notes are in [feature-flows/](feature-flows/).
+
+1. [Signing in](feature-flows/01-sign-in.png): Supabase Auth, guests, and the phone handoff code and QR code. No model.
+2. [Making a retreat from a document](feature-flows/02-new-retreat.png): extraction, then planning with Claude Opus 5.5 or the free Jetstream models.
+3. [Building a day](feature-flows/03-build-day.png): the heart, the deep dive with six research services, the guidance, and the voices.
+4. [Praying a day](feature-flows/04-pray.png): signed links to recordings made earlier. No model at prayer time.
+5. [Talk it over and Talk now](feature-flows/05-talk.png): live voice (OpenAI, xAI), or taking turns with a chosen brain and a free voice.
+6. [Your own Examen](feature-flows/06-my-examen.png): written by Claude around your days, recorded in ElevenLabs George or Microsoft Ryan.
+7. [A retreat from an idea or a photo](feature-flows/07-idea.png): passages chosen by the model, scripture fetched from bible-api.com.
+
+![Signing in](feature-flows/01-sign-in.png)
+![Making a retreat from a document](feature-flows/02-new-retreat.png)
+![Building a day](feature-flows/03-build-day.png)
+![Praying a day](feature-flows/04-pray.png)
+![Talk it over and Talk now](feature-flows/05-talk.png)
+![Your own Examen](feature-flows/06-my-examen.png)
+![A retreat from an idea or a photo](feature-flows/07-idea.png)

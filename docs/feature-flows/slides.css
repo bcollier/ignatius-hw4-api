@@ -1,0 +1,45 @@
+
+:root{--bg:#f4eee2;--page:#f8f3e8;--field:#fbf8f1;--ink:#1c1712;--muted:#6b5d4c;--line:#d9ccb0;--line-strong:#bfae88;
+--rubric:#a32a1c;--gold:#c9a042;--stage:#0d0b09;--free:#3b6a3a;--paid:#8a6516;
+--display:"Cormorant Garamond",Georgia,serif;--serif:"EB Garamond",Georgia,serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1600px;height:900px;background:var(--bg);color:var(--ink);font-family:var(--serif);overflow:hidden}
+.slide{width:1600px;height:900px;padding:34px 44px 26px;display:flex;flex-direction:column}
+header{display:flex;align-items:baseline;gap:22px;border-bottom:1px solid var(--line-strong);padding-bottom:12px}
+.kicker{font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:var(--rubric);white-space:nowrap}
+h1{font-family:var(--display);font-weight:600;font-size:44px;line-height:1}
+.lede{font-size:19px;color:var(--muted);margin-left:auto;max-width:640px;text-align:right;line-height:1.3}
+.cols{flex:1;display:grid;grid-template-columns:var(--left,360px) 34px 1fr 34px 440px;gap:0;margin-top:20px;min-height:0}
+.arrow{display:flex;align-items:center;justify-content:center;color:var(--line-strong);font-size:30px}
+.col-title{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;gap:8px;align-items:center}
+.col-title b{color:var(--ink);font-weight:600}
+.phones{display:flex;gap:14px;align-items:flex-start;height:100%}
+.phone{flex:none;align-self:center;border:9px solid #1c1712;border-radius:34px;overflow:hidden;background:#000;box-shadow:0 14px 32px rgb(60 40 15/.22);position:relative}
+.phone img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
+.phonewrap .cap{max-width:100%}
+.phonewrap{display:flex;flex-direction:column;height:100%;gap:8px;min-width:0;flex:1}
+.cap{font-size:15px;color:var(--muted);text-align:center;line-height:1.25}
+.inset{border:1px solid var(--line-strong);border-radius:6px;overflow:hidden;background:var(--page);box-shadow:0 8px 20px rgb(60 40 15/.15)}
+.inset img{display:block;width:100%}
+.server{display:flex;flex-direction:column;gap:12px;min-height:0}
+.box{background:var(--page);border:1px solid var(--line);border-radius:4px;padding:14px 18px;box-shadow:0 1px 0 var(--line),0 10px 24px rgb(60 40 15/.08)}
+.render{border-top:4px solid var(--rubric)}
+.data{border-top:4px solid #5b4a8a}
+ol.steps{list-style:none;counter-reset:s;display:flex;flex-direction:column;gap:7px}
+ol.steps li{counter-increment:s;position:relative;padding-left:34px;font-size:17px;line-height:1.3}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:23px;height:23px;border-radius:50%;background:var(--rubric);color:#fff;font:600 13px/23px var(--serif);text-align:center}
+ul.data-list{list-style:none;display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:16px;line-height:1.28}
+ul.data-list li{display:contents}
+.where{font-family:var(--mono);font-size:13px;color:#4b3d73;white-space:nowrap;padding-top:2px}
+code{font-family:var(--mono);font-size:.8em;background:#efe6d3;padding:1px 5px;border-radius:3px;color:#5a2a1c}
+.models{display:flex;flex-direction:column;gap:10px;min-height:0}
+.model{background:var(--page);border:1px solid var(--line);border-left:5px solid var(--gold);border-radius:4px;padding:10px 14px}
+.model.free{border-left-color:var(--free)}
+.model.none{border-left-color:var(--line-strong)}
+.model h3{font-family:var(--display);font-size:22px;font-weight:600;line-height:1.1;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.tag{font-family:var(--serif);font-size:12px;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.tag.paid{background:#f1e2b8;color:#6b4c0e}.tag.free{background:#dcead5;color:#2d5a2c}.tag.none{background:#e9e1cf;color:var(--muted)}
+.model p{font-size:15.5px;line-height:1.3;margin-top:4px;color:#3a3026}
+.model .id{font-family:var(--mono);font-size:12.5px;color:#5a2a1c}
+footer{display:flex;justify-content:space-between;font-size:14px;color:var(--muted);border-top:1px solid var(--line);padding-top:9px;margin-top:14px}
+footer .prompts code{font-size:12.5px}

@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1600">
+<title>7. A retreat from an idea or a photo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="slides.css"></head><body>
+<div class="slide">
+<header><span class="kicker">Feature 7 of 7</span><h1>A retreat from an idea or a photo</h1><p class="lede">“Trusting God with a new job”, or a photo of a page of verses, becomes a retreat of as many days as you choose.</p></header>
+<div class="cols" style="--left:360px">
+  <div><div class="col-title"><b>The screen</b> · iPhone</div><div class="phones" style="height:calc(100% - 26px)"><div class="phonewrap"><div class="phone" style="width:305px;height:640px"><img src="screens/idea.jpg" alt="New retreat → or start from an idea or a photo"></div><div class="cap">New retreat → or start from an idea or a photo</div></div></div></div>
+  <div class="arrow">→</div>
+  <div class="server">
+    <div class="box render"><div class="col-title"><b>Server</b> · FastAPI on Render</div><ol class="steps"><li><code>POST /api/retreats</code> with <code>idea</code>, <code>idea_days</code> and an optional <code>photo</code>: 202 at once.</li><li><code>app/inspiration.py</code> gives the model the idea and the photo; it answers with a title and, for each day, a Bible reference, or says the text is on the photo.</li><li>The scripture is fetched from <b>bible-api.com</b> in the World English Bible (public domain), or copied from the photo. The model never writes scripture.</li><li>The result is an ordinary source document: planned (feature 2) and built (feature 3) like any upload.</li></ol></div>
+    <div class="box data"><div class="col-title"><b>Data</b> · Supabase, private (server key only)</div><ul class="data-list"><li><span class="where">retreats</span><span>The same row as any retreat; the source is marked as made from an idea</span></li><li><span class="where">bucket retreats</span><span>The photo becomes <code>image0.jpg</code>, shown while praying</span></li><li><span class="where">llm_calls</span><span>The outline call, then planning and writing</span></li></ul></div>
+  </div>
+  <div class="arrow">→</div>
+  <div><div class="col-title"><b>AI models and services</b></div><div class="models"><div class="model paid"><h3>Claude Opus 5.5<span class="tag paid">full accounts</span></h3><p>Reads the photo and chooses the passages, in a JSON schema. Any model on the menu.</p></div><div class="model free"><h3>Free open models<span class="tag free">free</span></h3><p><span class="id">muse-glimmer</span> reads photos; a model that can't is asked for words instead.</p></div><div class="model free"><h3>bible-api.com<span class="tag free">free</span></h3><p>Public-domain World English Bible text, no key.</p></div></div></div>
+</div>
+<footer><span class="prompts">Prompts: <code>app/agent_prompts/inspiration.md</code>, then <code>plan.md</code></span><span>Ignatius at Home · ignatius-hw4-api</span></footer>
+</div></body></html>

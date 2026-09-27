@@ -290,6 +290,19 @@ flowchart TD
 
 Pauses persist in `system/search_status.json`, so a restart or Render waking from sleep doesn't retry a service that's out of credits; `/api/options` reports each service's status for the menu. Linkup's two modes share one account and pause together. Every query, successful or not, is a row in `llm_calls`.
 
+### Set up the research services yourself
+
+Any one service is enough, and with none the deep dive is written without web research. Sign up, create an API key, and put it in the server's environment under the name below: in `.env` locally, or under Environment on Render. The server uses every service that has a key. Free allowances are as listed in September 2026.
+
+| Service | Free tier | Sign up and get a key | Getting started | API reference (the endpoint this app calls) | Pricing | Environment variable |
+| --- | --- | --- | --- | --- | --- | --- |
+| Brave Search | About 1,000 searches a month ($5 of monthly credit) | [Register](https://api-dashboard.search.brave.com/register) | [Web search quickstart](https://api-dashboard.search.brave.com/app/documentation/web-search/get-started) | [`GET /res/v1/web/search`](https://api-dashboard.search.brave.com/api-reference/web/search/get) | [Pricing](https://api-dashboard.search.brave.com/documentation/pricing) | `BRAVE_SEARCH_API_KEY` |
+| Brave Answers | $5 of monthly credit; a separate plan and key in the same Brave account | [Register](https://api-dashboard.search.brave.com/register) | [Answers guide](https://api-dashboard.search.brave.com/documentation/services/answers) | [`POST /res/v1/chat/completions`](https://api-dashboard.search.brave.com/api-reference/ai/answers) | [Pricing](https://api-dashboard.search.brave.com/documentation/pricing) | `BRAVE_ANSWERS_API_KEY` |
+| Exa | About 1,400 searches a month ($10 of credit, reset on the 1st; no card) | [API keys](https://dashboard.exa.ai/api-keys) | [Quickstart](https://exa.ai/docs/reference/quickstart) | [`POST /search`](https://exa.ai/docs/reference/search) | [Pricing](https://exa.ai/pricing) | `EXA_API_KEY` |
+| Tavily | 1,000 searches a month (no card) | [Sign in](https://app.tavily.com) | [Quickstart](https://docs.tavily.com/documentation/quickstart) | [`POST /search`](https://docs.tavily.com/documentation/api-reference/endpoint/search) | [Pricing](https://www.tavily.com/pricing), [credits](https://docs.tavily.com/documentation/api-credits) | `TAVILY_API_KEY` |
+| Firecrawl | About 500 searches a month (1,000 credits; no card) | [Sign in](https://www.firecrawl.dev/signin), then [API keys](https://www.firecrawl.dev/app/api-keys) | [Introduction](https://docs.firecrawl.dev/introduction) | [`POST /v2/search`](https://docs.firecrawl.dev/api-reference/endpoint/search) | [Pricing](https://www.firecrawl.dev/pricing) | `FIRECRAWL_API_KEY` |
+| Linkup (standard and deep) | $20 of credit a month: about 4,000 standard or 360 deep searches | [Sign in](https://app.linkup.so) | [Quickstart](https://docs.linkup.so/pages/documentation/get-started/quickstart) | [`POST /v1/search`](https://docs.linkup.so/pages/documentation/api-reference/endpoint/post-search) | [Pricing](https://docs.linkup.so/pages/documentation/development/pricing) | `LINKUP_API_KEY` (one key for both) |
+
 ---
 
 ## 6. Voices and recording
