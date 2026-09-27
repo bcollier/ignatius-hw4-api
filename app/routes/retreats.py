@@ -72,6 +72,7 @@ async def create_retreat(
     series_ids: str = Form("", alias="series"),
     options: str = Form(""),
     start_date: str = Form(""),
+    personal: bool = Form(True),
     user: User = Depends(current_user),
 ):
     """Upload and make a retreat. With `options` (the build settings as JSON, the same
@@ -88,7 +89,8 @@ async def create_retreat(
     build_options = _build_options(options, user)
     start = check_date(start_date)
     if idea.strip() or photo is not None:
-        return await _retreat_from_idea(idea, idea_days, photo, plan_prompt, model, build_options, start, series_ids, user)
+        return await _retreat_from_idea(idea, idea_days, photo, plan_prompt, model, build_options, start, series_ids, user,
+                                        personal)
     filename, data = await _source_bytes(file, example, google_doc)
     try:
         source = extract(filename, data)
@@ -98,13 +100,14 @@ async def create_retreat(
     ids = await check_series(series_ids, user)
     retreat = await pipeline.create_retreat(
         user.id, filename, source, plan_prompt, model,
-        email=user.log_email, series_ids=ids, build_options=build_options, start_date=start,
+        email=user.log_email, series_ids=ids, build_options=build_options, start_date=start, personal=personal,
     )
     return await pipeline.public_view(retreat)
 
 
 async def _retreat_from_idea(idea: str, days: int, photo: UploadFile | None, plan_prompt: str, model: str,
-                             build_options: dict | None, start: str | None, series_ids: str, user: User) -> dict:
+                             build_options: dict | None, start: str | None, series_ids: str, user: User,
+                             personal: bool = True) -> dict:
     if len(idea) > inspiration.MAX_IDEA:
         raise HTTPException(400, f"Please keep the idea under {inspiration.MAX_IDEA:,} characters.")
     if not 1 <= days <= config.MAX_DAYS:
@@ -120,7 +123,7 @@ async def _retreat_from_idea(idea: str, days: int, photo: UploadFile | None, pla
     placeholder = Extracted(kind="idea", text=idea, page_count=0)
     retreat = await pipeline.create_retreat(
         user.id, "Your idea", placeholder, plan_prompt, model, email=user.log_email, series_ids=ids,
-        build_options=build_options, start_date=start,
+        build_options=build_options, start_date=start, personal=personal,
         compose=lambda: inspiration.compose(idea, image, days, model),
     )
     return await pipeline.public_view(retreat)

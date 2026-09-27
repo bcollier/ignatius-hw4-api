@@ -962,6 +962,34 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** An iPhone's file picker shows Google Drive only when the Drive app is installed and turned on in Files, and even then Google Docs often can't be picked as files. About me now also takes a Google Doc link (shared as "Anyone with the link can view"), read the same way as a retreat's Google Doc source: `POST /api/profile/google-doc`.
 
+### 154. 2026-09-27, 04:01 UTC
+
+> Rotate this screen it always says the same thing give updates at each stage such as planning day 5 or converting reading to voice now converting deep drive to voice converting heart lesson to voice compiling all pieces etc give text updates on this screen *(with a screenshot of "Planning your retreat")*
+
+**What was done:** A live line under the progress bar says what is happening now. While Claude plans, the plan is read as it streams in ("Planning day 5: The Lost Sheep"); each step of a day shows as it starts ("Day 2: writing the reflection for the heart", "Day 2: researching the passage and writing the deep dive", "Day 2: turning the deep dive into voice"). While a model plans in one reply that can't be followed (the free model), the stages of planning take turns every few seconds. The server keeps the line in memory on the retreat being made, so it costs no extra saves.
+
+### 155. 2026-09-27, 04:02 UTC
+
+> It's been hanging here for like 10 seconds or longer *(with a screenshot of a blank page, header only)*
+
+### 156. 2026-09-27, 04:06 UTC
+
+> Hanging a long time *(with a screenshot of the same blank page in Chrome)*
+
+**What was done (155 and 156):** A bug in the version just published: the new Google Doc box on About me was a form inside the About me form, which browsers drop, so starting up failed on it and nothing drew. Fixed, and start-up now wires each part of the page separately, so one missing piece can't stop the app. The waiting screen is now part of the page itself (it fades in after a moment even before any script runs, and suggests reopening the app after twenty seconds), and the sign-in library (supabase-js 2.117.2) is served with the app instead of from a separate CDN.
+
+### 157. 2026-09-27, 04:05 UTC
+
+> Build a bank of quotes form desert fathers and mothers or Richard roar or st ignatius or profound thoughts and quotes in this space St. John of the cross Julian of Norwich Thomas Merton cs Lewis people Jim Finley has covered in his podcast turning to the mystics put those up on waiting screens when building a retreat or on initial load if it is taking time and the back end is not respond show a waking up screen with quotes
+
+**What was done:** js/quotes.js: thirty-seven short sayings with sources, from the desert mothers and fathers, Saint Ignatius, Saint John of the Cross, Julian of Norwich, Saint Teresa, Augustine, Meister Eckhart, The Cloud of Unknowing, Brother Lawrence, Thérèse of Lisieux, Francis de Sales, Hopkins, Guigo II, Thomas Merton, C. S. Lewis and Richard Rohr. Only sayings that trace to the person are used (several famous ones are misattributed); two traditional ones are marked "attributed". They rotate on the waiting screen (a Julian of Norwich line is built into the page, so it shows before any script) and on the screen for a retreat being made.
+
+### 158. 2026-09-27, 04:08 UTC
+
+> The app should have the option to allow customize this retreat based on info in the about section and then uncheck for a generic version
+
+**What was done:** New retreat has "Make it personal: shape the reflections with what I've told you in About me", ticked by default; untick it for a general retreat. The choice is kept with the retreat (`personal`), so rebuilding a day later follows it; a general retreat's model calls leave the About me notes out entirely. If About me is empty, the page says it will be a general retreat for now.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

@@ -208,3 +208,22 @@ def test_about_me_from_a_google_doc(monkeypatch):
         assert client.post("/api/profile/google-doc", json={"link": "https://docs.google.com/document/d/bad/edit"}).status_code == 400
         r = client.post("/api/profile/google-doc", json={"link": "https://docs.google.com/document/d/abc/edit"})
         assert r.status_code == 200 and "pray best at dawn" in r.json()["about"]
+
+
+def test_a_generic_retreat_leaves_out_the_notes(monkeypatch):
+    import asyncio
+
+    from app import pipeline, profile, prompts
+
+    async def use(user_id):
+        prompts.PERSON.set("I teach and pray at dawn.")
+
+    monkeypatch.setattr(profile, "use_for_job", use)
+
+    async def notes(personal):
+        prompts.PERSON.set("")
+        await pipeline._use_notes({"user_id": "u", "personal": personal})
+        return prompts.PERSON.get()
+
+    assert asyncio.run(notes(True)) == "I teach and pray at dawn."
+    assert asyncio.run(notes(False)) == ""

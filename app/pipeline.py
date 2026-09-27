@@ -226,7 +226,7 @@ async def public_view(retreat: dict) -> dict:
 async def create_retreat(
     user_id: str, filename: str, source: Extracted, plan_prompt: str, model: str, email: str | None = None,
     series_ids: list[str] | None = None, build_options: dict | None = None, start_date: str | None = None,
-    compose=None,
+    compose=None, personal: bool = True,
 ) -> dict:
     """Store the document's images, save a new retreat record, and start planning it
     in the background. Returns the record at once (status "planning").
@@ -257,6 +257,7 @@ async def create_retreat(
         "plan": None,
         "days": {},
         "composing": bool(compose),
+        "personal": personal,  # made with the About me notes, or generic
     }
     if compose:
         await store.save(retreat)
@@ -324,6 +325,15 @@ async def series_context(retreat: dict, model: str) -> str:
     return text
 
 
+async def _use_notes(retreat: dict) -> None:
+    """The person's About me notes ("user info.md") inform every call, unless they asked
+    for a generic retreat (made without them)."""
+    if retreat.get("personal", True):
+        await profile.use_for_job(retreat["user_id"])
+    else:
+        prompts.PERSON.set("")
+
+
 def _plan_watcher():
     """As the plan streams in, say which day is being planned, and its title."""
     def watch(text: str) -> None:
@@ -339,7 +349,7 @@ async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
     """Plan the retreat, then (when made in one go) make every day."""
     meter = pricing.Meter(retreat["model"], await pricing.prices())
     llm_log.tag(user_id=retreat["user_id"], retreat_id=retreat["id"], purpose="plan")
-    await profile.use_for_job(retreat["user_id"])  # "user info.md" informs every call
+    await _use_notes(retreat)
     series_text = await series_context(retreat, retreat["model"])
     await _log_planning_start(retreat)
     llm_log.activity("Reading your document")
@@ -598,7 +608,7 @@ class _DayBuild:
 
     async def run(self) -> None:
         llm_log.tag(user_id=self.retreat["user_id"], retreat_id=self.retreat["id"], day=self.day_no)
-        await profile.use_for_job(self.retreat["user_id"])  # "user info.md" informs every call
+        await _use_notes(self.retreat)
         self.series_text = await series_context(self.retreat, self.meter.model)
         # The rest of this retreat: earlier days as heard, coming days as readings only.
         self.so_far = prompts.retreat_so_far(self.retreat["plan"], self.retreat["days"], self.day_no)
