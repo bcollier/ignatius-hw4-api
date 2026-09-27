@@ -1,6 +1,6 @@
 # Sign-in email templates
 
-For Supabase **Authentication → Emails → Templates** (editable once custom SMTP is set up; see "Setting up the sign-in emails" below). Keep `{{ .ConfirmationURL }}` and `{{ .Token }}` exactly as written: Supabase fills in the link and the six-digit code.
+For Supabase **Authentication → Emails → Templates** (editable once custom SMTP is set up; see "Setting up the sign-in emails" below). Keep `{{ .ConfirmationURL }}` and `{{ .Token }}` exactly as written: Supabase fills in the link and the code (six to ten digits, as set under Authentication → Providers → Email → Email OTP Length; this project uses eight).
 
 The code matters on an iPhone: an app added to the Home Screen never receives the email's link (it opens in the browser), so there the person types the code instead.
 
