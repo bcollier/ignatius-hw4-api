@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 214 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 222 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1332,6 +1332,54 @@ The seven features: sign-in, new retreat, building a day, praying, Talk it over 
 > *(the About page's research services text)* these should all have links to the sites where people can sign in and get a free API key for those services, actually a few links into the best documentation about how to setup those services yourself with an API key
 
 **What was done:** Each research service on the About page shows its free allowance and four links: sign up for a key, getting started, the reference for the exact endpoint the app calls, and pricing. It also names the environment variable for the key. Both READMEs gained a "Set up the research services yourself" table with the same links. A subagent opened every link on September 27; three sign-in dashboards (Exa, Tavily, Linkup) load only in a browser, so only their addresses were confirmed.
+
+### 215. 2026-09-27, 21:24 UTC
+
+> i want to build a harness for running evals on all of these models. so I want to be able to compare claude 5.5 with OpenAI 6 or free service Muse, or best ollama model. have them all generate responses to the deep dives, and to the from the heart . they should be rated on a rubric for 1-7 scores on how good they were at being emotionally engaging, thoughtful, well-research, sounded like it had AI jargon in it, was too vague, said something a user may disagree with theoligically , was encouraging, rate it on how the response does from 1-7 by each fruit of the spirit that it demonstrates,. rate it 1-7 on how it conveys faith, hope, and love.
+
+**What was done:** In progress. Contestants: Claude Opus 5.5, OpenAI GPT-6 Sol (GPT-6 on OpenRouter comes as Luna, Sol and Astra; Astra and Fable 5.1 can be added), Muse Glimmer (free) and Gemma 4 31B, the best general model that fits this Mac, running locally in Ollama 0.34.4 (installed from Ollama's official release into ~/.local, since Homebrew here belongs to another account). Every model gets exactly what the app sends: the same prompts, day context and shared web research. The rubric (19 scales, 1 to 7) is in `app/agent_prompts/eval_judge.md`, judged blind by two judges from different companies.
+
+### 216. 2026-09-27, 21:27 UTC
+
+> on this page the book on the top left has a cool animation but the ones on the bottom don't animate the same way on hover, look into that , add the animation to all if possible *(with a screenshot of the library)*
+
+**What was done:** The example covers' entrance animation used `fill-mode: both`, which kept `transform: none` after it ended and overrode the hover lift. Changed it to `backwards`; all covers now lift and tilt on hover (checked in a headless browser).
+
+### 217. 2026-09-27, 21:33 UTC
+
+> implement https://deepeval.com/blog/introducing-jev-in-deepeval. this for the ignatius systm , using evals I discussed and all reasonable evals
+
+**What was done:** In progress. Read the post and the JevEval docs, installed DeepEval 4.2.6 and the TypeSafe SDK for the eval tools only (not the server), and built a DeepEval suite: JevEval Score and Noul questions for every rubric scale and yes/no checks, G-Eval, Faithfulness, Hallucination, Prompt alignment, Role adherence and Turn relevancy for the companion, and deterministic checks (length, spoken format, citing only the research, sentence length, naming 988). Jev needs a TypeSafe API key from the author.
+
+### 218. 2026-09-27, 21:36 UTC
+
+> this can be a separate eval systme from what you made, I want to use LLM as judge evals and then a comparison to a total DeepEval system
+
+**What was done:** Split into system A (LLM as judge, `evals/llm_judge.py`) and system B (all DeepEval, `evals/deepeval_suite.py`), both scoring the same generated pieces and companion conversations (`evals/generate.py`), with `evals/compare.py` reporting each system and how far they agree (Spearman correlation per scale, model rankings). A smoke test ran end to end; G-Eval needs a judge model that returns log-probabilities, which GPT-6's reasoning models don't.
+
+### 219. 2026-09-27, 21:41 UTC
+
+> when complete build a slide deck and a whitepaper explaining AI evals, and explaining https://deepeval.com/blog/introducing-jev-in-deepeval and how it is the same or different than other eval systems for AI. compare them generally and then use this as an example for which evals for the models in this app is generating
+
+**What was done:** Pending: to be written from the full eval run.
+
+### 220. 2026-09-27, 21:48 UTC
+
+> I just had a security audit ran using codex, go look at what it found and advise me jarvis@Mac-mini security-audit-2026-09-27 %
+
+**What was done:** Read the audit (ten findings) and checked the key ones against the code and production. The example-log leak of conversations (F01) is real in code, but no conversations were attached to the examples yet; the storage bucket is private; `/api/options` shows the ElevenLabs balance publicly. Advised an order of fixes and asked before changing code.
+
+### 221. 2026-09-27, 22:00 UTC
+
+> *(two PDFs: a retreat worksheet, "Prayer Over My Dossier", and "Meditation on My Birth" by Dr. Eileen C. Burke-Sullivan)* build these into exercises you can do on the web app. guided through each of these with a free voice. build both entire features they could go in prayer practice
+
+**What was done:** Two new guided sessions under Practice, written by Claude Opus 5.5 from summaries of the handouts (in the app's own words, credited) and recorded in the free Microsoft voice Ava, with no ElevenLabs credits used. "Prayer Over My Dossier" (about 40 minutes): the worksheet's facts one group at a time, with the fields shown as writing prompts, then the four sets of six traits, turning each into praise. "Meditation on My Birth" (about 25 minutes): imaginative prayer standing beside God at one's own birth, gentle about adoption and painful stories, a long colloquy, the Glory Be, and review questions, shown over Georges de La Tour's *The Newborn* (public domain). Answers save to the journal like the other practices.
+
+### 222. 2026-09-27, 22:05 UTC
+
+> put a turn on debug mode in the settings page
+
+**What was done:** The Settings switch is now labeled "Debug mode" (it shows the build logs and costs), and turning it on or off also shows or hides the Debug badge in the header.
 
 ---
 

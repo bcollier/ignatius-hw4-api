@@ -2,10 +2,12 @@
 long each silence and journaling pause should be. Writes (or adds to) practice.json for
 the web app; the narration is recorded by record_practice.py.
 
-Run: .venv/bin/python tools/make_practice.py OUT_DIR [practice|dossier|examen]
+Run: .venv/bin/python tools/make_practice.py OUT_DIR [practice|dossier|examen|my-dossier|birth]
   practice: "Creating a Prayer Practice" (a daily practice and a weekly review)
   dossier:  "Your Life's Faith Story" (a thirty-minute guided life review)
   examen:   "The Examen" (the end-of-day review of the day with God)
+  my-dossier: "Prayer Over My Dossier" (praise over the facts of one's life, about forty minutes)
+  birth:    "Meditation on My Birth" (imaginative prayer at one's own birth, about twenty-five minutes)
 """
 
 import asyncio
@@ -84,10 +86,27 @@ Over time the middle review reveals patterns, which connects the Examen to disce
 
 EXAMEN_TASK = prompts._prompt("practice_examen")
 
+# "Prayer Over My Dossier" (a retreat worksheet, Prayer Unit 2, Day 3), summarized.
+MY_DOSSIER = """A prayer over the "vital statistics" of one's life. As each fact is recalled and written down, the person lifts their mind to God their Maker and praises and thanks God for the details of their history and of themselves, knowing God chose that they would exist in this place and time, with these parents, genes and traits. They ponder God's choices for them and in them; that God loved them before they existed; and that God did not finish making them once, long ago, but keeps creating them, the Spirit still hoping they will grow until they love as God loves.
+Worksheet fields: father (full name, birth date, birthplace); mother (full name, birth date, birthplace); myself (full name, birth date, birthplace; gender, race, ethnicity; hair color, eye color, physical build); siblings (name and birth date for each); notes and significant family details; the places I have lived; my extended family.
+Traits, six of each: traits and characteristics formed in me before I had a choice (my environment, temperament such as self-assurance or anxiety, intelligence, the languages I speak, habits of study, activities I enjoy); traits inherited from my parents or extended family, some I like and some I'd rather not have; personal qualities I particularly like (quiet or outgoing, thorough, sensitive to others' feelings, energetic, accomplishing a great deal), noted as gifts from the One who makes me, for which I praise and thank God; personal qualities I don't particularly like (height, an attitude I can't shake, an illness such as diabetes, a negative self-image), which the worksheet also asks me to acknowledge as gifts from the One who makes me. For all this, I praise and thank God.
+A last page for additional reflections, sketches, images and memories."""
+
+# "Meditation on my birth: an exercise in prayer of memory and imagination", by Dr.
+# Eileen C. Burke-Sullivan (Creighton University), summarized.
+BIRTH = """Uses memory of family stories, or imagination drawn from what one knows of human birth (even from film or television). Quiet yourself, feet on the floor, breathing until somewhat peaceful; ask God for the gift of memory or imagination to be an observer at your own birth.
+Remember what family has told you: where your mother was when labor began, early or late or on time, a long labor or sudden. If never told, imagine how your mother looked then; if adopted and you never knew your birth parents, imagine them as you'd like them to have looked. Stand as an observer with God the Creator at your side; you may not see God but recognize the divine presence by its warmth.
+Imagine the setting: doctors and nurses, or a midwife and helpers, all busy and focused on your mother; they can't see you as you are now, nor God. Hear your mother in labor, crying out or breathing hard, suddenly gasping; your father may or may not be there, but someone is cheering her on.
+Then you see the child you were, tiny, defenseless, struggling to breathe in a strange new world as you are born. The doctor lifts you and prompts your first breath; the nurse washes, measures and weighs you and prepares to hand you to your mother. But for a moment God steps forward, takes you in the divine arms and gazes at you with complete love, delighted, almost playful with the pleasure of holding you. Then God hands you back, looks deep into your present eyes and tells you that you are God's beloved child, that God longed for the moment you would come into life, and longs even more for you to know how deeply you are loved.
+Stay with this moment. What do you want to say to this God who loves you utterly? Do you believe what God says? Converse with God about what is in your heart. Near the end, pray the Glory Be slowly, bowing from the waist toward God.
+Afterwards: What are your feelings from the prayer? Can you talk with Jesus for a few minutes about it; is it real to you; any sense of connection with the Creator? Journal what you "saw", what you thought, and your own longing from this kind of prayer; if disappointed, journal the negative feelings too. Were there distractions, when, from what, and how did you handle them?"""
+
 TASKS = {
     "practice": lambda: f"<handout>\n{HANDOUT}\n</handout>",
     "dossier": lambda: f"{DOSSIER_TASK}\n\n<handout>\n{DOSSIER}\n</handout>",
     "examen": lambda: f"{EXAMEN_TASK}\n\n<notes>\n{EXAMEN}\n</notes>",
+    "my-dossier": lambda: f"{prompts._prompt('practice_my_dossier')}\n\n<worksheet>\n{MY_DOSSIER}\n</worksheet>",
+    "birth": lambda: f"{prompts._prompt('practice_birth')}\n\n<notes>\n{BIRTH}\n</notes>",
 }
 
 

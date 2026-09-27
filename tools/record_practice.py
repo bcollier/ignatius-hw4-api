@@ -25,6 +25,8 @@ SESSION_VOICES = {
         "deluxe": ("JBFqnCBsd6RMkjVDRZzb", "George, ElevenLabs"),
     },
 }
+# Sessions recorded only in the free voice (no ElevenLabs credits).
+FREE_ONLY = {"my-dossier", "birth"}
 
 
 async def _balance() -> dict:
@@ -41,6 +43,11 @@ async def main(folder: Path) -> None:
         (folder / tier).mkdir(exist_ok=True)
         for session in practice["sessions"]:
             voices = SESSION_VOICES.get(session["id"], VOICES)
+            if session["id"] in FREE_ONLY:
+                voices = {"standard": voices["standard"]}
+                if tier not in voices:
+                    session["voices"] = {"standard": voices["standard"][1]}
+                    continue
             voice = voices[tier][0]
             session["voices"] = {k: label for k, (_, label) in voices.items()}
             for n, seg in enumerate(session["segments"], start=1):
