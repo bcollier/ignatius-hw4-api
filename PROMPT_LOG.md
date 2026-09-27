@@ -916,6 +916,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** With the music set to None (the default) the sample had nothing to play. It now plays the chant when None is chosen, otherwise the chosen music; the button says "Stop the sample" while it plays; changing the choice switches what's playing; and leaving the page stops it.
 
+### 147. 2026-09-27, 03:21 UTC
+
+> Is the image cut off on top *(with a screenshot of the Examen on an iPhone, in dark mode)*
+
+**What was done:** Yes: the painting was cropped to fill a wide frame, so a tall painting lost its top (the Magdalen's face). Now the whole painting shows, never cropped, over a soft blurred copy of itself that fills the frame, and the slow drift is gentler. Also fixed: the header's links ran off the right edge on phones (they now sit on their own row under the name), text could hide behind the buttons, and skipping quickly through the steps left old paintings stacked up underneath.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
