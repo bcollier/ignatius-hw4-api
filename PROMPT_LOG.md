@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 198 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 199 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1226,6 +1226,12 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 > I have the same problem here, it will not let me scroll down any further than this *(with a screenshot of the Practice page)*
 
 **What was done (197 and 198):** Scrolling froze in the Home Screen app on more than one page, with no keyboard involved, so the earlier keyboard explanation wasn't the whole story. The prime suspect is the cross-fade between views (the browser's view transitions): the app is a single page, so if WebKit on an iPhone leaves scrolling broken after one transition, every later page is stuck until the app is reopened, and Chrome on an iPhone uses the same engine. Views now switch without the cross-fade on iPhones and iPads. And the guided practice's controls (Back, Pause, Next, the picture switch and End the exercise) are now pinned to the bottom of the screen on a solid bar, like the prayer screen's player, so they're always within reach.
+
+### 199. 2026-09-27, 20:25 UTC
+
+> it no longer gets stuck, but the ordering on the practice page should be redone. if the user has customized any prayers they should be at the top, then there should be a done recently, then the library of standard prayer
+
+**What was done:** The Practice page now has three parts: "Your prayers" (your own Examen, once made), "Done recently" (the last three sessions, newest first, from sessions started on this device and from journal entries saved to the account, so a session on the laptop counts on the phone too), and "The library" of standard sessions. Writing your own Examen ("Write a new Examen" once one exists) comes after the library, then the voice and music settings, then the journal.
 
 ---
 
