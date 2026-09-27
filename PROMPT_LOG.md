@@ -1,6 +1,8 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with one design review by Claude Fable 5.1) over September 25–26, 2026. Below is **every prompt** the author typed, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 193 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+
+**How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
 The same log is in both repositories: [API](https://github.com/bcollier/ignatius-hw4-api/blob/main/PROMPT_LOG.md) and [web](https://github.com/bcollier/ignatius-hw4-web/blob/main/PROMPT_LOG.md).
 
@@ -9,11 +11,14 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 | Where | Tool or model | Used for |
 | --- | --- | --- |
 | Building the app | Claude Code with Claude Opus 5.5 | Planning, all code and tests, running local servers and builds, testing in Chrome, screenshots, docs |
-| Building the app | Claude Fable 5.1 | The redesign review that became docs/IMPROVEMENTS.md |
-| Inside the app, premium | Claude Opus 5 (default), Opus 5.5, Fable 5.1, Sonnet 5, Haiku 4.5, through OpenRouter's Anthropic-compatible API | Planning retreats (structured JSON), reflections, deep dives with web search, tailoring the guidance, condensing About me |
+| Building the app | Claude Fable 5.1 | The redesign review that became docs/IMPROVEMENTS.md; the planning, reflection, deep dive and companion prompts (docs/prompt-design); the premium example retreat |
+| Building the app | Claude Design | The seven redesign mockups (docs/VISUAL_REDESIGN.md) |
+| Building the app | Playwright (WebKit) and Puppeteer (Chrome), gitleaks, pip-audit | Testing at iPhone size in Safari's engine, screenshots, the secret scan and dependency audit |
+| Inside the app, premium | Claude Opus 5.5 (default), Opus 5, Fable 5.1, Sonnet 5, Haiku 4.5, through OpenRouter's Anthropic-compatible API | Planning retreats (structured JSON), reflections, deep dives with web search, tailoring the guidance, choosing passages for an idea, writing guided practices and your own Examen, condensing About me |
 | Inside the app, free | Muse Glimmer (default) and Llama 4 Scout on Jetstream (academic allocation) | The same jobs, with server-side web research |
 | Inside the app, research | Brave Search, Brave Answers, Exa, Tavily, Firecrawl, Linkup (search and deep research) | Research for free-mode deep dives, all combined by default |
-| Inside the app, voices | Microsoft neural voices via `edge-tts`; ElevenLabs | Text to speech |
+| Inside the app, voices and music | Microsoft neural voices via `edge-tts`; ElevenLabs voices and ElevenLabs Music | Text to speech; the background instrumental for guided practices |
+| Inside the app, scripture | bible-api.com (World English Bible) | The text of passages chosen for a retreat made from an idea |
 | Inside the app, conversation | OpenAI GPT-Live (`gpt-live-1`); xAI Grok voice | "Talk it over," a live voice conversation |
 
 ## Every prompt, in order
@@ -1175,6 +1180,28 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 > I still don't have the option to watch technical details
 
 **What was done:** Debug mode worked in testing; explained where the three places are (the checkbox above Make my retreat, the link under the progress bar, the build log at the foot of a finished retreat, and Costs in the footer). Added a "Debug" marker to the header while debug mode is on, which also turns it off.
+
+### 191. 2026-09-27, 19:04 UTC
+
+> for the run that is going right now, I had elevenlabs read the passage. it looks like it is recording a seperate version for each reading, is that true? why? should we just use the same recording four times?
+
+**What was done:** Checked the call log for the retreat being made: the passage is recorded once per day (one ElevenLabs recording) and played for all four readings; the other nine recordings a day are the reflection, the deep dive and the short spoken lead-ins to each reading, which the live progress line reports one by one.
+
+### 192. 2026-09-27, 19:06 UTC
+
+> if i just take a picture of 5 verses will it make a 5 day retreat or how does it determine the number of days for this retreat?
+
+**What was done:** Explained the two ways: uploaded as the material, the planner follows any days on the page, and otherwise shapes an arc of "about seven days, fewer when the material honestly supports fewer" (usually one passage a day for five good passages); under "Start from an idea or a photo" the person chooses the number of days, the photo's verses come first word for word, and any extra days are chosen to fit.
+
+### 193. 2026-09-27, 19:47 UTC
+
+> finalize the prompt log, and add this app to the others in my portfolio page https://github.com/bcollier/ben.collier.phd
+
+**What was done:** Brought the log's header up to date (the dates, the phases of the build, the tools, Opus 5.5 as the default) and checked the numbering (193 entries, none missing or repeated). Added Ignatius at Home to the portfolio page's projects, following that repository's rules: a branch, the entry in `data/portfolio.json` with a new screenshot of a day as a two-page spread, the page regenerated with `scripts/build.py`, and a pull request squash-merged into `main`.
+
+---
+
+*End of the log. The original design came from an earlier, separate session (September 24–25; see [docs/original-spec](docs/original-spec/)); every change made to these two repositories after it came from one of the prompts above. Account settings the author changed by hand, such as the Supabase email settings, are described where they came up.*
 
 ## Prompts the app sends to models
 
