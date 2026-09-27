@@ -1116,6 +1116,66 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** The code box was shown only on iPhones. Now that the sign-in email carries a six-digit code, the code box shows on every device ("Then enter the code from the email", or just click the link), and pasting the link is folded away as a last resort.
 
+### 181. 2026-09-27, 18:22 UTC
+
+> does claude code know everything about me (memories) the same wya claude chat does? I want to have it write the "about me" page
+
+**What was done:** Explained that Claude Code and the Claude chat app keep separate memories; suggested asking Claude chat for a first-person summary to bring over, to be shaped here into About me.
+
+### 182. 2026-09-27, 18:24 UTC
+
+> If I have a profile in the about me page and I use one of the example retreats will it customize the retreat to me?
+
+**What was done:** The finished example retreats are the same for everyone; Talk it over and your own Examen use About me with them.
+
+### 183. 2026-09-27, 18:25 UTC
+
+> I meant these examples *(with a screenshot of the Be Still and I Am example documents on New retreat)*
+
+**What was done:** Yes: "Use this example" makes a new retreat from that document, written with the About me notes when Make it personal is ticked (the default); the scripture is unchanged.
+
+### 184. 2026-09-27, 18:27 UTC
+
+> *(pasted a long first-person "About me, for a prayer companion" summary from Claude chat, not reproduced here since it is personal)*
+
+**What was done:** Shaped it into the app's two boxes: About me (who, work, faith, how I pray, what I'm carrying, questions, hopes, patterns) and What I'm looking for in the conversation companion; both under the 6,000-character limit so nothing is condensed. Dropped names of people outside the family; noted that the notes go with each request to the model providers.
+
+### 185. 2026-09-27, 18:30 UTC
+
+> write a script for me to record the video, show off all the features including write my examen, customized retreats, and a session with the live AI talk
+
+**What was done:** A scene-by-scene demo script (about eight minutes) with preparation, what to show and what to say, including a personalized retreat, Talk it over and Write my Examen.
+
+### 186. 2026-09-27, 18:31 UTC
+
+> for showing the iphone version, is there an iphone simulator I can use on my desktop
+
+**What was done:** Suggested recording the real iPhone through QuickTime and a cable (with sound), iPhone Mirroring, or Xcode's Simulator.
+
+### 187. 2026-09-27, 18:32 UTC
+
+> walk me through installing the Xcode iphone simulator
+
+**What was done:** Step by step: Xcode from the App Store, the iOS platform, opening Simulator, adding the app to its Home Screen, recording, and shortcuts.
+
+### 188. 2026-09-27, 18:38 UTC
+
+> are my airpods gen 3 better for recording than my macbook audio? I recorded from macbook last time and the audio quality was pretty bad
+
+**What was done:** No: using AirPods as a microphone on a Mac drops Bluetooth into a low-quality call mode. Suggested the MacBook or iPhone mic close up, AirPods for listening only, capturing the app's audio directly as system audio, and a quieter, softer room.
+
+### 189. 2026-09-27, 18:50 UTC
+
+> how do I enable debug mode
+
+**What was done:** Open the site once with `?debug=true` (it stays on in that browser; `?debug=false` turns it off).
+
+### 190. 2026-09-27, 18:51 UTC
+
+> I still don't have the option to watch technical details
+
+**What was done:** Debug mode worked in testing; explained where the three places are (the checkbox above Make my retreat, the link under the progress bar, the build log at the foot of a finished retreat, and Costs in the footer). Added a "Debug" marker to the header while debug mode is on, which also turns it off.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
