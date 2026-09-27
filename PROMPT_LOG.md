@@ -1215,7 +1215,7 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 > i'm trying to build my own examine using the iphone web app, but I weirdly can't scroll down past this picture to see if it's running *(with a screenshot of the Practice page in the Home Screen app, its text running under the status bar)*
 
-**What was done:** A known iPhone bug in Home Screen apps: when the keyboard closes while the box you were typing in disappears (here the "What are your days like?" form, hidden once the Examen is being made), the page can stay shifted and stop short of the bottom. Now Write my Examen closes the keyboard first and scrolls to "Writing your Examen…", and in a Home Screen app any text box losing focus nudges the page back into place.
+**What was done:** A known iPhone bug in Home Screen apps: when the keyboard closes while the box you were typing in disappears (here the "What are your days like?" form, hidden once the Examen is being made), the page can stay shifted and stop short of the bottom. Now Write my Examen closes the keyboard first and scrolls to "Writing your Examen…", and in a Home Screen app any text box losing focus nudges the page back into place. Checking the server showed the Examen had started but then been cut off: pushing to the API repository redeploys Render, which restarts the server and ended the job, leaving it "making" for twenty minutes. Now an Examen interrupted by a restart starts again by itself with the same notes and voice (at most twice), and one that can't is marked failed at once rather than after twenty minutes.
 
 ---
 

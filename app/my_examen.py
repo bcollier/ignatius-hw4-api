@@ -23,6 +23,8 @@ VOICES = {
 }
 MAX_DAYS_TEXT = 4_000
 STALE_SECONDS = 20 * 60  # a "making" left behind by a restart counts as failed after this
+BOOTED = time.time()  # when this server started; a job begun before it was cut off by a restart
+MAX_RESTARTS = 2
 SYSTEM = prompts._prompt("my_examen")
 
 SEGMENT = {
@@ -51,6 +53,7 @@ SCHEMA = {
 }
 
 _tasks: set[asyncio.Task] = set()  # keep references so running tasks aren't garbage collected
+_running: set[str] = set()  # people whose Examen this server is making right now
 
 
 def _path(user_id: str) -> str:
@@ -62,8 +65,14 @@ async def load(user_id: str) -> dict:
         state = json.loads(await store.get_file(_path(user_id)))
     except (StorageError, ValueError):
         return {"status": "none"}
-    if state.get("status") == "making" and time.time() - state.get("started", 0) > STALE_SECONDS:
-        state["status"], state["error"] = "failed", "It stopped partway (the server restarted). Please try again."
+    if state.get("status") == "making" and user_id not in _running:
+        if state.get("started", 0) < BOOTED and state.get("restarts", 0) < MAX_RESTARTS:
+            # Begun on a server that has since restarted (an update, say): start it again.
+            log.warning("restarting an interrupted Examen for %s", user_id)
+            state["restarts"] = state.get("restarts", 0) + 1
+            return await _launch(user_id, state.get("email"), state)
+        if time.time() - state.get("started", 0) > STALE_SECONDS or state.get("started", 0) < BOOTED:
+            state["status"], state["error"] = "failed", "It stopped partway (the server restarted). Please try again."
     return state
 
 
@@ -89,12 +98,19 @@ async def start(user_id: str, email: str | None, days: str, voice: str) -> dict:
     previous = await load(user_id)
     if previous.get("status") == "making":
         return previous
-    state = {**previous, "status": "making", "started": time.time(), "error": None,
-             "days": days[:MAX_DAYS_TEXT], "voice": voice}
+    state = {**previous, "status": "making", "error": None, "restarts": 0,
+             "days": days[:MAX_DAYS_TEXT], "voice": voice, "email": email}
+    return await _launch(user_id, email, state)
+
+
+async def _launch(user_id: str, email: str | None, state: dict) -> dict:
+    state["started"] = time.time()
     await _save(user_id, state)
+    _running.add(user_id)
     task = asyncio.create_task(_make(user_id, email, state))
     _tasks.add(task)
     task.add_done_callback(_tasks.discard)
+    task.add_done_callback(lambda _: _running.discard(user_id))
     return state
 
 

@@ -48,3 +48,21 @@ def test_it_is_written_recorded_and_served(monkeypatch):
         assert spoken["seconds"] == 1.5 and spoken["file"]
         assert state["session"]["voices"] == {"standard": "Ryan, Microsoft (free)"}
         main.app.dependency_overrides.clear()
+
+
+def test_an_examen_cut_off_by_a_restart_starts_again(monkeypatch):
+    started = []
+
+    async def make(user_id, email, state):
+        started.append(state["days"])
+
+    monkeypatch.setattr(my_examen, "_make", make)
+    user = "ex-restart"
+    old = {"status": "making", "started": my_examen.BOOTED - 60, "days": "I teach.", "voice": "standard"}
+    asyncio.run(my_examen._save(user, old))
+    state = asyncio.run(my_examen.load(user))
+    assert state["status"] == "making" and state["restarts"] == 1
+    asyncio.run(asyncio.sleep(0))
+    my_examen._running.discard(user)
+    asyncio.run(my_examen._save(user, {**old, "restarts": my_examen.MAX_RESTARTS}))
+    assert asyncio.run(my_examen.load(user))["status"] == "failed"
