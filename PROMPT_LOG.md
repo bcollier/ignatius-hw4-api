@@ -1008,6 +1008,16 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** No: the email's link then opens in Chrome instead of Safari, and the code works the same from either. The wording now says "your browser (Safari or Chrome)".
 
+### 162. 2026-09-27, 14:12 UTC
+
+> I don't see how to go back to the menu from here *(with a screenshot of the prayer screen, its text cut off at the right)*
+
+### 163. 2026-09-27, 14:13 UTC
+
+> I didn't zoom it is at standard width
+
+**What was done (162 and 163):** The close button (top right) had been pushed off the screen: a long part name in the player ("Opening: asking for the grace") couldn't shrink inside its row, so it widened the whole prayer screen (to 439px on a 393px iPhone), cutting off the close button, the text and the third button. The name's box can now shrink, so the name wraps, and the prayer screen can't scroll sideways. Also, every text box is now at least 16px, since iPhone browsers zoom into smaller ones.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.
