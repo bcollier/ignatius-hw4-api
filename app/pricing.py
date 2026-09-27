@@ -89,7 +89,7 @@ async def prices() -> dict:
     try:
         async with httpx.AsyncClient(timeout=15) as http:
             data = (await http.get("https://openrouter.ai/api/v1/models")).json()["data"]
-        live = {m["id"]: {k: float(v) for k, v in m["pricing"].items() if _is_number(v)} for m in data if m["id"] in model_ids()}
+        live = {m["id"]: {k: float(v) for k, v in m["pricing"].items() if _is_number(v)} for m in data if m["id"] in model_ids() or m["id"].startswith("openai/")}  # OpenAI's too, for the companion's brains
         _prices = {**FALLBACK_PRICES, **live}
         _prices_at = time.time()
     except Exception:

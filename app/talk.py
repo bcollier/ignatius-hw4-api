@@ -10,6 +10,9 @@ Providers (each on when its key is set):
           so the key never reaches the browser. A server-side hangup enforces the
           time limit.
   xai     xAI Grok voice (see _xai_session).
+  turns   Taking turns: the browser listens, a chosen "brain" writes each reply, and a
+          free Microsoft voice speaks it (see talk_turns.py). Free accounts use it with
+          the free model and no daily limit.
 
 Free users get FREE_TALK_SECONDS a day; premium users up to TALK_MAX_SECONDS a call.
 """
@@ -23,7 +26,7 @@ from datetime import date, datetime, timezone
 
 import httpx
 
-from . import config, llm_log, prompts
+from . import config, llm_log, prompts, talk_turns
 from .storage import StorageError, store
 
 log = logging.getLogger(__name__)
@@ -47,7 +50,7 @@ class TalkError(Exception):
 
 
 def providers() -> dict[str, dict]:
-    out = {}
+    out = {talk_turns.PROVIDER: talk_turns.provider_info()} if talk_turns.brains(False) or config.LLM_MODE == "openrouter" else {}
     if config.OPENAI_API_KEY:
         out["openai"] = {"label": "OpenAI (GPT-Live)", "voices": OPENAI_VOICES, "default_voice": "marin"}
     if config.XAI_API_KEY:
@@ -57,10 +60,12 @@ def providers() -> dict[str, dict]:
 
 def options() -> dict:
     p = providers()
+    live = [k for k in p if k != talk_turns.PROVIDER]
     return {
         "enabled": bool(p),
         "providers": p,
-        "default_provider": next(iter(p), None),
+        "default_provider": live[0] if live else next(iter(p), None),  # free accounts start on turns (see the page)
+        "turn_brains": {"free": talk_turns.brains(False), "full": talk_turns.brains(True)},
         "free_seconds": config.FREE_TALK_SECONDS,
         "max_seconds": config.TALK_MAX_SECONDS,
     }
@@ -279,10 +284,12 @@ _sessions: dict[str, dict] = {}
 
 
 async def start(user, retreat: dict | None, about: str, notes: str, provider: str, voice: str, sdp: str | None,
-                local_time: str | None = None, instructions: str = "") -> dict:
+                local_time: str | None = None, instructions: str = "", brain: str = "") -> dict:
     available = providers()
     if provider not in available:
         raise TalkError(400, "That conversation service isn't set up on this server.")
+    if provider == talk_turns.PROVIDER:
+        return await _start_turns(user, retreat, about, notes, voice, local_time, instructions, brain)
     if voice not in available[provider]["voices"]:
         voice = available[provider]["default_voice"]
     if user.full:
@@ -315,7 +322,8 @@ async def end(user, session_id: str, seconds: int, transcript: str) -> None:
     if not s or s["user_id"] != user.id:
         return
     seconds = int(min(max(0, seconds), time.time() - s["started"] + 5))
-    if not s["full"]:
+    turns = s["provider"] == talk_turns.PROVIDER
+    if not s["full"] and not turns:  # the daily allowance is for the paid live voices
         await add_usage(user.id, seconds)
     if transcript.strip():
         history = await load_history(user.id)
@@ -328,13 +336,65 @@ async def end(user, session_id: str, seconds: int, transcript: str) -> None:
         await save_history(user.id, history)
         asyncio.create_task(_remember(user.id, s["full"]))
     llm_log.tag(user_id=s["user_id"], email=s["email"], retreat_id=s["retreat_id"], purpose="talk")
+    if turns:  # each reply was logged as its own call, with its cost; this row is the whole conversation
+        model, usd = f"turns: {s['brain']}", s.get("usd", 0.0)
+    else:
+        model = "gpt-live-1" if s["provider"] == "openai" else config.XAI_VOICE_MODEL
+        usd = round(seconds / 60 * (0.05 if s["provider"] == "openai" else config.XAI_USD_PER_MINUTE), 4)
     await llm_log.record(
-        provider=s["provider"], model="gpt-live-1" if s["provider"] == "openai" else config.XAI_VOICE_MODEL,
+        provider=s["provider"], model=model,
         system=s["instructions"], messages=[], response_text=transcript[:200_000] or None,
-        response_extra={"voice": s["voice"], "seconds": seconds},
-        usage={"usd": round(seconds / 60 * (0.05 if s["provider"] == "openai" else config.XAI_USD_PER_MINUTE), 4)},
-        duration_ms=seconds * 1000,
+        response_extra={"voice": s["voice"], "seconds": seconds}, usage={"usd": usd}, duration_ms=seconds * 1000,
     )
+
+
+# ---------------------------------------------------------------- taking turns
+
+
+async def _start_turns(user, retreat, about, notes, voice, local_time, instructions, brain) -> dict:
+    try:
+        brain = talk_turns.check_brain(brain, user.full)
+    except ValueError as exc:
+        raise TalkError(400, str(exc)) from exc
+    voice = voice if voice in talk_turns.provider_info()["voices"] else talk_turns.DEFAULT_VOICE
+    instructions = context(retreat, about, notes, await load_history(user.id), local_time, instructions)
+    sid = _new_id()
+    _sessions[sid] = talk_turns.new_session(user, retreat, instructions, voice, brain)
+    greeting = await _turn_reply(sid, None)
+    return {"session_id": sid, "provider": talk_turns.PROVIDER, "voice": voice, "brain": brain,
+            "max_seconds": config.TALK_MAX_SECONDS, "greeting": greeting}
+
+
+def _turn_session(user, session_id: str) -> dict:
+    s = _sessions.get(session_id)
+    if not s or s["user_id"] != user.id or s["provider"] != talk_turns.PROVIDER:
+        raise TalkError(404, "That conversation has ended. Start a new one.")
+    if time.time() - s["started"] > s["max"]:
+        raise TalkError(403, "The conversation reached its time limit.")
+    return s
+
+
+async def _turn_reply(session_id: str, text: str | None) -> str:
+    from .llm import LLMError
+
+    try:
+        return await talk_turns.reply(_sessions[session_id], text)
+    except LLMError as exc:
+        raise TalkError(502, str(exc)) from exc
+
+
+async def turn(user, session_id: str, text: str) -> str:
+    """What the person said; returns the companion's reply."""
+    _turn_session(user, session_id)
+    if not text.strip():
+        raise TalkError(400, "Nothing was heard. Try again.")
+    return await _turn_reply(session_id, text)
+
+
+async def speak(user, session_id: str, text: str) -> bytes:
+    """One sentence of a reply, in the conversation's voice."""
+    s = _turn_session(user, session_id)
+    return await talk_turns.speak(s["voice"], text)
 
 
 # ---------------------------------------------------------------- OpenAI GPT-Live

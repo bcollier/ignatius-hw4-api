@@ -227,3 +227,19 @@ def test_a_generic_retreat_leaves_out_the_notes(monkeypatch):
 
     assert asyncio.run(notes(True)) == "I teach and pray at dawn."
     assert asyncio.run(notes(False)) == ""
+
+
+def test_saved_defaults_follow_the_person():
+    from fastapi.testclient import TestClient
+
+    from app import main
+    from app.auth import User, current_user
+
+    with TestClient(main.app) as client:
+        main.app.dependency_overrides[current_user] = lambda: User("defaults-1", "d@b.c")
+        assert client.get("/api/profile/defaults").json()["settings"] == {}
+        client.put("/api/profile/defaults", json={"settings": {"voice.reading": "en-GB-RyanNeural"}})
+        assert client.get("/api/profile/defaults").json()["settings"]["voice.reading"] == "en-GB-RyanNeural"
+        main.app.dependency_overrides[current_user] = lambda: User("defaults-2", "e@b.c")
+        assert client.get("/api/profile/defaults").json()["settings"] == {}
+        main.app.dependency_overrides.clear()

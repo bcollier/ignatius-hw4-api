@@ -1,11 +1,15 @@
 """About me ("user info.md"): what the person has told the app about themselves."""
 
+import json
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from .. import google_docs, llm_log, profile
 from ..auth import User, current_user
 from ..extract import ExtractError, extract
+from ..storage import StorageError, store
 from .uploads import read_upload
 
 router = APIRouter(prefix="/api/profile")
@@ -58,6 +62,39 @@ async def profile_from_google_doc(body: GoogleDocRequest, user: User = Depends(c
         raise HTTPException(400, "That Google Doc has no text in it.")
     llm_log.tag(user_id=user.id, email=user.log_email)
     return await profile.save(user.id, text, None, user.full, source=filename)
+
+
+# ---------------------------------------------------------------- saved defaults
+# The New retreat choices (voices, models, research, prompts, guidance) a person saved
+# as their own defaults, so every device starts from them.
+
+MAX_DEFAULTS_BYTES = 200_000
+
+
+def _defaults_path(user_id: str) -> str:
+    return f"{user_id}/defaults.json"
+
+
+class Defaults(BaseModel):
+    settings: dict
+
+
+@router.get("/defaults")
+async def read_defaults(user: User = Depends(current_user)):
+    try:
+        return json.loads(await store.get_file(_defaults_path(user.id)))
+    except (StorageError, ValueError):
+        return {"settings": {}, "saved_at": None}
+
+
+@router.put("/defaults")
+async def save_defaults(body: Defaults, user: User = Depends(current_user)):
+    data = {"settings": body.settings, "saved_at": datetime.now(timezone.utc).isoformat()}
+    blob = json.dumps(data).encode()
+    if len(blob) > MAX_DEFAULTS_BYTES:
+        raise HTTPException(400, "Those settings are too large to save.")
+    await store.put_file(_defaults_path(user.id), blob, "application/json")
+    return data
 
 
 def _text_of(filename: str, data: bytes) -> str:

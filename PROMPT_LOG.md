@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 203 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 206 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1256,6 +1256,24 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 > when I mark a day as prayed "Mark a Day as Prayed" there is no good visual queue that it succeeded. Put something simple that says Day marked as prayed
 
 **What was done:** Marking a day now shows a short message at the bottom of the screen, "Day 3 marked as prayed." (or "marked as complete" for an exercise day, and "marked as not prayed" when undone), wherever it's done: the day's page, after praying, or the Today card.
+
+### 204. 2026-09-27, 20:42 UTC
+
+> build the free companion. build a version of the free companion that we can change the brain to claude or openai models. the brain of the free ai companion that is. we wouldn't be paying $0.08 per minute or whatever but the brain could be smarter (Fable) or just much less money if the app is mostly listening.
+
+**What was done:** Talk it over has a third way to talk, "Free voice (takes turns)" (`app/talk_turns.py`): the browser's own speech recognition listens (with a box to type instead where a browser can't), the chosen brain writes the reply with the same instructions, context and memory as the live companion plus a note that it will be heard, and a free Microsoft voice speaks it sentence by sentence, the next sentence recorded while one plays. Brains: the free Jetstream model for everyone (the default for free accounts, with no daily limit), and for premium accounts Claude Fable 5.1, Opus 5.5 and Haiku 4.5 through OpenRouter or OpenAI GPT-5.5 and GPT-5.4 mini directly; each reply is logged with its cost, and Claude's unchanging context is cached, so later replies cost about a tenth (Haiku: $0.009 then $0.0008). Tested: the free brain answers in 10 to 20 seconds, the paid ones in 1.5 to 6. Conversations are saved to history and memory like live ones. New endpoints `POST /api/talk/turn` and `/api/talk/speak`.
+
+### 205. 2026-09-27, 20:44 UTC
+
+> this is a bug, when I change one of these models planning the retreat the other one changes, I cant make them different *(with a screenshot of the two model menus)*
+
+**What was done:** The two menus were tied together from when one model did both jobs. Now planning and writing each keep their own choice (the server already accepted separate models); tested with Haiku to plan and Fable to write.
+
+### 206. 2026-09-27, 20:48 UTC
+
+> add a "Save my defaults" button so that once I choose these voices when I make the next retreat I have these the same way *(with a screenshot of the Voices menus)*
+
+**What was done:** "Save my defaults" (under the voices, and at the end of Advanced) saves every choice in Advanced (voices, models, research, the reflection's voice, prompts, guidance) to the account (`GET`/`PUT /api/profile/defaults`). Signing in on any device applies the saved defaults once whenever they're newer; changes after that stay on the device until saved again. Tested by wiping a browser's storage and seeing the saved voices come back.
 
 ---
 
