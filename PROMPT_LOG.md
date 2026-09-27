@@ -904,6 +904,18 @@ The same log is in both repositories: [API](https://github.com/bcollier/ignatius
 
 **What was done:** The waiting screen has a random gentle phrase ("The sacristan is finding the keys…", "Brother Server is putting on his sandals…"), a note that the app runs on modest hardware that rests when no one is praying, a seconds counter, and a golden circle that grows and shrinks for slow belly breathing (in for four seconds, out for six).
 
+### 145. 2026-09-27, 03:05 UTC
+
+> Users should be able to upload a photo of something like a book that has five verses on it or anything that could be an inspiration for a retreat for example suggest the parables of Jesus for a retreat of seven days and build a daily audio series on it for meditation
+
+**What was done:** Two new ways to start a retreat. A photo (JPEG or PNG) can be uploaded as the material, and the planner reads it like a scanned page. And "or start from an idea or a photo": the person describes an idea ("the parables of Jesus"), chooses how many days, and can add a photo. A model chooses one passage a day (app/inspiration.py, prompt in app/prompt_texts/inspiration.md). Verses in the photo are copied exactly as printed; every other passage is fetched from the World English Bible (public domain) through bible-api.com, so no scripture is written by a model. The result is planned and made like any upload. Tried on "the parables, seven days" ("The Kingdom Is Like This") and on an anxious-trust idea with a photo of Psalm 121 and Isaiah 43 (the photo's verses became days one and two, word for word).
+
+### 146. 2026-09-27, 03:17 UTC
+
+> Play or stop a sample button is not doing anything
+
+**What was done:** With the music set to None (the default) the sample had nothing to play. It now plays the chant when None is chosen, otherwise the chosen music; the button says "Stop the sample" while it plays; changing the choice switches what's playing; and leaving the page stops it.
+
 ## Prompts the app sends to models
 
 The defaults are in `app/prompts.py` and are shown, editable, under Advanced on the web page. Every call starts with a background on the Spiritual Exercises, retreats and lectio divina, and the person's About me notes.

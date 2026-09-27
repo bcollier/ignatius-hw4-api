@@ -34,7 +34,7 @@ async def options():
     return {
         "tiers": tts.tiers(),
         "prompts": prompts.defaults(),
-        "limits": {"max_upload_mb": config.MAX_UPLOAD_MB, "max_pages": config.MAX_PAGES},
+        "limits": {"max_upload_mb": config.MAX_UPLOAD_MB, "max_pages": config.MAX_PAGES, "max_days": config.MAX_DAYS},
         "models": await pricing.model_menu(),
         "default_model": config.LLM_MODEL,
         "web_search": config.WEB_SEARCH,

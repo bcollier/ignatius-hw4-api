@@ -21,7 +21,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import config, llm, llm_log, pricing, profile, prompts, search, series, tts
+from . import config, inspiration, llm, llm_log, pricing, profile, prompts, search, series, tts
 from .extract import Extracted, Image
 from .storage import StorageError, store
 
@@ -103,6 +103,9 @@ async def _resume(retreat: dict) -> None:
 
     log.warning("resuming interrupted job for retreat %s (attempt %s)", retreat["id"], retreat["resumes"])
     llm_log.tag(email=retreat.get("owner_email"))
+    if retreat["status"] == "planning" and retreat.get("composing"):
+        retreat.update(status="failed", error="Choosing the passages was interrupted by a server restart. Please try again.")
+        return await save(retreat)
     if retreat["status"] == "planning":
         source = await _load_source(retreat)
         if source is None:
@@ -170,7 +173,8 @@ def _source_path(retreat: dict, name: str) -> str:
 async def _save_source(retreat: dict, source: Extracted) -> None:
     """Keep what planning needs, so an interrupted plan can restart."""
     meta = {"kind": source.kind, "text": source.text, "page_count": source.page_count, "truncated": source.truncated,
-            "scanned": [img.page for img in source.scanned_pages]}
+            "scanned": [img.page for img in source.scanned_pages],
+            "scanned_mimes": [img.mime for img in source.scanned_pages]}
     await store.put_file(_source_path(retreat, "source.json"), json.dumps(meta).encode(), "application/json")
     for i, img in enumerate(source.scanned_pages):
         await store.put_file(_source_path(retreat, f"scan{i}.png"), img.data, img.mime)
@@ -180,7 +184,8 @@ async def _load_source(retreat: dict) -> Extracted | None:
     try:
         meta = json.loads(await store.get_file(_source_path(retreat, "source.json")))
         images = [Image(await store.get_file(img["path"]), "image/jpeg", 0, 0, img.get("page")) for img in retreat["images"]]
-        scans = [Image(await store.get_file(_source_path(retreat, f"scan{i}.png")), "image/png", 0, 0, page)
+        mimes = meta.get("scanned_mimes") or ["image/png"] * len(meta.get("scanned", []))  # photos are JPEG
+        scans = [Image(await store.get_file(_source_path(retreat, f"scan{i}.png")), mimes[i], 0, 0, page)
                  for i, page in enumerate(meta.get("scanned", []))]
     except (StorageError, ValueError):
         return None
@@ -216,9 +221,12 @@ async def public_view(retreat: dict) -> dict:
 async def create_retreat(
     user_id: str, filename: str, source: Extracted, plan_prompt: str, model: str, email: str | None = None,
     series_ids: list[str] | None = None, build_options: dict | None = None, start_date: str | None = None,
+    compose=None,
 ) -> dict:
     """Store the document's images, save a new retreat record, and start planning it
-    in the background. Returns the record at once (status "planning")."""
+    in the background. Returns the record at once (status "planning").
+    With `compose` (a retreat from an idea, app/inspiration.py), the source document is
+    written first, in the background: compose() returns (filename, source)."""
     retreat_id = str(uuid.uuid4())
     images = await _store_images(user_id, retreat_id, source)
     retreat = {
@@ -243,11 +251,35 @@ async def create_retreat(
         "images": images,
         "plan": None,
         "days": {},
+        "composing": bool(compose),
     }
+    if compose:
+        await store.save(retreat)
+        spawn(retreat, _compose_then_plan(retreat, compose, plan_prompt))
+        return retreat
     await _save_source(retreat, source)
     await store.save(retreat)
     spawn(retreat, _plan(retreat, source, plan_prompt))
     return retreat
+
+
+async def _compose_then_plan(retreat: dict, compose, plan_prompt: str) -> None:
+    """A retreat from an idea: choose the passages and fetch their text, then plan as usual."""
+    llm_log.tag(user_id=retreat["user_id"], retreat_id=retreat["id"])
+    try:
+        filename, source = await compose()
+    except (inspiration.InspirationError, llm.LLMError) as exc:
+        retreat.update(status="failed", error=str(exc), composing=False)
+        return await save(retreat)
+    except Exception:  # anything else still ends the job, rather than leave it "planning"
+        log.exception("choosing passages failed for retreat %s", retreat["id"])
+        retreat.update(status="failed", error="Choosing the passages didn't work this time. Please try again.", composing=False)
+        return await save(retreat)
+    retreat.update(filename=filename, source=_source_summary(source), composing=False,
+                   images=await _store_images(retreat["user_id"], retreat["id"], source))
+    await _save_source(retreat, source)
+    await save(retreat)
+    await _plan(retreat, source, plan_prompt)
 
 
 async def _store_images(user_id: str, retreat_id: str, source: Extracted) -> list[dict]:

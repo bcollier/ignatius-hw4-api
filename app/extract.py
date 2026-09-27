@@ -1,4 +1,4 @@
-"""Pull text and images out of an uploaded PDF or Word document."""
+"""Pull text and images out of an uploaded PDF, Word document, text file or photo."""
 
 import io
 from dataclasses import dataclass, field
@@ -10,6 +10,9 @@ from . import config
 
 MIN_IMAGE_SIDE = 80  # skip bullets, rules and other decoration
 MAX_IMAGE_SIDE = 1568  # larger images are scaled down before storage and vision calls
+
+
+PHOTO_SUFFIXES = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff")
 
 
 class ExtractError(ValueError):
@@ -44,8 +47,10 @@ def extract(filename: str, data: bytes) -> Extracted:
         result = _extract_docx(data)
     elif name.endswith((".txt", ".md", ".markdown")):
         result = _extract_text(data)
+    elif name.endswith(PHOTO_SUFFIXES):
+        result = extract_photo(data)
     else:
-        raise ExtractError("Upload a PDF (.pdf), Word document (.docx) or text file (.txt).")
+        raise ExtractError("Upload a PDF (.pdf), Word document (.docx), text file (.txt) or photo (.jpg or .png).")
 
     if len(result.text) > config.MAX_SOURCE_CHARS:
         result.text = result.text[: config.MAX_SOURCE_CHARS]
@@ -63,6 +68,23 @@ def _extract_text(data: bytes) -> Extracted:
         except UnicodeDecodeError:
             continue
     return Extracted(text=text.replace("\r\n", "\n"), images=[], kind="text", page_count=0)
+
+
+def photo_image(data: bytes) -> Image:
+    """A photo, sized and encoded like a scanned page, for a vision model to read."""
+    try:
+        pix = pymupdf.Pixmap(data)
+    except Exception as exc:
+        raise ExtractError("That photo couldn't be read. Please use a JPEG or PNG.") from exc
+    img = _to_web_image(pix, 1, fmt="jpeg")
+    if not img:
+        raise ExtractError("That photo is too small to read.")
+    return img
+
+
+def extract_photo(data: bytes) -> Extracted:
+    """A photo of a page, a book or a card: the planner reads it like a scanned page."""
+    return Extracted(kind="photo", text="", page_count=1, scanned_pages=[photo_image(data)])
 
 
 def _to_web_image(pix: pymupdf.Pixmap, page: int | None, fmt: str = "jpeg") -> Image | None:

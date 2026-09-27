@@ -7,11 +7,11 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from .. import config, demos, examples, google_docs, llm_log, pipeline, prompts, script_pdf
+from .. import config, demos, examples, google_docs, inspiration, llm_log, pipeline, prompts, script_pdf
 from ..access import my_retreat, readable_retreat, save_retreat, view_of
 from ..auth import User, current_user
 from ..checks import BuildRequest, check_date, check_model, check_prompt, check_series, check_title, resolve_build
-from ..extract import ExtractError, extract
+from ..extract import Extracted, ExtractError, extract, photo_image
 from ..storage import StorageError, store, summary
 from .uploads import read_upload, too_big
 
@@ -61,6 +61,9 @@ async def create_retreat(
     file: UploadFile | None = File(None),
     example: str = Form(""),
     google_doc: str = Form(""),
+    idea: str = Form(""),
+    idea_days: int = Form(7),
+    photo: UploadFile | None = File(None),
     plan_prompt: str = Form(""),
     model: str = Form(""),
     series_ids: str = Form("", alias="series"),
@@ -73,12 +76,16 @@ async def create_retreat(
     the retreat comes back ready to pray. Without it, only the plan is made.
     Instead of a file, `example` names one of the example documents (/api/examples),
     ("be-still", or "be-still.txt" for its plain-text version), or `google_doc` is the
-    link to a Google Doc shared as "Anyone with the link can view"."""
+    link to a Google Doc shared as "Anyone with the link can view", or `idea` (and/or an
+    inspiring `photo`) asks for a retreat of `idea_days` days on a theme: the passages are
+    chosen and their text fetched first (app/inspiration.py)."""
     # Everything is checked before the upload is read, so a bad option fails fast.
     plan_prompt = check_prompt(plan_prompt, prompts.PLAN_INSTRUCTIONS, "planning")
     model = check_model(model, user)
     build_options = _build_options(options, user)
     start = check_date(start_date)
+    if idea.strip() or photo is not None:
+        return await _retreat_from_idea(idea, idea_days, photo, plan_prompt, model, build_options, start, series_ids, user)
     filename, data = await _source_bytes(file, example, google_doc)
     try:
         source = extract(filename, data)
@@ -89,6 +96,29 @@ async def create_retreat(
     retreat = await pipeline.create_retreat(
         user.id, filename, source, plan_prompt, model,
         email=user.log_email, series_ids=ids, build_options=build_options, start_date=start,
+    )
+    return await pipeline.public_view(retreat)
+
+
+async def _retreat_from_idea(idea: str, days: int, photo: UploadFile | None, plan_prompt: str, model: str,
+                             build_options: dict | None, start: str | None, series_ids: str, user: User) -> dict:
+    if len(idea) > inspiration.MAX_IDEA:
+        raise HTTPException(400, f"Please keep the idea under {inspiration.MAX_IDEA:,} characters.")
+    if not 1 <= days <= config.MAX_DAYS:
+        raise HTTPException(400, f"Choose between 1 and {config.MAX_DAYS} days.")
+    image = None
+    if photo is not None:
+        try:
+            image = photo_image(await read_upload(photo))
+        except ExtractError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    llm_log.tag(email=user.log_email)
+    ids = await check_series(series_ids, user)
+    placeholder = Extracted(kind="idea", text=idea, page_count=0)
+    retreat = await pipeline.create_retreat(
+        user.id, "Your idea", placeholder, plan_prompt, model, email=user.log_email, series_ids=ids,
+        build_options=build_options, start_date=start,
+        compose=lambda: inspiration.compose(idea, image, days, model),
     )
     return await pipeline.public_view(retreat)
 
