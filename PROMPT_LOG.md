@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 252 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 254 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1612,6 +1612,27 @@ Tested with a real conversation.
 > add the youtube video to the readme file, make the thumbnail nice https://www.youtube.com/watch?v=GpS1dclAo4w  this is the description video
 
 **What was done:** Added the description video to the top of both READMEs. It shows as a thumbnail made from the video's own frame with a play button and a caption, linked to YouTube.
+
+### 253. 2026-09-28, 16:20 UTC
+
+> build product roadmap
+>
+> Future states build an apple / android app
+> virtual talk with the saints, talk to julian of norwich or st john of the cross as a director
+> other ideas?
+
+**What was done:** Wrote a product roadmap as a shared Claude doc ([link](https://claude.ai/code/artifact/69b4effe-73d9-4fc0-8d23-858d40c67a89), private until shared). It has three phases with gates, drawn as a diagram:
+- **Now (Oct–Dec 2026):** harden the web app.
+- **Next (Jan–Jun 2027):** iPhone and Android apps, by wrapping the web app with Capacitor. This adds lock-screen audio, offline retreats, reminders and native speech recognition. It costs $99 a year for Apple and $25 once for Google.
+- **Later (Jul–Dec 2027):** praying with the saints. Answers come only from public-domain translations of their writings, with citations. Each conversation is labelled as imaginative, not the saint and not spiritual direction, and gets theological review and evals.
+
+It also has a table of ten other ideas, plus risks and open questions.
+
+### 254. 2026-09-28, 16:25 UTC
+
+> load open source or out of print etc retreats
+
+**What was done:** Added a classic retreats library as the first of the other ideas, and put it in the Next phase: ready-made retreats from public-domain books found on Project Gutenberg, CCEL and the Internet Archive. It notes that out-of-print books published in 1931 or later are usually still under US copyright, so they need permission or a Creative Commons licence.
 
 ---
 
