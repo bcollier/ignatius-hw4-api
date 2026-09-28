@@ -326,6 +326,65 @@ def analyse(run: RunDir, judges: list[str]) -> dict:
                          "models": model_rows, "diffs": diffs, "self_preference": selfpref,
                          "within_model_sd": r3(sd), "power": power}
     out["tracks_data"] = tracks_out
+    out["pieces"] = pieces(run)
+    out["text_agreement"] = text_agreement(rows, judges)
+    return out
+
+
+# ---------------------------------------------------------------- the raw exchanges, and whether the judges' words agree
+
+MAX_SHOWN = 8000  # characters of what a model was given (a deep dive's research runs much longer)
+STOP = set(("the and for that with this its it's into from your their they them what which about more than have has "
+            "been being were was are not but also only such very some most much many then when where while would could "
+            "should there these those here just each even over under onto upon piece listener reflection deep dive").split())
+
+
+def pieces(run: RunDir) -> dict:
+    """What each contestant was given and what it wrote, by "model|track|item"."""
+    out = {}
+    for s in run.samples("samples"):
+        given = s.get("input") or ""
+        out[f"{s['model']}|{s['track']}|{s['passage']}"] = {
+            "given": given[:MAX_SHOWN], "given_chars": len(given), "wrote": s["script"], "words": s.get("words"),
+            "sources": s.get("sources", []), "seconds": s.get("seconds"), "usd": s.get("usd")}
+    for c in run.samples("conversations"):
+        out[f"{c['model']}|companion|{c['scenario']}"] = {
+            "given": c["system"][-MAX_SHOWN:], "given_chars": len(c["system"]),
+            "turns": [{"who": t["role"], "text": t["content"]} for t in c["turns"]], "seconds": c.get("seconds"), "usd": c.get("usd")}
+    return out
+
+
+def content_words(text: str) -> set[str]:
+    import re
+    return {w for w in re.findall(r"[a-z]{4,}", (text or "").lower()) if w not in STOP}
+
+
+def jaccard(a: set, b: set) -> float | None:
+    return len(a & b) / len(a | b) if a | b else None
+
+
+def text_agreement(rows: list[dict], judges: list[str]) -> dict:
+    """For each piece: how far the judges' strengths (and weaknesses) share their words
+    (mean pairwise Jaccard overlap of content words), and the words two or more used. A
+    rough measure: two judges can say the same thing in different words, and similar
+    words can hide different points; read the texts side by side to be sure."""
+    by_piece = defaultdict(dict)
+    for r in rows:
+        by_piece["|".join(r["key"])][r["judge"]] = r
+    out = {}
+    for key, per in by_piece.items():
+        entry = {}
+        for field in ("strength", "weakness"):
+            words = {j: content_words(per[j].get(field, "")) for j in per}
+            pairs = [jaccard(words[a], words[b]) for a, b in combinations(sorted(words), 2)]
+            pairs = [p for p in pairs if p is not None]
+            counts = defaultdict(int)
+            for ws in words.values():
+                for w in ws:
+                    counts[w] += 1
+            entry[field] = {"overlap": r3(statistics.fmean(pairs)) if pairs else None,
+                            "shared": sorted(w for w, n in counts.items() if n >= 2)}
+        out[key] = entry
     return out
 
 
