@@ -24,6 +24,8 @@ Variants (prompts in app/agent_prompts/eval_scale_*.md):
   checklist  10 yes/no criteria per track, summed (0-10)
   pairwise   two pieces for the same day: which is better, by 0-3 (Bradley-Terry)
   ranking    all the pieces for a day ranked together (a forced distribution)
+  v2         the revised rubric: fixed reference points (4 = typical AI work, 7 = a master),
+             every point anchored, critique first, references, a quote for any 6 or 7
 
   .venv/bin/python -m evals.scale_study [--run full] [--collect] [--analyse]
 Writes evals/runs/<run>/scale_study/ (cache) and ~/Code/ignatius-hw4-web/evals/scales.json.
@@ -56,6 +58,7 @@ JUDGES = ["gemini", "muse", "llama-scout"]
 DIMS = {"piece": ["overall", "emotionally_engaging", "thoughtful", "too_vague", "ai_jargon"],
         "companion": ["overall", "listening", "spiritual_depth", "restraint"]}
 LOWER = {"too_vague", "ai_jargon"}
+LOWER_V2 = LOWER | {"theological_disagreement"}
 # The primary score of every rubric variant (and of the current rubric) is the same
 # composite, so they're compared like for like: the dimensions all of them ask about,
 # lower-is-better ones turned around. "overall" is reported on its own.
@@ -80,6 +83,8 @@ VARIANTS = {
                  "change": "Must quote 3–5 specific flaws before scoring."},
     "checklist": {"label": "Checklist (10 yes/no)", "kind": "checklist", "lo": 0, "hi": 10,
                   "change": "Ten concrete yes/no criteria per track, summed; \"when in doubt, no\"."},
+    "v2": {"label": "Revised rubric (four changes)", "kind": "rubric", "lo": 1, "hi": 7,
+           "change": "4 = typical AI work, 7 = a master (Newman, Augustine shown); every point anchored; critique first; weak/typical/strong references; a 6 or 7 needs a quote."},
     "pairwise": {"label": "Pairwise comparison", "kind": "pairwise", "lo": -3, "hi": 3,
                  "change": "Two pieces for the same day: which is better, by 0–3; scored by Bradley–Terry."},
     "ranking": {"label": "Rank the day's pieces", "kind": "ranking", "lo": 1, "hi": 4,
@@ -232,6 +237,10 @@ class Study:
             user = await self.items.shown(key)
             if variant == "exemplar":
                 user = f"<references>\n{self.exemplars(key)}\n</references>\n\nNow the one to rate:\n\n{user}"
+            elif variant == "v2":  # the same references, plus a master for the top of the scale
+                master = "" if key[1] == "companion" else (
+                    f"<reference label=\"MASTER\" overall=\"7\">\n{prompt_of('v2', 'master_' + key[1])}\n</reference>\n\n")
+                user = f"<references>\n{master}{self.exemplars(key)}\n</references>\n\nNow the one to rate:\n\n{user}"
             dims = DIMS["companion" if key[1] == "companion" else "piece"]
             if variant == "checklist":
                 valid = lambda r: isinstance(r.get("answers"), dict) and all(f"c{i}" in r["answers"] for i in range(1, 11))
@@ -308,12 +317,15 @@ class Study:
             rec["labels"] = {lab: k[0] for lab, k in labels.items()}
             path.write_text(json.dumps(rec, ensure_ascii=False))
 
-    async def collect(self) -> None:
+    async def collect(self, only: list[str] | None = None) -> None:
         jobs = []
-        for v in ("anchored", "ten", "exemplar", "critique", "checklist"):
-            jobs += await self.rubric_jobs(v)
-        jobs += await self.pairwise_jobs()
-        jobs += await self.ranking_jobs()
+        for v in ("anchored", "ten", "exemplar", "critique", "checklist", "v2"):
+            if not only or v in only:
+                jobs += await self.rubric_jobs(v)
+        if not only or "pairwise" in only:
+            jobs += await self.pairwise_jobs()
+        if not only or "ranking" in only:
+            jobs += await self.ranking_jobs()
         print(f"{len(jobs)} judgments to make (cached ones are skipped)", flush=True)
         await asyncio.gather(*jobs)
 
@@ -370,6 +382,10 @@ def scores_for(study: Study, variant: str) -> tuple[dict, dict, dict]:
                          "criteria": {f"c{i}": bool(ans.get(f"c{i}")) for i in range(1, 11)}}
             else:
                 sc = {k: float(v) for k, v in rec["result"]["scores"].items() if isinstance(v, (int, float))}
+                if variant == "v2":  # a 6 or 7 on a higher-is-better scale counts only with a quote
+                    quotes = rec["result"].get("evidence_high") or {}
+                    sc = {k: (min(v, 5.0) if v >= 6 and k not in LOWER_V2 and not str(quotes.get(k) or "").strip() else v)
+                          for k, v in sc.items()}
                 primary = composite(sc, track, VARIANTS[variant]["lo"], VARIANTS[variant]["hi"])
                 if primary is None:
                     continue
@@ -637,7 +653,7 @@ def main(args) -> None:
     study = Study(RunDir(args.run))
     if args.collect or not args.analyse:
         started = time.time()
-        asyncio.run(study.collect())
+        asyncio.run(study.collect(args.only.split(",") if args.only else None))
         print(f"collected in {time.time() - started:.0f} s")
     if args.analyse or not args.collect:
         result = analyse(study)
@@ -653,6 +669,7 @@ if __name__ == "__main__":
     parser.add_argument("--run", default="full")
     parser.add_argument("--collect", action="store_true")
     parser.add_argument("--analyse", action="store_true")
+    parser.add_argument("--only", default="", help="collect only these variants, e.g. v2")
     main(parser.parse_args())
 
 

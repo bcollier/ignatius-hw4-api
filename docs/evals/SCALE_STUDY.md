@@ -245,3 +245,29 @@ Each variant ranked on nine criteria (1 = best); the table is ordered by the mea
 - **deep**: OpenAI GPT-6 Sol 0.67, Claude Opus 5.5 0.43, Gemma 4 31B -0.42, Muse Glimmer -0.68
 - **heart**: Claude Opus 5.5 1.94, Muse Glimmer -0.22, OpenAI GPT-6 Sol -0.76, Gemma 4 31B -0.97
 - Position bias: the first-shown piece won 41% of comparisons (50% = none).
+
+## Follow-up: the revised rubric (v2), 28 September 2026
+
+The first four recommendations above, combined into one rubric (`app/agent_prompts/eval_scale_v2.md`), then run on the same 48 items with the same three judges:
+- **Reference point:** 4 = what a capable AI model typically writes for this app; 7 = master level, shown with Newman's "Hope in God—Creator" (1893) and Augustine's Tractate 15 on John (NPNF, 1888).
+- **Anchors** at 2, 4 and 6 for every scale.
+- **Critique first:** 2–3 quoted weaknesses before any score.
+- **Reference pieces:** weak, typical and strong ones from another day, plus a quote required for any 6 or 7.
+
+It used 216 judgments with none invalid, and cost $0.53.
+
+| | Current rubric (v0) | Revised (v2) |
+| --- | --- | --- |
+| Share in the top two points | 79% | **27%** |
+| Mean (1–7) | 5.80 | 4.85 |
+| Skew | −1.10 | **0.14** (nearly symmetric) |
+| Krippendorff's α (within track) | −0.26 | 0.05 |
+| ICC(2,k), the three judges' average | 0.14 | **0.40** |
+| Same answer twice (retest ρ) | – | 0.93 |
+| Separates the models (η² over chance, mean of tracks) | 0.16 | **0.24** |
+| Deep dives: η² (p) | 0.36 (.02) | **0.64 (<.001)** |
+| Companion: η² (p) | 0.06 (.92) | 0.11 (.76) |
+
+Gemini's share of 6s and 7s fell from 98% to 50%, Llama's from 93% to 22%, and Muse's from 47% to 8%. The quote rule demoted only 7 of 251 high scores, so the reference point, the anchors and the critique did most of the work. The judges now agree more, though still well short of the 0.67 usually wanted; pairwise comparison remains the better tool for ranking the models, and the companion track is still not separated by any absolute rubric.
+
+On the mean rank across the nine criteria, v2 ties pairwise for second, behind ranking, whose even spread is built in.

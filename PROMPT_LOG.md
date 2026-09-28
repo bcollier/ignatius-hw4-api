@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 256 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 257 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1654,6 +1654,17 @@ It also has a table of ten other ideas, plus risks and open questions.
 - Keep pairwise comparison for ranking the models.
 - Check validity against about 20 pieces rated by people.
 Offered to draft it as a v2 rubric and test it on the free judges.
+
+### 257. 2026-09-28, 17:30 UTC
+
+> i like your suggestions, do all the first 4, show me the 19 scales we have now, group them, and show me what we should reduce down to that is more important and able to be evaluated
+
+**What was done:** Built the revised rubric (app/agent_prompts/eval_scale_v2.md) with the first four changes:
+- a fixed reference point: 4 = typical AI work, 7 = master level, with public-domain master texts shown (Newman 1893; Augustine's Tractate 15 on John, NPNF 1888 from CCEL);
+- every point anchored;
+- critique before scoring;
+- weak, typical and strong reference pieces, and a quote required for any 6 or 7 (otherwise it counts as 5).
+Added it to the scale study as variant v2 and started it on the three cheap judges over the same 48 pieces (216 judgments). Grouped the 19 scales into craft, faults, fruits of the Spirit and theological virtues. Each scale shows its top-end share, agreement, how well it separates the models, and the scale it most duplicates. Proposed reducing to 5 scored scales plus two yes/no flags and a fruits checklist. None of the 12 fruit and virtue scales separated the models in either track, and several pairs correlate at 0.86–0.94.
 
 ---
 
