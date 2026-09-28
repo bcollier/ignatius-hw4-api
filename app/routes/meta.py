@@ -38,10 +38,8 @@ async def options():
         "models": await pricing.model_menu(),
         "default_model": config.LLM_MODEL,
         "web_search": config.WEB_SEARCH,
-        "elevenlabs": {
-            "usd_per_1k_chars": config.ELEVENLABS_USD_PER_1K_CHARS,
-            "balance": await pricing.elevenlabs_balance(),
-        },
+        # The rate only: the account's balance is on the Costs page, for full accounts.
+        "elevenlabs": {"usd_per_1k_chars": config.ELEVENLABS_USD_PER_1K_CHARS},
         "talk": {**talk.options(), "xai_voices": await talk.xai_voices() if config.XAI_API_KEY else {}},
         "search_providers": search.configured(),
         "search_status": search.status(),

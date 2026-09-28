@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import config
+from . import auth, config
 from .routes import (about_me, agents, build_log, client_errors, conversation, handoff, cost_report, days, example_documents, local_files, meta,
                      my_examen, practice_journal, retreats)
 from .storage import LocalStore, StorageError, store
@@ -21,6 +21,7 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    auth.check_setup()
     await store.setup()
     yield
 

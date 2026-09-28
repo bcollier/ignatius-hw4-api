@@ -27,7 +27,7 @@ class StorageError(RuntimeError):
     """Saving or loading failed; the message is safe to show to the user."""
 
 
-LOG_FIELDS = ("id", "created_at", "day", "purpose", "provider", "model", "request", "response_text", "response",
+LOG_FIELDS = ("id", "created_at", "user_id", "day", "purpose", "provider", "model", "request", "response_text", "response",
               "input_tokens", "output_tokens", "web_searches", "usd", "duration_ms", "status", "error")
 USAGE_FIELDS = ("created_at", "retreat_id", "day", "purpose", "provider", "model", "usd", "web_searches",
                 "input_tokens", "output_tokens", "duration_ms")
@@ -184,9 +184,13 @@ class SupabaseStore:
         return response
 
     async def setup(self) -> None:
-        """Create the private bucket on first run."""
+        """Create the private bucket on first run; refuse to start with a public one, since
+        it holds people's notes, journals, conversations and documents."""
         response = await self.http.get(f"/storage/v1/bucket/{self.bucket}")
         if response.status_code == 200:
+            if response.json().get("public") is not False:
+                raise RuntimeError(f"The storage bucket {self.bucket!r} is public. Make it private in Supabase "
+                                   "(Storage → the bucket → Edit → turn off Public) before starting.")
             return
         await self._request("POST", "/storage/v1/bucket", json={"id": self.bucket, "name": self.bucket, "public": False})
         log.info("created storage bucket %s", self.bucket)

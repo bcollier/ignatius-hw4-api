@@ -89,11 +89,13 @@ def fake_openai(monkeypatch):
         seen["voice"] = voice
         return {"session_id": f"live_{time.time()}", "sdp": "v=0 answer"}
 
-    async def no_hangup(session_id, seconds):
+    async def no_hangup(session_id, *args):
         return None
 
     monkeypatch.setattr(talk, "_openai_session", session)
-    monkeypatch.setattr(talk, "_hang_up_later", no_hangup)
+    monkeypatch.setattr(talk, "_finish_at_limit", no_hangup)
+    monkeypatch.setattr(talk, "_hang_up", no_hangup)
+    talk._sessions.clear()
     return seen
 
 
@@ -186,8 +188,9 @@ def test_companion_prompt_can_be_replaced(client, monkeypatch):
     as_user(User("t-full-3", "me@x.y"))
     assert "prayer companion" in client.get("/api/options").json()["prompts"]["companion"]
     client.put("/api/profile", json={"companion_prompt": "You are a quiet listener. Ask one question."})
-    client.post("/api/talk/session", json={"provider": "openai", "sdp": "o"})
+    first = client.post("/api/talk/session", json={"provider": "openai", "sdp": "o"}).json()
     assert seen["instructions"].startswith("You are a quiet listener.") and "<background>" in seen["instructions"]
+    client.post("/api/talk/end", json={"session_id": first["session_id"], "seconds": 5, "transcript": ""})
     client.put("/api/profile", json={"companion_prompt": ""})  # back to the default
     client.post("/api/talk/session", json={"provider": "openai", "sdp": "o"})
     assert seen["instructions"].startswith(talk.COMPANION[:40])

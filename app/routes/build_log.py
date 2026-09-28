@@ -16,6 +16,9 @@ PRIVATE_NOTES = re.compile(r"<about_the_person>.*?</about_the_person>", re.S)
 PREVIEW_CHARS = 1200  # the live view shows this much of each prompt and response
 LIVE_PAGE_ROWS = 200
 FULL_PAGE_ROWS = 1000
+# What someone other than the retreat's owner may see: how the retreat was made, never
+# anyone's conversations, memory, notes or Examen (logged by user, not by retreat).
+BUILD_PURPOSES = {"plan", "step", "heart", "deep", "guide", "research", "search_queries", "voice", "inspiration"}
 ROW_FIELDS = ("id", "created_at", "day", "purpose", "provider", "model", "input_tokens", "output_tokens",
               "web_searches", "usd", "duration_ms", "status", "error")
 
@@ -28,6 +31,8 @@ async def build_log(retreat: dict = Depends(readable_retreat), user: User = Depe
     `after` returns only newer rows (for watching live); `full` is the complete record."""
     owner = retreat.get("user_id") == user.id and not retreat.get("read_only")
     rows = await _rows_after(retreat["id"], after, full)
+    if not owner:  # an example seen by someone else: only its builder's build steps
+        rows = [r for r in rows if r.get("purpose") in BUILD_PURPOSES and r.get("user_id") == retreat.get("user_id")]
     return {"rows": [log_row(r, full, owner) for r in rows], "busy": pipeline._busy(retreat)}
 
 
@@ -55,7 +60,8 @@ def log_row(row: dict, full: bool, owner: bool) -> dict:
     out = {k: row.get(k) for k in ROW_FIELDS}
     messages = request.get("messages") or []
     out.update(system=clean(system), prompt=clean(_prompt_text(messages)),
-               response=clean(row.get("response_text") or ""), details=row.get("response") if full else None)
+               response=clean(row.get("response_text") or ""),
+               details=row.get("response") if full and owner else None)  # may hold the model's reasoning
     if full:  # exactly what was sent, message by message (images appear as placeholders)
         out["messages"] = [_clean_message(m, owner) for m in messages if isinstance(m, dict)]
     if not full:

@@ -81,6 +81,9 @@ ALLOWED_ORIGINS = _list(
     "http://localhost:5500,http://127.0.0.1:5500,http://localhost:8080,http://127.0.0.1:8080",
 )
 
+# Running without Supabase (one local user, files on disk) must be asked for by name,
+# so a missing setting on the server can never quietly turn sign-in off.
+LOCAL_MODE = os.environ.get("LOCAL_MODE") == "1"
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/tmp/ignatius"))
 
 MAX_UPLOAD_MB = _int("MAX_UPLOAD_MB", 15)

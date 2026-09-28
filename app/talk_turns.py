@@ -78,7 +78,7 @@ async def reply(session: dict, text: str | None) -> str:
     ask = (f"The conversation so far:\n{said}\n\nReply with only what you say next." if said
            else "The person has just started the conversation. Greet them and ask your first question. Reply with only what you say.")
     system = session["instructions"] + "\n\n" + (session.get("spoken") or SPOKEN)
-    llm_log.tag(user_id=session["user_id"], email=session["email"], retreat_id=session["retreat_id"], purpose="talk_turn")
+    llm_log.tag(user_id=session["user_id"], email=session["email"], retreat_id=session.get("log_retreat_id"), purpose="talk_turn")
     words, usd = await _think(session["brain"], system, ask)
     words = words.strip().strip('"')
     session["turns"].append(("You", words))
@@ -147,5 +147,6 @@ def new_session(user, retreat: dict | None, instructions: str, voice: str, brain
     return {"user_id": user.id, "email": user.log_email, "provider": PROVIDER, "voice": voice, "brain": brain,
             "started": time.time(), "max": config.TALK_MAX_SECONDS,
             "retreat_id": retreat["id"] if retreat else None,
+            "log_retreat_id": retreat["id"] if retreat and retreat.get("user_id") == user.id and not retreat.get("read_only") else None,
             "retreat_title": (retreat.get("plan") or {}).get("title") if retreat else None,
             "instructions": instructions, "full": user.full, "turns": [], "usd": 0.0}

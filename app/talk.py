@@ -54,7 +54,9 @@ def providers() -> dict[str, dict]:
     if config.OPENAI_API_KEY:
         out["openai"] = {"label": "OpenAI (GPT-Live)", "voices": OPENAI_VOICES, "default_voice": "marin"}
     if config.XAI_API_KEY:
-        out["xai"] = {"label": "xAI (Grok voice)", "voices": XAI_VOICES, "default_voice": config.XAI_DEFAULT_VOICE}
+        # Premium only: the browser talks to xAI directly, so the server can't hang up at the limit.
+        out["xai"] = {"label": "xAI (Grok voice)", "voices": XAI_VOICES, "default_voice": config.XAI_DEFAULT_VOICE,
+                      "premium": True}
     return out
 
 
@@ -297,6 +299,14 @@ async def add_usage(user_id: str, seconds: int) -> None:
     await store.put_file(_usage_path(user_id), json.dumps(data).encode(), "application/json")
 
 
+def _own_retreat_id(retreat: dict | None, user) -> str | None:
+    """The retreat to file a conversation's log under: only the person's own. A talk about
+    an example retreat is logged under the person alone, never under the shared example."""
+    if retreat and retreat.get("user_id") == user.id and not retreat.get("read_only"):
+        return retreat["id"]
+    return None
+
+
 # Sessions started here, so /end can log them and the limit can be enforced.
 _sessions: dict[str, dict] = {}
 
@@ -308,8 +318,12 @@ async def start(user, retreat: dict | None, about: str, notes: str, provider: st
         raise TalkError(400, "That conversation service isn't set up on this server.")
     if provider == talk_turns.PROVIDER:
         return await _start_turns(user, retreat, about, notes, voice, local_time, instructions, brain)
+    if available[provider].get("premium") and not user.full:
+        raise TalkError(403, "The Grok voice is for premium accounts. Try the free voice, which takes turns.")
     if voice not in available[provider]["voices"]:
         voice = available[provider]["default_voice"]
+    if _open_live_call(user.id):
+        raise TalkError(409, "You already have a live conversation open. End it first, then start again.")
     if user.full:
         max_seconds = config.TALK_MAX_SECONDS
     else:
@@ -328,32 +342,50 @@ async def start(user, retreat: dict | None, about: str, notes: str, provider: st
     _sessions[sid] = {"user_id": user.id, "email": user.log_email,
                       "provider": provider, "voice": voice, "started": time.time(), "max": max_seconds,
                       "retreat_id": retreat["id"] if retreat else None,
+                      "log_retreat_id": _own_retreat_id(retreat, user),
                       "retreat_title": (retreat.get("plan") or {}).get("title") if retreat else None,
                       "instructions": instructions, "full": user.full}
-    if provider == "openai":
-        asyncio.create_task(_hang_up_later(sid, max_seconds + 5))
+    # Settled at the limit by the server, whether or not the browser ever says it ended.
+    asyncio.create_task(_finish_at_limit(sid, max_seconds + 5))
     return {**result, "provider": provider, "voice": voice, "max_seconds": max_seconds}
 
 
+def _open_live_call(user_id: str) -> bool:
+    """Whether this person has a live voice call that hasn't been settled yet."""
+    return any(s["user_id"] == user_id and s["provider"] != talk_turns.PROVIDER for s in _sessions.values())
+
+
 async def end(user, session_id: str, seconds: int, transcript: str) -> None:
-    s = _sessions.pop(session_id, None)
-    if not s or s["user_id"] != user.id:
+    s = _sessions.get(session_id)
+    if not s or s["user_id"] != user.id:  # checked before anything changes
         return
-    seconds = int(min(max(0, seconds), time.time() - s["started"] + 5))
+    await _settle(session_id, transcript)
+
+
+async def _settle(session_id: str, transcript: str) -> None:
+    """End a conversation once: hang up a live call, charge the time the server measured
+    (never what the browser reports), save the transcript and log it."""
+    s = _sessions.pop(session_id, None)
+    if not s:
+        return
     turns = s["provider"] == talk_turns.PROVIDER
+    seconds = int(min(time.time() - s["started"], s["max"]))
+    if s["provider"] == "openai":
+        await _hang_up(session_id)
+    user_id = s["user_id"]
     if not s["full"] and not turns:  # the daily allowance is for the paid live voices
-        await add_usage(user.id, seconds)
+        await add_usage(user_id, seconds)
     if transcript.strip():
-        history = await load_history(user.id)
+        history = await load_history(user_id)
         history["conversations"].append({
             "id": session_id, "started_at": datetime.fromtimestamp(s["started"], timezone.utc).isoformat(),
             "ended_at": datetime.now(timezone.utc).isoformat(), "retreat_id": s["retreat_id"],
             "retreat_title": s.get("retreat_title"), "provider": s["provider"], "voice": s["voice"],
             "seconds": seconds, "transcript": transcript[:60_000],
         })
-        await save_history(user.id, history)
-        asyncio.create_task(_remember(user.id, s["full"]))
-    llm_log.tag(user_id=s["user_id"], email=s["email"], retreat_id=s["retreat_id"], purpose="talk")
+        await save_history(user_id, history)
+        asyncio.create_task(_remember(user_id, s["full"]))
+    llm_log.tag(user_id=s["user_id"], email=s["email"], retreat_id=s.get("log_retreat_id"), purpose="talk")
     if turns:  # each reply was logged as its own call, with its cost; this row is the whole conversation
         model, usd = f"turns: {s['brain']}", s.get("usd", 0.0)
     else:
@@ -434,16 +466,20 @@ async def _openai_session(instructions: str, voice: str, sdp: str) -> dict:
     return {"session_id": created.session.id, "sdp": created.transport.sdp}
 
 
-async def _hang_up_later(session_id: str, seconds: int) -> None:
+async def _finish_at_limit(session_id: str, seconds: int) -> None:
+    """At the time limit, settle a conversation the browser never ended (charged in full)."""
     await asyncio.sleep(seconds)
-    if session_id not in _sessions:
-        return
+    if session_id in _sessions:
+        log.info("settling talk session %s at its limit", session_id)
+        await _settle(session_id, "")
+
+
+async def _hang_up(session_id: str) -> None:
     from openai import AsyncOpenAI
 
     try:
         await AsyncOpenAI(api_key=config.OPENAI_API_KEY).live.sessions.hangup(session_id)
-        log.info("hung up talk session %s at its limit", session_id)
-    except Exception:
+    except Exception:  # already over, or the service is unreachable; the time is charged either way
         pass
 
 

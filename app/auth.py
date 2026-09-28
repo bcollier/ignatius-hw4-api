@@ -33,12 +33,25 @@ def enabled() -> bool:
     return bool(config.SUPABASE_URL and config.SUPABASE_SECRET_KEY)
 
 
+def check_setup() -> None:
+    """At startup: sign-in fully set up, or local mode asked for by name. Anything in
+    between (a missing key, say) stops the server rather than letting everyone in."""
+    if enabled() or config.LOCAL_MODE:
+        return
+    if config.SUPABASE_URL or config.SUPABASE_SECRET_KEY:
+        raise RuntimeError("Sign-in is half set up: SUPABASE_URL and SUPABASE_SECRET_KEY are both needed.")
+    raise RuntimeError("Sign-in isn't set up. Set SUPABASE_URL and SUPABASE_SECRET_KEY, or LOCAL_MODE=1 "
+                       "to run on this computer with one local user.")
+
+
 def email_allowed(email: str) -> bool:
     return not config.ALLOWED_EMAILS or email.lower() in config.ALLOWED_EMAILS
 
 
 async def current_user(authorization: str = Header(default="")) -> User:
     if not enabled():
+        if not config.LOCAL_MODE:  # never reached after check_setup; a second line of defense
+            raise HTTPException(503, "Sign-in isn't set up on this server.")
         # Local development: one user; LOCAL_USER_MODE=free previews free mode.
         return User(LOCAL_USER_ID, "local", full=os.environ.get("LOCAL_USER_MODE") != "free")
 

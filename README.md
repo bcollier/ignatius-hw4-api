@@ -577,6 +577,16 @@ flowchart LR
 - **Live conversation keys** never reach the browser: OpenAI's SDP is relayed by the server, and xAI gets a token that expires in 5 minutes.
 - **Spending** is limited to `ALLOWED_EMAILS`; free mode costs nothing; uploads, pages, text, prompts, track lengths and conversation time are capped.
 - **CORS** allows only `ALLOWED_ORIGINS`. The local file route exists only without Supabase and refuses paths outside `DATA_DIR`.
+- **Fixed after the September 27, 2026 security audit** (tests in `tests/test_security.py`):
+  - An example retreat's build log shows other people only its build steps: never conversations, memory, notes or model reasoning. Conversations are filed under a retreat only if it's the person's own.
+  - Live voice time is measured and charged by the server, not reported by the browser.
+  - A call is checked to be the person's own before it can be ended.
+  - Ending an OpenAI call hangs it up, and a call the browser never ends is settled at its limit.
+  - One live call at a time; the Grok voice (whose connection the server can't close) is premium-only.
+  - The server refuses to start with half-configured sign-in, without sign-in unless `LOCAL_MODE=1`, or with a public storage bucket.
+  - The public options no longer show the ElevenLabs balance.
+  - Unsaved journal drafts in the browser are kept per account and cleared at sign-out.
+  - Still to do: deletion of logs and source files with a retreat or conversation history (F08), ownership checked before a read can resume a job (F10), and a per-address sign-in throttle (F09). Limits on job admission and upload parsing (F03, F04) matter only at a larger scale.
 
 ---
 
@@ -681,7 +691,8 @@ cp .env.example .env        # then fill in keys; all are optional for a first ru
 .venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
-- With no keys, set `LLM_MODE=stub`: plans and scripts are placeholders, free voices still record real audio, storage is local under `DATA_DIR`, and there's no sign-in.
+- **Running without Supabase needs `LOCAL_MODE=1`** (one local user, files under `DATA_DIR`). Without it, the server refuses to start unless `SUPABASE_URL` and `SUPABASE_SECRET_KEY` are both set, so a missing setting in production can never turn sign-in off.
+- With no keys, also set `LLM_MODE=stub`: plans and scripts are placeholders, and free voices still record real audio.
 - To try free mode locally, set `JETSTREAM_API_KEY` and `LOCAL_USER_MODE=free`.
 - Serve the web repo on port 5500 (`python3 -m http.server 5500`); its `config.js` points at `localhost:8000`.
 - Tests: `.venv/bin/python -m pytest -q`.
