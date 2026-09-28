@@ -1,0 +1,4 @@
+# For the eval tools only (evals/); the server doesn't need these.
+deepeval==4.2.6
+typesafe-sdk==0.7.2
+numpy==2.5.3

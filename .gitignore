@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 /data/
 .pytest_cache/
+
+# Eval runs and caches (regenerate with python -m evals.generate / llm_judge / analysis)
+evals/runs/
+evals/cache/

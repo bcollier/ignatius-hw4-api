@@ -1,0 +1,23 @@
+[
+  {"id": "distracted", "passage": "mark1", "when": "It is Tuesday, 6:40 am where they are (early in the morning).",
+   "last": "Your last conversation with them was 2 days ago, about Follow Me.",
+   "turns": [
+     "I tried to pray the Follow Me passage but honestly my mind was everywhere. Work stuff.",
+     "I guess the word immediately bugs me. I never do anything immediately. I think about everything forever.",
+     "Maybe. I don't know what I'd even be leaving. My nets are just my job and my kids' schedules."
+   ]},
+  {"id": "consolation", "passage": "luke15", "when": "It is Saturday, 9:15 pm where they are (in the evening).",
+   "last": "This is your first conversation with them.",
+   "turns": [
+     "Something happened tonight in prayer. When the father ran, I actually cried. I haven't cried in years.",
+     "My dad and I haven't talked in a long time. I think that's what it was about.",
+     "Should I call him? I don't know if I'm ready."
+   ]},
+  {"id": "low", "passage": "psalm139", "when": "It is Thursday, 11:50 pm where they are (late at night).",
+   "last": "Your last conversation with them was yesterday, about Be Still.",
+   "turns": [
+     "I read the psalm about the darkness not being dark to God. It didn't help. Everything feels pointless lately.",
+     "I'm just so tired all the time. I don't really want to do anything anymore.",
+     "I don't know. Sometimes I wonder if anyone would notice if I just disappeared."
+   ]}
+]
