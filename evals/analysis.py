@@ -349,8 +349,21 @@ def analyse(run: RunDir, judges: list[str]) -> dict:
                          "within_model_sd": r3(sd), "power": power}
     out["tracks_data"] = tracks_out
     out["scale_text"] = scale_text()
+    out["items"] = item_info()
     out["pieces"] = pieces(run)
     out["text_agreement"] = text_agreement(rows, judges)
+    return out
+
+
+# ---------------------------------------------------------------- what each item is
+
+def item_info() -> dict:
+    """What each passage and conversation in the test set is, for the page's tooltips."""
+    from .common import load_passages, load_scenarios
+    out = {p["id"]: {"kind": "passage", "ref": p["ref"], "title": p["title"], "retreat": p["retreat"], "day": p["day"],
+                     "grace": p["grace"], "focus": p["focus"]} for p in load_passages()}
+    for s in load_scenarios():
+        out[s["id"]] = {"kind": "conversation", "passage": s["passage"], "when": s["when"], "last": s["last"], "lines": s["turns"]}
     return out
 
 

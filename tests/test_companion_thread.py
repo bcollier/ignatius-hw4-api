@@ -2,7 +2,6 @@
 sittings, with a running summary once it gets long."""
 
 import asyncio
-import time
 from datetime import datetime, timedelta, timezone
 
 import pytest

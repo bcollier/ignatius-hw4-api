@@ -232,7 +232,7 @@ def test_script_pdf_follows_the_prayer(client):
     order = ["Opening", "Silence, 20 seconds", "First reading", "For the heart", "Second reading",
              "Deep dive", "Third reading", "silence, 1 minute", "Last reading", "Closing"]
     positions = [text.find(label) for label in order]
-    assert all(p >= 0 for p in positions) and positions == sorted(positions), list(zip(order, positions))
+    assert all(p >= 0 for p in positions) and positions == sorted(positions), list(zip(order, positions, strict=False))
 
     whole = client.get(f"{url}/script.pdf")
     doc = pymupdf.open(stream=whole.content, filetype="pdf")

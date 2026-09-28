@@ -639,7 +639,7 @@ class _DayBuild:
             deep = await self._write_deep(heart)
             await self._write_guidance(heart, deep)
             results = await asyncio.gather(*self.recordings.values(), return_exceptions=True)
-        for key, result in zip(self.recordings, results):
+        for key, result in zip(self.recordings, results, strict=False):
             if isinstance(result, Exception):
                 self.errors[key] = result
         await self._finish()

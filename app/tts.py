@@ -122,7 +122,7 @@ def words_from_alignment(alignment: dict, offset: float) -> list[tuple[float, st
     chars = alignment.get("characters") or []
     starts = alignment.get("character_start_times_seconds") or []
     words, current, start = [], "", 0.0
-    for ch, t in zip(chars, starts):
+    for ch, t in zip(chars, starts, strict=False):
         if ch.isspace():
             if current:
                 words.append((start, current))

@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 239 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 245 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1527,6 +1527,49 @@ Tested with a real conversation.
 > i like this one, i wnat to be able to see the raw question/response in a hover or something and are teh stength and weakness does each model give text for strength weakness? do they agree in text about the strenght and weakness? *(with a screenshot of the judgments table)*
 
 **What was done:** Yes: every judge writes a strength and a weakness for every piece. "Every piece" now groups the judges side by side, marks words two or more of them used, and shows how much their words overlap. Strengths overlap by about 5% on average and weaknesses by 4%, though they often make the same point in different words. Opening a piece shows exactly what the model was given and what it wrote, or the whole conversation.
+
+### 240. 2026-09-28, 03:00 UTC
+
+> look at the distribution of the raw scores, it seems we need more scale variability consider ways we could have a more "bell curve" like evaluation, develop several alternative scales, compare them using the free/cheap models, and give me a report on which scales have the best statistical properties on the cheap/free models. what changes in the scale were the most effective?
+
+**What was done:** Started a scale study (evals/scale_study.py) comparing seven alternative formats with the cheap judges: behaviourally anchored 1–7, a 0–10 scale, a checklist, critique-then-score, exemplar-anchored, pairwise and ranking. The results and report follow when collection finishes.
+
+### 241. 2026-09-28, 03:10 UTC
+
+> you just used my scale, I like these evluations but add some that are more scientific or helpful for truly evaluating which model would be best for this application and at what cost
+
+**What was done:** Added evals/fitness.py and a "Which model for this app, at what cost?" section. It checks the pieces directly: scripture fidelity, grounding in the research, instructions followed, writing for the ear, the companion's behaviour, reliability, speed and cost. It adds a Pareto frontier and a weighting sensitivity study (docs/evals/FITNESS.md). Muse Glimmer is the only model on the cost-and-fitness frontier. GPT-6 Sol costs about a sixth of what Opus does. Gemma cites sources outside its research.
+
+### 242. 2026-09-28, 03:15 UTC
+
+> when hovering over the text like "too vague" it should list the entire question and the scale that was used in the tooltip
+
+**What was done:** Every scale name on the evals page now shows a tooltip with the full question the judges were asked and the 1–7 anchors.
+
+### 243. 2026-09-28, 03:20 UTC
+
+> what about other measures of agreement? cohen's quadratic weighted kappa or something?
+
+**What was done:** Added quadratic-weighted Cohen's kappa (the mean of each judge pair, per scale), Gwet's AC2 and ICC(2,1)/ICC(2,k). Pooling kappa across scales was misleading, so it is computed per scale. The scores show the kappa paradox: kappa is near 0 while AC2 is 0.95 or more. The judges agree, but nearly every score is 6 or 7, so the scale can't tell pieces apart.
+
+### 244. 2026-09-28, 03:25 UTC
+
+> when hovering over john20 in Every judgement it should say what the passage is, should be easy to get to other measures besides overall
+
+**What was done:** Passage ids now show the reference and its opening words on hover. "Every piece" can show all the scales, and the models chart has a measure picker covering overall and each scale.
+
+### 245. 2026-09-28, 03:35 UTC
+
+> we should clearly indicate what a good value is here with annotations the red line is good, or by chance, or what, be explicity with annoations to interpret graphs
+
+**What was done:** Every eval chart now says what a good value looks like:
+- The η² chart points to what luck alone gives and labels the 0 and 1 ends, with a "How to read a bar" key.
+- The models chart has callouts, a "better →" label and labels for which model is better.
+- The judge-usage bars mark the critical and generous ends.
+- The correlation heatmap has a reading key and a legend saying which values are good or redundant.
+- The cost plots mark the "better" corner and the frontier.
+- The weighting plot shows which way is better.
+- The power table has a legend.
 
 ---
 

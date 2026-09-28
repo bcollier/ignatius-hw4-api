@@ -140,7 +140,7 @@ async def _combined(http: httpx.AsyncClient, queries: list[str], research: "Rese
         research.queries += parts[n].queries
         research.usd += parts[n].usd
         research.skipped += parts[n].skipped
-    research.contributors = [n for n, ok in zip(names, found) if ok is True and parts[n].results]
+    research.contributors = [n for n, ok in zip(names, found, strict=False) if ok is True and parts[n].results]
     return bool(research.results)
 
 

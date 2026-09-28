@@ -355,7 +355,7 @@ def strip_verse_numbers(text: str) -> str:
     if found and not any(verse) and found[0].start() == 0:
         verse[0] = True
     out, pos = [], 0
-    for m, is_verse in zip(found, verse):
+    for m, is_verse in zip(found, verse, strict=False):
         if is_verse:
             out.append(text[pos:m.start()])
             pos = m.end()
@@ -388,7 +388,7 @@ def stub_plan(source: Extracted, filename: str) -> dict:
     chunks = re.split(r"(?im)^\s*day\s+\d+\b[^\n]*\n", text)
     headings = re.findall(r"(?im)^\s*(day\s+\d+\b[^\n]*)\n", text)
     if len(headings) >= 2:
-        mode, pairs = "follows_source", list(zip(headings, chunks[1:]))
+        mode, pairs = "follows_source", list(zip(headings, chunks[1:], strict=False))
     else:
         mode = "composed"
         paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()] or ["(No text found.)"]
