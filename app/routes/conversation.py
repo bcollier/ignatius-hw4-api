@@ -18,6 +18,8 @@ class TalkRequest(BaseModel):
     sdp: str | None = None  # the browser's WebRTC offer (OpenAI)
     retreat_id: str | None = None
     local_time: str | None = None  # the browser's local time with its offset, e.g. 2026-09-26T21:30:00-04:00
+    carry_on: bool = True  # continue a conversation from the last twelve hours, in whatever mode it was
+    mode: str = "voice"  # taking turns: "voice" (talking), "listen" (typing, replies spoken) or "text"
 
 
 class TalkEnd(BaseModel):
@@ -36,7 +38,7 @@ async def talk_session(body: TalkRequest, user: User = Depends(current_user)):
     try:
         return await talk.start(user, retreat, about_me["about"], about_me["companion_notes"], provider or "",
                                 body.voice or "", body.sdp, body.local_time, about_me.get("companion_prompt", ""),
-                                body.brain or "")
+                                body.brain or "", carry_on=body.carry_on, mode=body.mode)
     except talk.TalkError as exc:
         raise HTTPException(exc.status, str(exc)) from exc
 
@@ -44,13 +46,14 @@ async def talk_session(body: TalkRequest, user: User = Depends(current_user)):
 class TurnRequest(BaseModel):
     session_id: str
     text: str = Field("", max_length=4000)
+    mode: str = "voice"  # how the person is talking right now (see talk_turns.MODES)
 
 
 @router.post("/turn")
 async def talk_turn(body: TurnRequest, user: User = Depends(current_user)):
     """Taking turns: what the person said, and the companion's reply."""
     try:
-        return {"reply": await talk.turn(user, body.session_id, body.text)}
+        return {"reply": await talk.turn(user, body.session_id, body.text, body.mode)}
     except talk.TalkError as exc:
         raise HTTPException(exc.status, str(exc)) from exc
 

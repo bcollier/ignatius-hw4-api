@@ -308,6 +308,50 @@ async def add_usage(user_id: str, seconds: int) -> None:
     await store.put_file(_usage_path(user_id), json.dumps(data).encode(), "application/json")
 
 
+# One continuous conversation: starting again soon after, in any mode (live voice, the
+# free voice, typing with spoken replies, or text), picks up the same thread.
+CONTINUE_SECONDS = 12 * 3600
+
+
+def _thread_to_continue(history: dict) -> dict | None:
+    """The last conversation, if it ended recently enough to carry on."""
+    past = [c for c in history.get("conversations", []) if c.get("transcript")]
+    if not past:
+        return None
+    last = past[-1]
+    try:
+        ended = datetime.fromisoformat(last.get("ended_at") or last["started_at"]).timestamp()
+    except (KeyError, ValueError):
+        return None
+    return last if time.time() - ended < CONTINUE_SECONDS else None
+
+
+def _turns_of(record: dict) -> list[tuple[str, str]]:
+    """A saved conversation as turns: ("Them", ...) for the person, ("You", ...) for the companion."""
+    if record.get("turns"):
+        return [tuple(t) for t in record["turns"]]
+    turns = []
+    for line in (record.get("transcript") or "").splitlines():
+        who, _, words = line.partition(": ")
+        if who in ("You", "Companion") and words.strip():
+            turns.append(("Them" if who == "You" else "You", words.strip()))
+        elif line.startswith("[") and line.endswith("]"):
+            turns.append(("Note", line))
+        elif turns and line.strip():
+            turns[-1] = (turns[-1][0], turns[-1][1] + " " + line.strip())
+    return turns
+
+
+def _for_screen(turns: list[tuple[str, str]], last: int = 40) -> list[dict]:
+    return [{"who": {"Them": "you", "You": "companion"}.get(who, "note"), "text": words} for who, words in turns[-last:]]
+
+
+def _continuing_note(record: dict) -> str:
+    return ("This conversation continues the one you were having " + _how_long_ago(record.get("ended_at"), datetime.now(timezone.utc))
+            + " (its latest part is in your most recent conversations above). Pick up where it left off: don't greet them "
+            "as if for the first time, don't recap, just carry on naturally.")
+
+
 def _own_retreat_id(retreat: dict | None, user) -> str | None:
     """The retreat to file a conversation's log under: only the person's own. A talk about
     an example retreat is logged under the person alone, never under the shared example."""
@@ -321,12 +365,15 @@ _sessions: dict[str, dict] = {}
 
 
 async def start(user, retreat: dict | None, about: str, notes: str, provider: str, voice: str, sdp: str | None,
-                local_time: str | None = None, instructions: str = "", brain: str = "") -> dict:
+                local_time: str | None = None, instructions: str = "", brain: str = "", carry_on: bool = True,
+                mode: str = "voice") -> dict:
     available = providers()
     if provider not in available:
         raise TalkError(400, "That conversation service isn't set up on this server.")
+    history = await load_history(user.id)
+    thread = _thread_to_continue(history) if carry_on else None
     if provider == talk_turns.PROVIDER:
-        return await _start_turns(user, retreat, about, notes, voice, local_time, instructions, brain)
+        return await _start_turns(user, retreat, about, notes, voice, local_time, instructions, brain, history, thread, mode)
     if available[provider].get("premium") and not user.full:
         raise TalkError(403, "The Grok voice is for premium accounts. Try the free voice, which takes turns.")
     if voice not in available[provider]["voices"]:
@@ -340,7 +387,9 @@ async def start(user, retreat: dict | None, about: str, notes: str, provider: st
         if left <= 5:
             raise TalkError(403, f"You've used today's {config.FREE_TALK_SECONDS} seconds of free conversation. Come back tomorrow.")
         max_seconds = left
-    instructions = context(retreat, about, notes, await load_history(user.id), local_time, instructions)
+    instructions = context(retreat, about, notes, history, local_time, instructions)
+    if thread:
+        instructions += "\n\n" + _continuing_note(thread)
     if provider == "openai":
         if not sdp:
             raise TalkError(400, "Missing the browser's connection offer.")
@@ -353,7 +402,7 @@ async def start(user, retreat: dict | None, about: str, notes: str, provider: st
                       "retreat_id": retreat["id"] if retreat else None,
                       "log_retreat_id": _own_retreat_id(retreat, user),
                       "retreat_title": (retreat.get("plan") or {}).get("title") if retreat else None,
-                      "instructions": instructions, "full": user.full}
+                      "instructions": instructions, "full": user.full, "thread": thread["id"] if thread else None}
     # Settled at the limit by the server, whether or not the browser ever says it ended.
     asyncio.create_task(_finish_at_limit(sid, max_seconds + 5))
     return {**result, "provider": provider, "voice": voice, "max_seconds": max_seconds}
@@ -384,15 +433,10 @@ async def _settle(session_id: str, transcript: str) -> None:
     user_id = s["user_id"]
     if not s["full"] and not turns:  # the daily allowance is for the paid live voices
         await add_usage(user_id, seconds)
+    if turns and s.get("log"):  # the server's own record of the conversation, the whole thread
+        transcript = "\n".join(w if who == "Note" else f"{'You' if who == 'Them' else 'Companion'}: {w}" for who, w in s["log"])
     if transcript.strip():
-        history = await load_history(user_id)
-        history["conversations"].append({
-            "id": session_id, "started_at": datetime.fromtimestamp(s["started"], timezone.utc).isoformat(),
-            "ended_at": datetime.now(timezone.utc).isoformat(), "retreat_id": s["retreat_id"],
-            "retreat_title": s.get("retreat_title"), "provider": s["provider"], "voice": s["voice"],
-            "seconds": seconds, "transcript": transcript[:60_000],
-        })
-        await save_history(user_id, history)
+        await _save_conversation(user_id, session_id, s, seconds, transcript)
         asyncio.create_task(_remember(user_id, s["full"]))
     llm_log.tag(user_id=s["user_id"], email=s["email"], retreat_id=s.get("log_retreat_id"), purpose="talk")
     if turns:  # each reply was logged as its own call, with its cost; this row is the whole conversation
@@ -410,19 +454,33 @@ async def _settle(session_id: str, transcript: str) -> None:
 # ---------------------------------------------------------------- taking turns
 
 
-async def _start_turns(user, retreat, about, notes, voice, local_time, instructions, brain) -> dict:
+async def _start_turns(user, retreat, about, notes, voice, local_time, instructions, brain, history, thread,
+                       mode: str = "voice") -> dict:
     try:
         brain = talk_turns.check_brain(brain, user.full)
     except ValueError as exc:
         raise TalkError(400, str(exc)) from exc
     voice = voice if voice in talk_turns.provider_info()["voices"] else talk_turns.DEFAULT_VOICE
-    instructions = context(retreat, about, notes, await load_history(user.id), local_time, instructions)
+    if thread:  # its turns are carried in the session itself, not repeated among the past conversations
+        history = {**history, "conversations": [c for c in history.get("conversations", []) if c is not thread]}
+    instructions = context(retreat, about, notes, history, local_time, instructions)
     sid = _new_id()
-    _sessions[sid] = talk_turns.new_session(user, retreat, instructions, voice, brain)
-    _sessions[sid]["spoken"] = (await profile.agent_settings(user.id))["prompts"].get("companion_spoken")
-    greeting = await _turn_reply(sid, None)
+    session = _sessions[sid] = talk_turns.new_session(user, retreat, instructions, voice, brain)
+    mine = (await profile.agent_settings(user.id))["prompts"]
+    session["spoken"] = mine.get("companion_spoken")
+    session["custom"] = {k: v for k, v in mine.items() if k in talk_turns.MODES.values()}
+    session["summary_prompt"] = mine.get("companion_summary")
+    session["log_retreat_id"] = _own_retreat_id(retreat, user)
+    previous = []
+    if thread:
+        session["thread"] = thread["id"]
+        session["log"] = _turns_of(thread)
+        session["turns"] = list(session["log"])
+        session["summary"] = thread.get("summary", "")
+        previous = _for_screen(session["log"])
+    greeting = await _turn_reply(sid, None, mode)
     return {"session_id": sid, "provider": talk_turns.PROVIDER, "voice": voice, "brain": brain,
-            "max_seconds": config.TALK_MAX_SECONDS, "greeting": greeting}
+            "max_seconds": config.TALK_MAX_SECONDS, "greeting": greeting, "continued": bool(thread), "previous": previous}
 
 
 def _turn_session(user, session_id: str) -> dict:
@@ -434,21 +492,21 @@ def _turn_session(user, session_id: str) -> dict:
     return s
 
 
-async def _turn_reply(session_id: str, text: str | None) -> str:
+async def _turn_reply(session_id: str, text: str | None, mode: str = "voice") -> str:
     from .llm import LLMError
 
     try:
-        return await talk_turns.reply(_sessions[session_id], text)
+        return await talk_turns.reply(_sessions[session_id], text, mode)
     except LLMError as exc:
         raise TalkError(502, str(exc)) from exc
 
 
-async def turn(user, session_id: str, text: str) -> str:
-    """What the person said; returns the companion's reply."""
+async def turn(user, session_id: str, text: str, mode: str = "voice") -> str:
+    """What the person said (or typed); returns the companion's reply."""
     _turn_session(user, session_id)
     if not text.strip():
         raise TalkError(400, "Nothing was heard. Try again.")
-    return await _turn_reply(session_id, text)
+    return await _turn_reply(session_id, text, mode)
 
 
 async def speak(user, session_id: str, text: str) -> bytes:
@@ -473,6 +531,32 @@ async def _openai_session(instructions: str, voice: str, sdp: str) -> dict:
         log.warning("gpt-live session failed: %s", exc)
         raise TalkError(502, "The conversation service couldn't start a session. Try again in a moment.") from exc
     return {"session_id": created.session.id, "sdp": created.transport.sdp}
+
+
+async def _save_conversation(user_id: str, session_id: str, s: dict, seconds: int, transcript: str) -> None:
+    """Save the conversation: into the thread it continued, if any, else as a new one."""
+    history = await load_history(user_id)
+    now = datetime.now(timezone.utc).isoformat()
+    record = next((c for c in history["conversations"] if s.get("thread") and c.get("id") == s["thread"]), None)
+    if record:
+        if s["provider"] == talk_turns.PROVIDER:
+            record["transcript"] = transcript[-60_000:]  # the session carried the whole thread
+        else:
+            record["transcript"] = ((record.get("transcript") or "") + "\n" + transcript)[-60_000:]
+        record["seconds"] = int(record.get("seconds") or 0) + seconds
+        record["ended_at"] = now
+        record["modes"] = sorted(set(record.get("modes") or [record.get("provider")]) | {s["provider"]})
+        history["conversations"] = [c for c in history["conversations"] if c is not record] + [record]  # latest last
+    else:
+        record = {"id": session_id, "started_at": datetime.fromtimestamp(s["started"], timezone.utc).isoformat(),
+                  "ended_at": now, "retreat_id": s["retreat_id"], "retreat_title": s.get("retreat_title"),
+                  "provider": s["provider"], "modes": [s["provider"]], "voice": s["voice"], "seconds": seconds,
+                  "transcript": transcript[-60_000:]}
+        history["conversations"].append(record)
+    if s["provider"] == talk_turns.PROVIDER:
+        record["turns"] = [list(t) for t in s.get("log", [])][-300:]
+        record["summary"] = s.get("summary", "")
+    await save_history(user_id, history)
 
 
 async def _finish_at_limit(session_id: str, seconds: int) -> None:
