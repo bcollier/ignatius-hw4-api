@@ -9,6 +9,11 @@
 > **Live app:** https://bcollier.github.io/ignatius-hw4-web/ · **Frontend repo, with screenshots and the full story:** [ignatius-hw4-web](https://github.com/bcollier/ignatius-hw4-web) · **Every prompt used to build it:** [PROMPT_LOG.md](PROMPT_LOG.md) · **Original design spec and build plan:** [docs/original-spec](docs/original-spec/) ([design](docs/original-spec/design-spec.md), [technical](docs/original-spec/technical-spec.md), [build plan](docs/original-spec/staging-plan.md)) · **Redesign spec:** [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) · **Visual redesign spec:** [docs/VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md) · **Code review guidance:** [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md)
 
 <p align="center">
+  <a href="https://www.youtube.com/watch?v=GpS1dclAo4w"><img src="https://raw.githubusercontent.com/bcollier/ignatius-hw4-web/main/docs/screenshots/video-walkthrough.jpg" alt="Video walkthrough of Ignatius at Home on YouTube: play" width="720"></a><br>
+  <sub><b>▶ <a href="https://www.youtube.com/watch?v=GpS1dclAo4w">Watch the walkthrough on YouTube</a></b>: from a retreat handout to a guided audio retreat, and the companion.</sub>
+</p>
+
+<p align="center">
   <img src="https://raw.githubusercontent.com/bcollier/ignatius-hw4-web/main/docs/screenshots/iphone-hero.png" alt="Ignatius at Home on three iPhones" width="820">
 </p>
 

@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 249 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 252 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1594,6 +1594,24 @@ Tested with a real conversation.
 > immediately after a user uploads a PDF it should come up with a 2-3 sentence description and title for the retreat to confirm the user has the right file rather than P1W3P.pdf or whatever the file is called
 
 **What was done:** Choosing a file on New retreat now shows "Reading it to see what it is". A second or two later, the file name is replaced by the document's title and a 2–3 sentence description of what it contains, with the file name, page count and "Not the right file? Choose another" in small print. It uses the new POST /api/retreats/preview (app/preview.py and the agent prompt preview.md, listed on the Agents page as "The first look"). It reads the start of the file, or the first page of a scan or photo, with the fast model from the family chosen for planning: Llama 4 Scout (free) or Claude Haiku 4.5. Nothing is stored; it's limited to 20 per account per 10 minutes, and if it fails the file name simply stays. Two tests added; 152 pass.
+
+### 250. 2026-09-28, 14:05 UTC
+
+> instead of "Tap to talk" can we have it listen and determine? the way claude conversations work?
+
+**What was done:** The free voice is now hands-free, like a voice conversation with Claude. After the companion speaks, the app listens. It answers when you pause: about 2 seconds, longer after just a word or two or after "and…" or "um…". If the browser stops listening during a long silence, it starts again. The one button pauses listening, sends at once, or interrupts the companion while it speaks. Settings → Listening chooses between hands-free and tap to talk, and how long a pause ends your turn (short, normal, long). Tested in the browser with a stand-in speech recognizer and the real free brain and voice: it listened after the greeting, sent 2 seconds after the last word, and listened again after the reply.
+
+### 251. 2026-09-28, 14:10 UTC
+
+> this is wonky *(with a screenshot of the Talk page in text mode: a large empty gap above the conversation, and four "You're typing/talking now" notes in a row)*
+
+**What was done:** Fixed both. When typing, the empty voice-button area now hides completely, which removes the gap. Switching modes again before anything is said updates the one note instead of adding another.
+
+### 252. 2026-09-28, 14:15 UTC
+
+> add the youtube video to the readme file, make the thumbnail nice https://www.youtube.com/watch?v=GpS1dclAo4w  this is the description video
+
+**What was done:** Added the description video to the top of both READMEs. It shows as a thumbnail made from the video's own frame with a play button and a caption, linked to YouTube.
 
 ---
 
