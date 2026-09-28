@@ -239,3 +239,19 @@ def test_script_pdf_follows_the_prayer(client):
     assert doc.page_count >= 8  # cover + one page or more per day
     assert "haven't been written yet" in "".join(p.get_text() for p in doc)  # unbuilt days still appear
     assert client.get(f"{url}/script.pdf", params={"day": 99}).status_code == 404
+
+
+def test_preview_gives_a_title_and_description(client):
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Week Three: The Call of the Disciples")
+    page.insert_text((72, 100), "Pray with Mark 1:16-20 and Luke 5:1-11. Notice what you leave behind.")
+    r = client.post("/api/retreats/preview", files={"file": ("P1W3P.pdf", doc.tobytes())})
+    body = r.json()
+    assert r.status_code == 200 and body["title"] == "Week Three: The Call of the Disciples"
+    assert "Mark 1:16-20" in body["description"] and body["pages"] == 1
+
+
+def test_preview_rejects_what_it_cannot_read(client):
+    r = client.post("/api/retreats/preview", files={"file": ("notes.rtf", b"hello")})
+    assert r.status_code == 400

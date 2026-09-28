@@ -3,12 +3,15 @@ script, renaming or re-dating it, and deleting it."""
 
 import asyncio
 import json
+import logging
+import time
+from collections import deque
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from .. import config, demos, examples, google_docs, inspiration, llm_log, pipeline, prompts, quotas, script_pdf
+from .. import config, demos, examples, google_docs, inspiration, llm_log, pipeline, preview, profile, prompts, quotas, script_pdf
 from ..access import my_retreat, readable_retreat, save_retreat, view_of
 from ..auth import User, current_user
 from ..checks import BuildRequest, check_date, check_model, check_prompt, check_series, check_title, resolve_build
@@ -17,7 +20,11 @@ from ..storage import StorageError, store, summary
 from .uploads import read_upload, too_big
 
 router = APIRouter(prefix="/api/retreats")
+log = logging.getLogger(__name__)
 PDF_SLUG_CHARS = 60
+PREVIEWS_PER_WINDOW = 20  # first looks per account per PREVIEW_WINDOW
+PREVIEW_WINDOW = 10 * 60
+_previews: dict[str, deque] = {}
 
 
 # ---------------------------------------------------------------- the library
@@ -105,6 +112,40 @@ async def create_retreat(
         email=user.log_email, series_ids=ids, build_options=build_options, start_date=start, personal=personal,
     )
     return await pipeline.public_view(retreat)
+
+
+@router.post("/preview")
+async def preview_document(file: UploadFile = File(...), model: str = Form(""), user: User = Depends(current_user)):
+    """A first look at a chosen file, before anything is made: a working title and two
+    or three sentences on what it is, so the person can check it's the right one. Not
+    counted against the retreat quota (a short call on the start of the file), but
+    limited per account; nothing is stored."""
+    model = check_model(model, user)
+    if not _preview_allowed(user.id):
+        raise HTTPException(429, "Too many previews in a short time. Try again in a few minutes.")
+    filename, data = await _source_bytes(file, "")
+    try:
+        source = await asyncio.to_thread(extract, filename, data)
+    except ExtractError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    llm_log.tag(email=user.log_email, user_id=user.id)
+    await profile.use_agents(user.id)
+    try:
+        return await preview.describe(filename, source, model)
+    except Exception as exc:  # the page falls back to the file name
+        log.warning("couldn't preview %s: %s", filename, exc)
+        raise HTTPException(502, "Couldn't describe this file.") from exc
+
+
+def _preview_allowed(user_id: str) -> bool:
+    now = time.time()
+    mine = _previews.setdefault(user_id, deque())
+    while mine and now - mine[0] > PREVIEW_WINDOW:
+        mine.popleft()
+    if len(mine) >= PREVIEWS_PER_WINDOW:
+        return False
+    mine.append(now)
+    return True
 
 
 async def _retreat_from_idea(idea: str, days: int, photo: UploadFile | None, plan_prompt: str, model: str,
