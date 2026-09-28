@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 232 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 239 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1464,6 +1464,69 @@ Production came back up on the new code.
   - the web page has a Content Security Policy, refuses framing, and keeps tokens out of error reports.
 145 backend tests pass, 23 of them security tests. A walk through the whole app under the new policy found no violations. Production confirmed live (an oversized body now gets 413).
 Cheap-judge pass (Gemini Flash, Muse, Llama Scout) on 48 pieces and conversations: ratings, leniency and agreement (Krippendorff's alpha, also with each judge's leniency removed) in `evals/runs/full/reliability.md`. Agreement is weak. Explained the silence notice, and the owner's remaining steps one by one.
+
+### 233. 2026-09-28, 02:20 UTC
+
+> *(screenshots confirming ALLOWED_EMAILS and the build command on Render)* yes do this [the silence notice] … for evals I want a screen available when in debug mode that shows the distributions of scores on the evals run. use both statistic tables and strong visuals that would make me proud as a professors of data visualization. I want a deep analysis on whether these cheap/free evaluations are good, what their distributions are, cohens kappa, alpha, etc. and comparison to I want to see detailed data before we run the expensive evals I want just make sense all the categories and comparisons will give me meaningful data
+
+**What was done:** The silence notice is live: "Still there?" after three quiet minutes on a live call, and the call ends a minute later unless you choose to keep talking. The Eval analysis page (debug mode: Settings, or the footer) has nine sections of hand-built SVG charts and tables, computed by `evals/analysis.py`:
+- the short answer;
+- how each judge uses the scale;
+- every scale's distribution per judge;
+- agreement: Krippendorff's alpha raw and with leniency removed, ICC(2,1) and ICC(2,k), and Cohen's quadratic-weighted kappa per scale;
+- η² against a permutation-test chance level;
+- model means with bootstrap intervals and pairwise differences;
+- the scale correlation heatmap with the share of the first factor;
+- power;
+- every judgment.
+Finding: the cheap judges aren't reliable on single scales. Most scores are 6 or 7, so kappa is near zero even where exact agreement is 90%. Some scales still separate the models.
+
+### 234. 2026-09-28, 02:30 UTC
+
+> needed feature, for the ai companion users should be able to do a text-only version. there should be a few options, fully live voice to voice, then the free voice to voice (with tts and sst), then one where the app talks outloud into your ear but you are typing (so you can remain quiet), and finally the standard text-to-text chat. it should all be stored as one continuous conversation, do reasonable technical things to manage the context length (like creating a summary) etc. but make sure all options are simple and available. build it now. when the text-to-text is processing the animation should be really cute or beautiful or something. maybe have a tiny animation where it goes back and highlights some keywords in the text you've typed with a highligher, something so the waiting for response is not so brutal. this feature does not work without an excellent animation, really spend the time on it, perhaps make 3-5 different designs for animations, and allow who-ever has "Debug on" to change the animation from one kind of animation to another in the settings screen. make a preview in the setttings screens of all the kinds of animations.
+
+**What was done:** Talk it over now offers four ways to talk: live voice, the free voice, typing with a spoken reply, and text chat. You choose up front and can switch at any time; switching to or from the live voice continues the conversation as a new call. A conversation from the last twelve hours continues by default, saved as one record, with "Start a new conversation instead". Long conversations fold older turns into a running summary (a new agent prompt) and keep the full record. Typed modes have a composer, and five waiting animations, all previewed and chosen in Settings in debug mode:
+- the highlighter, which marks key words in your message;
+- the quill;
+- the candle;
+- still water;
+- gold leaf.
+Tested with a real conversation.
+
+### 235. 2026-09-28, 02:32 UTC
+
+> create a feature when the user is in Debug on to have the last security audit run on the code base to show all for example 45 things checked in hte audit, show when it was checked, and a red, yellow, green if there is an issue. the security audit page should be extensive, very visual (again I teach Data Visualization so it has to be good), develop a complete unit testing, integration testing, UX testing plan, and security testing and code analysis checks, and all of those should be visible on a testing and security report buried in the settings page for people with Debug on
+
+**What was done:** In progress.
+
+### 236. 2026-09-28, 02:35 UTC
+
+> for evals we should keep the results of EVERY run, so we can compare test-retest validity. the evals section should have a section for reliability measures, validity measures, and generalizability measures. make it extensive. always save historic data for comparison when new evals are run
+
+**What was done:** In progress.
+
+### 237. 2026-09-28, 02:40 UTC
+
+> the ai companion should know when the user switches to voice, or text-to-text, or when the ai is speaking outloud. it may help with context.
+
+**What was done:** Each turn carries its mode. The companion gets matching guidance: spoken, typed with a spoken reply, or written (two new agent prompts). A note like "[They've switched to typing; your replies are now spoken aloud to them]" goes into the conversation where the switch happened. Tested.
+
+### 238. 2026-09-28, 02:50 UTC
+
+> label the graph itself with this information pointing to what is perfect agreement, etc Hollow circle: … a filled circle near zero means they don't even order the pieces alike.
+
+**What was done:** The agreement chart now labels itself:
+- arrows to "1 = perfect agreement", "0 = no better than chance" and "below 0 = systematic disagreement";
+- shaded bands for tentative and reliable;
+- callouts naming each marker on the first row;
+- a header for the right column;
+- a "How to read a row" strip with the two patterns drawn.
+
+### 239. 2026-09-28, 02:55 UTC
+
+> i like this one, i wnat to be able to see the raw question/response in a hover or something and are teh stength and weakness does each model give text for strength weakness? do they agree in text about the strenght and weakness? *(with a screenshot of the judgments table)*
+
+**What was done:** Yes: every judge writes a strength and a weakness for every piece. "Every piece" now groups the judges side by side, marks words two or more of them used, and shows how much their words overlap. Strengths overlap by about 5% on average and weaknesses by 4%, though they often make the same point in different words. Opening a piece shows exactly what the model was given and what it wrote, or the whole conversation.
 
 ---
 
