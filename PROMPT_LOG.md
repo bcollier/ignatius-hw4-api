@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 225 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 230 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1402,6 +1402,41 @@ Links with an anchor now scroll to their section.
 > Build a detailed diagram of all the agents in this app and the tools available to that agent
 
 **What was done:** A tall slide, [08-agents.png](docs/feature-flows/08-agents.png), with every agent: its model and prompt file, what it's given, its tools and capabilities, and where its output goes. Twelve agents plus the eval judges. Only the deep dive calls a tool itself (Anthropic's `web_search`, Claude only). The others use structured output, image reading, or tools the app runs around them: the six search services, bible-api.com, speech recognition and the voices. Added to ARCHITECTURE.md, the agent prompts index and the Agents page.
+
+### 226. 2026-09-27, 23:10 UTC
+
+> why this ? G-Eval, judged by Grok 4.7:   and why only two System A (LLM as judge): the text above goes to two judges, Claude Opus 5.5 and GPT-6 Sol. we should at least also do the free models that we haev acccess to like jetstream. maybe also use either grok or gemini as the another evaluator.
+
+**What was done:** Explained that G-Eval weights its score by the judge's token probabilities, which Claude and GPT-6's reasoning models don't return and Grok does, and that keeping Grok in system B keeps the two systems independent. System A now has five judges: Claude Opus 5.5, GPT-6 Sol, Gemini 3.8 Flash (Google's newest), and the free Muse Glimmer and Llama 4 Scout. The report adds a "no self-judging" view that leaves out each contestant's own model.
+
+### 227. 2026-09-27, 23:25 UTC
+
+> do a pass with the free / cheapest judges first, show the ratings and cross reliability. then if all looks good we will include OPUS and GPT6, do the deepeval with grok. what is it using for test data? sections that were already generated or specific test configurations?
+
+**What was done:** Explained the test set: six fixed passages and three scripted conversations, written fresh by each contestant with the app's real prompts and shared research, not the author's own retreats. Wrote `evals/reliability.py`: Krippendorff's alpha per scale, each judge's leniency, spread and range, judge-against-judge correlations, and each judge's ranking of the contestants. In progress: the cheap-judge pass after generation finishes.
+
+### 228. 2026-09-27, 23:35 UTC
+
+> do those security fixes as well, is there anything else you are waiting on me for?
+
+**What was done:** Fixed F01, F02, F05, F06, F07 and the public balance, with 10 new tests that assert the fixes hold. The audit's own draft reproduction now fails, which confirms the fix.
+- **F01, conversation leak:** an example's log shows other people only its build steps, and talks are filed only under the person's own retreat.
+- **F02, voice billing:** the server measures and charges call time; a call must be the person's own before it can be ended; OpenAI calls are hung up on end; unended calls are settled at the limit; one live call at a time; Grok is premium-only.
+- **F05/F06, fail-closed start:** the server refuses to start half-configured, without sign-in unless `LOCAL_MODE=1`, or with a public bucket (production's bucket was checked first: it's private).
+- **F07, journal drafts:** drafts are kept per account and cleared at sign-out.
+Production came back up on the new code.
+
+### 229. 2026-09-28, 01:40 UTC
+
+> It should say estimated time it takes to do this exercise, in the future have multiple versions that are longer or shorter . Like a 10 minute examen *(with a screenshot of a practice session)*
+
+**What was done:** Each practice session now shows "about 30 minutes" at the start and "… 29 left" as it goes, following the voice speed. Shorter and longer versions of each practice, like a 10-minute Examen, are written up as the next item in IMPROVEMENTS.md.
+
+### 230. 2026-09-28, 01:50 UTC
+
+> Give the option in settings to slow it down a bit. The voices sometime sound like they are going to fast
+
+**What was done:** Settings → Listening → Voice speed: Slower, A little slower, Normal, A little faster. It applies to every recorded voice (readings, reflections, deep dives, practices, turn-taking replies) without changing pitch. Silences and bells keep their exact length, and live voices stream at their own pace. The choice is saved with "Save my defaults".
 
 ---
 

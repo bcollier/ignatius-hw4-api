@@ -171,6 +171,12 @@ These came in while the run was under way and are part of the definition of done
 9. **Fully verbose build log**, "Talk it over" that explains itself, and the whole-retreat PDF hidden until the retreat is finished.
 10. **Conversation voices you can hear.** Samples of all 28 xAI voices and OpenAI's Marin and Cedar, a "▶ Hear this voice" button in the settings, the voice's gender in the picker, and a player grid on the About page.
 
+### 12. Next
+
+1. **Practices in more than one length.** A 10-minute Examen next to the 15-minute one, and short and long versions of the other practices (a 15-minute and a 45-minute Dossier, say), chosen from the practice's card. `tools/make_practice.py` would take a target length (the prompts already ask for one) and write each version as its own session (`examen-10`, `examen-15`), recorded once like the rest; the Practice page groups a practice's versions under one card with a length picker. The time shown in each session ("about 30 minutes, 29 left") already follows the voice speed.
+2. **Security, still to do** (from the September 27 audit): deletion that also removes a retreat's logs and source files and a conversation's log copies (F08); ownership checked before a read can resume a job (F10); a per-address sign-in throttle instead of a global one (F09).
+3. **A silence notice on live calls.** After about three minutes with nobody speaking, "Still there?" with a minute's countdown before the call ends, since live voices bill for silence.
+
 ## To do (Ben, not code)
 
 - [ ] **Branded sign-in emails.** Supabase only allows editing email templates with custom SMTP. Set up Resend on `collier.phd` (Domains → add the DNS records → verify; API key with sending access), then in Supabase **Authentication → Emails → SMTP Settings**: sender `retreats@collier.phd`, name `Ignatius at Home`, host `smtp.resend.com`, port `465`, user `resend`, password = the API key. Then paste the branded Confirm signup, Magic Link and Change Email Address templates (in [email-templates.md](email-templates.md)) and raise **Authentication → Rate Limits → emails per hour** to about 30. A Gmail app password works instead if DNS is a hassle. Until then, sign-in emails come from "Supabase Auth" and Supabase's built-in sender allows only a few emails an hour.
