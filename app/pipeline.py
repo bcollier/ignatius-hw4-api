@@ -86,18 +86,34 @@ async def save(retreat: dict) -> None:
         log.exception("couldn't save retreat %s", retreat["id"])
 
 
-async def get(retreat_id: str) -> dict | None:
+RETREAT_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+async def load(retreat_id: str) -> dict | None:
+    """The retreat as it is, with no side effects: safe before checking who's asking."""
+    if not RETREAT_ID.match(retreat_id or ""):
+        return None
     if retreat_id in active:
         return active[retreat_id]
     try:
-        retreat = await store.load(retreat_id)
+        return await store.load(retreat_id)
     except StorageError:
         return None
-    if retreat is None:
-        return None
-    if _busy(retreat) and time.time() - retreat.get("heartbeat", 0) > STALE:
+
+
+async def recover(retreat: dict) -> dict:
+    """Pick up the retreat's job if its server went away (see the module docstring).
+    Only for someone allowed to act on the retreat: its owner, or the server's tools."""
+    if retreat["id"] not in active and _busy(retreat) and time.time() - retreat.get("heartbeat", 0) > STALE:
         await _resume(retreat)
     return retreat
+
+
+async def get(retreat_id: str) -> dict | None:
+    """The retreat, with an interrupted job picked up. For the owner's own retreats and
+    the server's tools; access.py checks ownership with load() before recover()."""
+    retreat = await load(retreat_id)
+    return await recover(retreat) if retreat else None
 
 
 async def _resume(retreat: dict) -> None:

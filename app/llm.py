@@ -6,6 +6,7 @@ API is called, which keeps tests and frontend work free.
 """
 
 import base64
+import contextlib
 import contextvars
 import json
 import logging
@@ -444,7 +445,8 @@ async def _deep_jetstream(
 async def _server_research(model: str, context: str, meter: pricing.Meter, provider: str):
     """The Jetstream model writes the queries; the search services run them."""
     llm_log.tag(purpose="search_queries")
-    reply = await jetstream.complete(model, prompts.SEARCH_QUERIES, context, meter, max_tokens=16000)
+    with _without_notes():  # the queries go to outside search services
+        reply = await jetstream.complete(model, prompts.SEARCH_QUERIES, context, meter, max_tokens=16000)
     queries = _queries(reply) or [_passage_ref(context)]
     llm_log.tag(purpose="research")
     research = await search.search(queries, provider)
@@ -453,6 +455,17 @@ async def _server_research(model: str, context: str, meter: pricing.Meter, provi
     meter.usd += research.usd
     llm_log.tag(purpose="deep")
     return research
+
+
+@contextlib.contextmanager
+def _without_notes():
+    """For calls whose output leaves the app (search queries): the person's About me notes
+    aren't sent, so nothing private can end up in a query to a search service."""
+    token = prompts.PERSON.set("")
+    try:
+        yield
+    finally:
+        prompts.PERSON.reset(token)
 
 
 def _passage_ref(context: str) -> str:
@@ -627,8 +640,9 @@ async def _free_research(context: str, meter: pricing.Meter, provider: str | Non
         return None
     try:
         llm_log.tag(purpose="search_queries")
-        message = await _call(meter, system=prompts.SEARCH_QUERIES, max_tokens=1000,
-                              messages=[{"role": "user", "content": context}])
+        with _without_notes():  # the queries go to outside search services
+            message = await _call(meter, system=prompts.SEARCH_QUERIES, max_tokens=1000,
+                                  messages=[{"role": "user", "content": context}])
         queries = _queries(_text(message))
         llm_log.tag(purpose="research")
         research = await search.search(queries or [_passage_ref(context)], provider)

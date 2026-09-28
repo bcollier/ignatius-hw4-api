@@ -1,13 +1,14 @@
 """Retreats: the library, making one, reading one, its research notes, its printable
 script, renaming or re-dating it, and deleting it."""
 
+import asyncio
 import json
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from .. import config, demos, examples, google_docs, inspiration, llm_log, pipeline, prompts, script_pdf
+from .. import config, demos, examples, google_docs, inspiration, llm_log, pipeline, prompts, quotas, script_pdf
 from ..access import my_retreat, readable_retreat, save_retreat, view_of
 from ..auth import User, current_user
 from ..checks import BuildRequest, check_date, check_model, check_prompt, check_series, check_title, resolve_build
@@ -39,7 +40,7 @@ async def _example_summaries(user: User, registered: dict) -> list[dict]:
     state = await demos.load_state(user.id) if registered else {}
     out = []
     for rid, meta in registered.items():
-        retreat = await pipeline.get(rid)
+        retreat = await pipeline.load(rid)
         if retreat and retreat.get("status") == "ready":
             out.append({**summary(demos.personal(retreat, state.get(rid), meta)), "demo": meta, "read_only": True,
                         "hidden": bool((state.get(rid) or {}).get("hidden"))})
@@ -88,12 +89,13 @@ async def create_retreat(
     model = check_model(model, user)
     build_options = _build_options(options, user)
     start = check_date(start_date)
+    await quotas.admit(user)  # before the upload is read or anything is spent
     if idea.strip() or photo is not None:
         return await _retreat_from_idea(idea, idea_days, photo, plan_prompt, model, build_options, start, series_ids, user,
                                         personal)
     filename, data = await _source_bytes(file, example, google_doc)
     try:
-        source = extract(filename, data)
+        source = await asyncio.to_thread(extract, filename, data)  # off the event loop: parsing can be slow
     except ExtractError as exc:
         raise HTTPException(400, str(exc)) from exc
     llm_log.tag(email=user.log_email)  # inherited by the planning job
@@ -115,7 +117,7 @@ async def _retreat_from_idea(idea: str, days: int, photo: UploadFile | None, pla
     image = None
     if photo is not None:
         try:
-            image = photo_image(await read_upload(photo))
+            image = await asyncio.to_thread(photo_image, await read_upload(photo))
         except ExtractError as exc:
             raise HTTPException(400, str(exc)) from exc
     llm_log.tag(email=user.log_email)
@@ -243,7 +245,7 @@ async def _series_titles(retreat: dict) -> list[str]:
     """Titles of the earlier weeks, for the cover of a whole-retreat PDF."""
     titles = []
     for rid in retreat.get("series", []):
-        earlier = await pipeline.get(rid)
+        earlier = await pipeline.load(rid)
         if earlier and earlier["user_id"] == retreat["user_id"] and earlier.get("plan"):
             titles.append(earlier["plan"]["title"])
     return titles

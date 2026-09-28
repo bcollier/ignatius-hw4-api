@@ -239,13 +239,20 @@ async def save_history(user_id: str, history: dict) -> None:
     await store.put_file(_history_path(user_id), json.dumps(history).encode(), "application/json")
 
 
+TALK_PURPOSES = ("talk", "talk_turn", "talk_memory")
+
+
 async def clear_history(user_id: str) -> None:
-    await save_history(user_id, {"memory": "", "conversations": []})
+    """Forget every conversation and the memory: the saved history, and the copies of the
+    transcripts in the log. A memory update already running can't bring them back."""
+    await save_history(user_id, {"memory": "", "conversations": [], "cleared_at": time.time()})
+    await store.redact_logs(user_id=user_id, purposes=TALK_PURPOSES)
 
 
 async def _remember(user_id: str, full: bool) -> None:
     """Fold older transcripts into the memory summary once they get long."""
     history = await load_history(user_id)
+    cleared = history.get("cleared_at")
     older = history["conversations"][:-HISTORY_KEEP]
     if sum(len(c.get("transcript") or "") for c in older) < HISTORY_CONDENSE_OVER:
         return
@@ -266,6 +273,8 @@ async def _remember(user_id: str, full: bool) -> None:
         log.warning("couldn't update conversation memory for %s", user_id)
         return
     history = await load_history(user_id)  # re-read: another conversation may have ended meanwhile
+    if history.get("cleared_at") != cleared:
+        return  # they asked to forget everything meanwhile; don't bring it back
     keep = history["conversations"][len(older):]
     for c in history["conversations"][:len(older)]:
         c["transcript"] = None  # folded into memory; the summary line stays

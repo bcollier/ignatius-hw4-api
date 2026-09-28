@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from .. import llm_log, pipeline, tts
+from .. import llm_log, pipeline, quotas, tts
 from ..access import day_state, my_retreat, now_iso, readable_retreat, save_retreat, view_of
 from ..auth import User, current_user
 from ..checks import BuildRequest, resolve_build
@@ -76,6 +76,7 @@ async def build_day(
     """Rebuild one day: Rewrite, Re-record (keep_scripts) or Try again."""
     _check_can_rebuild(retreat, day)
     opts = resolve_build(body, user)
+    await quotas.admit(user, count=False)
     llm_log.tag(email=user.log_email)  # inherited by the build job
     try:
         await pipeline.start_day_build(retreat, day, opts["voices"], opts["heart_prompt"], opts["deep_prompt"],
@@ -104,6 +105,7 @@ async def retry_day(day: int, retreat: dict = Depends(my_retreat), user: User = 
     state = day_state(retreat, day)
     if not pipeline.can_retry(state):
         raise HTTPException(409, f"Day {day} can't be finished from its scripts; rewrite it instead.")
+    await quotas.admit(user, count=False)
     llm_log.tag(email=user.log_email)
     await pipeline.retry_failed(retreat, day)
     return await pipeline.public_view(retreat)

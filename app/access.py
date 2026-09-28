@@ -14,21 +14,21 @@ PERSONAL_DAY_FIELDS = ("prayed_at", "journal", "listening")
 
 async def my_retreat(retreat_id: str, user: User = Depends(current_user)) -> dict:
     """The person's own retreat (for building, rebuilding and deleting)."""
-    retreat = await pipeline.get(retreat_id)
+    retreat = await pipeline.load(retreat_id)  # no side effects until ownership is known
     # Someone else's retreat gets the same answer as a missing one.
     if not retreat or retreat["user_id"] != user.id:
         raise HTTPException(404, "Retreat not found.")
-    return retreat
+    return await pipeline.recover(retreat)
 
 
 async def readable_retreat(retreat_id: str, user: User = Depends(current_user)) -> dict:
     """The person's own retreat, or an example retreat seen with their own progress laid
     over it (marked read_only; save changes with save_retreat). Examples are read only
     on the site even for the account that built them; tools/ can still rebuild them."""
-    retreat = await pipeline.get(retreat_id)
+    retreat = await pipeline.load(retreat_id)  # no side effects until ownership is known
     meta = (await demos.registry()).get(retreat_id)
     if retreat and retreat["user_id"] == user.id and not meta:
-        return retreat
+        return await pipeline.recover(retreat)
     if not retreat or not meta:
         raise HTTPException(404, "Retreat not found.")
     mine = (await demos.load_state(user.id)).get(retreat_id)

@@ -1,6 +1,8 @@
 """Pull text and images out of an uploaded PDF, Word document, text file or photo."""
 
 import io
+import math
+import zipfile
 from dataclasses import dataclass, field
 
 import docx
@@ -10,6 +12,13 @@ from . import config
 
 MIN_IMAGE_SIDE = 80  # skip bullets, rules and other decoration
 MAX_IMAGE_SIDE = 1568  # larger images are scaled down before storage and vision calls
+# Limits checked before anything is decoded or expanded, so a small file can't turn into
+# a huge one in memory (an image bomb, a zip bomb, a giant page drawn at full resolution).
+MAX_PIXELS = 40_000_000  # an image's width x height, before it's decoded
+MAX_RENDER_PIXELS = 12_000_000  # a scanned page, as drawn
+MAX_DOCX_ENTRIES = 5_000
+MAX_DOCX_EXPANDED = 100 * 1024 * 1024  # all the parts of a Word file, unpacked
+MAX_DOCX_RATIO = 200  # a part that unpacks to more than 200 times its size is refused
 
 
 PHOTO_SUFFIXES = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff")
@@ -70,10 +79,26 @@ def _extract_text(data: bytes) -> Extracted:
     return Extracted(text=text.replace("\r\n", "\n"), images=[], kind="text", page_count=0)
 
 
+def _image_size(data: bytes) -> tuple[int, int]:
+    """An image's width and height from its header, without decoding the pixels."""
+    with pymupdf.open(stream=data) as doc:
+        rect = doc[0].rect
+        return int(rect.width), int(rect.height)
+
+
+def _safe_pixmap(data: bytes) -> pymupdf.Pixmap:
+    width, height = _image_size(data)
+    if width * height > MAX_PIXELS:
+        raise ExtractError("That image is too large to read (over 40 megapixels).")
+    return pymupdf.Pixmap(data)
+
+
 def photo_image(data: bytes) -> Image:
     """A photo, sized and encoded like a scanned page, for a vision model to read."""
     try:
-        pix = pymupdf.Pixmap(data)
+        pix = _safe_pixmap(data)
+    except ExtractError:
+        raise
     except Exception as exc:
         raise ExtractError("That photo couldn't be read. Please use a JPEG or PNG.") from exc
     img = _to_web_image(pix, 1, fmt="jpeg")
@@ -119,7 +144,7 @@ def _extract_pdf(data: bytes) -> Extracted:
 
         if len(page_text) < 20 and page_images:
             if len(scanned) < config.MAX_SCANNED_PAGES:
-                pix = page.get_pixmap(dpi=150)
+                pix = page.get_pixmap(dpi=_render_dpi(page))
                 img = _to_web_image(pix, page_no, fmt="png")
                 if img:
                     scanned.append(img)
@@ -128,8 +153,8 @@ def _extract_pdf(data: bytes) -> Extracted:
             texts.append(f"[Page {page_no}]\n{page_text}")
 
         for info in page_images:
-            xref = info[0]
-            if xref in seen or len(images) >= config.MAX_IMAGES:
+            xref, width, height = info[0], info[2], info[3]
+            if xref in seen or len(images) >= config.MAX_IMAGES or width * height > MAX_PIXELS:
                 continue
             seen.add(xref)
             try:
@@ -142,7 +167,26 @@ def _extract_pdf(data: bytes) -> Extracted:
     return Extracted(kind="pdf", text="\n\n".join(texts), page_count=doc.page_count, images=images, scanned_pages=scanned)
 
 
+def _render_dpi(page) -> int:
+    """150 dpi, or less for a very large page, so the drawing stays under MAX_RENDER_PIXELS."""
+    points = max(1.0, page.rect.width * page.rect.height)
+    return max(36, min(150, int(72 * math.sqrt(MAX_RENDER_PIXELS / points))))
+
+
+def _check_docx_archive(data: bytes) -> None:
+    """A Word file is a zip archive: refuse one that would unpack to something enormous."""
+    try:
+        entries = zipfile.ZipFile(io.BytesIO(data)).infolist()
+    except zipfile.BadZipFile as exc:
+        raise ExtractError("This file isn't a readable Word document.") from exc
+    if len(entries) > MAX_DOCX_ENTRIES or sum(e.file_size for e in entries) > MAX_DOCX_EXPANDED:
+        raise ExtractError("This Word document unpacks to more than the app can read.")
+    if any(e.file_size > 1024 * 1024 and e.file_size > MAX_DOCX_RATIO * max(1, e.compress_size) for e in entries):
+        raise ExtractError("This Word document is compressed in a way the app won't open.")
+
+
 def _extract_docx(data: bytes) -> Extracted:
+    _check_docx_archive(data)
     try:
         document = docx.Document(io.BytesIO(data))
     except Exception as exc:
@@ -160,7 +204,7 @@ def _extract_docx(data: bytes) -> Extracted:
         if "image" not in rel.reltype or rel.is_external or len(images) >= config.MAX_IMAGES:
             continue
         try:
-            img = _to_web_image(pymupdf.Pixmap(rel.target_part.blob), None)
+            img = _to_web_image(_safe_pixmap(rel.target_part.blob), None)
         except Exception:
             continue
         if img:

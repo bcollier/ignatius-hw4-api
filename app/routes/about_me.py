@@ -1,5 +1,6 @@
 """About me ("user info.md"): what the person has told the app about themselves."""
 
+import asyncio
 import json
 from datetime import datetime, timezone
 
@@ -38,7 +39,7 @@ async def write_profile(body: ProfileRequest, user: User = Depends(current_user)
 async def upload_profile(file: UploadFile = File(...), user: User = Depends(current_user)):
     """Replace the about-me notes with a text, Markdown, Word or PDF file."""
     data = await read_upload(file)
-    text = _text_of(file.filename or "notes", data)
+    text = await asyncio.to_thread(_text_of, file.filename or "notes", data)  # off the event loop
     if not text.strip():
         raise HTTPException(400, "No text found in that file.")
     llm_log.tag(user_id=user.id, email=user.log_email)
@@ -57,7 +58,7 @@ async def profile_from_google_doc(body: GoogleDocRequest, user: User = Depends(c
         filename, data = await google_docs.fetch(body.link)
     except google_docs.GoogleDocError as exc:
         raise HTTPException(400, str(exc)) from exc
-    text = _text_of(filename, data)
+    text = await asyncio.to_thread(_text_of, filename, data)
     if not text.strip():
         raise HTTPException(400, "That Google Doc has no text in it.")
     llm_log.tag(user_id=user.id, email=user.log_email)

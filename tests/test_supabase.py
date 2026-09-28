@@ -62,4 +62,7 @@ def test_email_allowlist(monkeypatch):
     assert auth.email_allowed("Ben@Collier.phd".lower())
     assert not auth.email_allowed("stranger@example.com")
     monkeypatch.setattr(config, "ALLOWED_EMAILS", [])
-    assert auth.email_allowed("anyone@example.com")
+    monkeypatch.delenv("EVERYONE_FULL", raising=False)
+    assert not auth.email_allowed("anyone@example.com")  # an empty list lets no one spend by accident
+    monkeypatch.setenv("EVERYONE_FULL", "1")
+    assert auth.email_allowed("anyone@example.com")  # unless it's asked for by name

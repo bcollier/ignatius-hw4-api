@@ -124,6 +124,7 @@ async def _make(user_id: str, email: str | None, state: dict) -> None:
         voice_usd = await _record(user_id, session, state["voice"])
         state.update(status="ready", session=session, made_at=datetime.now(timezone.utc).isoformat(),
                      usd={"script": round(script_usd, 4), "voice": round(voice_usd, 4)})
+        await _remove_old_recordings(user_id, session)
     except Exception as exc:  # shown to the person; details are in the server log
         log.exception("couldn't make the Examen for %s", user_id)
         state.update(status="failed", error=str(getattr(exc, "message", None) or exc)[:300])
@@ -141,6 +142,20 @@ async def _write(days: str, model: str) -> tuple[dict, float]:
     session = llm._parse_json(llm._text(message))
     session["id"] = "my-examen"
     return session, meter.usd
+
+
+async def _remove_old_recordings(user_id: str, session: dict) -> None:
+    """Earlier versions' audio, once the new one is recorded: only the current Examen is kept."""
+    clips = {g["audio"]["path"].removesuffix(".mp3") for g in session["segments"] if g.get("audio")}
+
+    def current(path: str) -> bool:  # a clip's audio and its word timings, or the Examen itself
+        return path == _path(user_id) or path.removesuffix(".mp3").removesuffix(".words.json") in clips
+    try:
+        old = [p for p in await store.list_prefix(f"{user_id}/examen/") if not current(p)]
+        if old:
+            await store.delete_files(old)
+    except Exception:  # tidying up never fails the new Examen
+        log.warning("couldn't remove old Examen recordings for %s", user_id, exc_info=True)
 
 
 async def _record(user_id: str, session: dict, tier: str) -> float:

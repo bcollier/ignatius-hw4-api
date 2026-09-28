@@ -47,7 +47,7 @@ async def check_series(raw: str, user: User) -> list[str]:
         raise HTTPException(400, f"A series can include up to {series.MAX_PREVIOUS} earlier retreats.")
     found = []
     for rid in ids:
-        r = await pipeline.get(rid)
+        r = await pipeline.load(rid)
         if not r or r["user_id"] != user.id:
             raise HTTPException(400, "One of the earlier retreats in the series wasn't found.")
         if not r.get("plan"):

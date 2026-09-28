@@ -45,16 +45,21 @@ def ready(client, rid):
         time.sleep(0.05)
 
 
-def test_guest_gets_jetstream_and_no_retreat_cap(guest):
+def test_guest_gets_jetstream_and_no_cap_on_retreats_kept(guest):
     me = guest.get("/api/me").json()
     assert me["mode"] == "free" and me["anonymous"] and "max_retreats" not in me
 
     r = upload(guest)
     assert r.status_code == 202 and r.json()["model"] == "jetstream/muse-glimmer"  # Muse is the default
     assert upload(guest, model="anthropic/claude-opus-5").status_code == 403
+    ready(guest, r.json()["id"])  # (one at a time is tested in test_security.py)
 
-    for _ in range(5):  # no limit on how many retreats a free user keeps
-        assert upload(guest).status_code == 202
+    from app import quotas
+    for _ in range(quotas.LIMITS["free"]["per_day"] - 1):  # no limit on how many a free user keeps,
+        made = upload(guest)                                # but only so many new ones a day
+        assert made.status_code == 202
+        ready(guest, made.json()["id"])
+    assert upload(guest).status_code == 429
 
 
 def test_guest_builds_only_with_free_voices_and_jetstream(guest):

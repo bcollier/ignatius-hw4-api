@@ -20,7 +20,7 @@ from . import config
 
 log = logging.getLogger(__name__)
 
-SIGNED_URL_SECONDS = 24 * 3600
+SIGNED_URL_SECONDS = 6 * 3600  # a file link works for six hours; the app asks for fresh ones
 
 
 class StorageError(RuntimeError):
@@ -77,6 +77,17 @@ def summary(retreat: dict) -> dict:
     }
 
 
+# What an erased log row keeps: who, when, what for, which model, tokens and cost.
+REDACTED = {"request": {"redacted": True}, "response_text": None, "response": {}}
+
+
+def _log_matches(row: dict, retreat_id: str | None, user_id: str | None, purposes: tuple[str, ...]) -> bool:
+    if not (retreat_id or user_id):
+        return False
+    return ((not retreat_id or row.get("retreat_id") == retreat_id) and (not user_id or row.get("user_id") == user_id)
+            and (not purposes or row.get("purpose") in purposes))
+
+
 def file_paths(retreat: dict) -> list[str]:
     paths = [img["path"] for img in retreat.get("images", [])]
     for day in retreat.get("days", {}).values():
@@ -100,7 +111,9 @@ class LocalStore:
         (self.rows / f"{retreat['id']}.json").write_text(json.dumps(retreat))
 
     async def load(self, retreat_id: str) -> dict | None:
-        path = self.rows / f"{retreat_id}.json"
+        path = (self.rows / f"{retreat_id}.json").resolve()
+        if path.parent != self.rows.resolve():  # an id like "../x" never leaves the rows folder
+            return None
         return json.loads(path.read_text()) if path.is_file() else None
 
     async def list_for(self, user_id: str) -> list[dict]:
@@ -109,9 +122,45 @@ class LocalStore:
         return sorted(mine, key=lambda r: r["created_at"], reverse=True)
 
     async def delete(self, retreat: dict) -> None:
-        for path in file_paths(retreat):
+        """Everything of a retreat's: its log bodies, its whole folder (sources and scans
+        too, not only the recordings) and its row."""
+        await self.redact_logs(retreat_id=retreat["id"])
+        await self.delete_prefix(f"{retreat['user_id']}/{retreat['id']}/")
+        for path in file_paths(retreat):  # anything stored outside the folder by older versions
             self.local_path(path).unlink(missing_ok=True)
         (self.rows / f"{retreat['id']}.json").unlink(missing_ok=True)
+
+    async def delete_prefix(self, prefix: str) -> None:
+        import shutil
+
+        folder = self.local_path(prefix.rstrip("/"))
+        if folder.is_dir():
+            shutil.rmtree(folder)
+
+    async def list_prefix(self, prefix: str) -> list[str]:
+        folder = self.local_path(prefix.rstrip("/"))
+        if not folder.is_dir():
+            return []
+        root = self.files.resolve()
+        return [str(p.resolve().relative_to(root)) for p in folder.rglob("*") if p.is_file()]
+
+    async def delete_files(self, paths: list[str]) -> None:
+        for path in paths:
+            self.local_path(path).unlink(missing_ok=True)
+
+    async def redact_logs(self, retreat_id: str | None = None, user_id: str | None = None,
+                          purposes: tuple[str, ...] = ()) -> None:
+        """Erase the prompts and replies of matching log rows; their costs and times stay."""
+        path = self.rows.parent / "llm_calls.jsonl"
+        if not path.exists():
+            return
+        out = []
+        for line in path.read_text().splitlines():
+            row = json.loads(line) if line.strip() else None
+            if row and _log_matches(row, retreat_id, user_id, purposes):
+                row.update(REDACTED)
+            out.append(json.dumps(row) if row else line)
+        path.write_text("\n".join(out) + ("\n" if out else ""))
 
     async def put_file(self, path: str, data: bytes, mime: str) -> None:
         target = self.local_path(path)
@@ -222,10 +271,53 @@ class SupabaseStore:
         return [summary(row["data"]) for row in response.json()]
 
     async def delete(self, retreat: dict) -> None:
-        paths = file_paths(retreat)
+        """Everything of a retreat's: its log bodies (first, while the rows still carry its
+        id), its whole folder (sources and scans too) and its row."""
+        await self.redact_logs(retreat_id=retreat["id"])
+        await self.delete_prefix(f"{retreat['user_id']}/{retreat['id']}/")
+        paths = file_paths(retreat)  # anything stored outside the folder by older versions
         if paths:
-            await self._request("DELETE", f"/storage/v1/object/{self.bucket}", json={"prefixes": paths})
+            await self.delete_files(paths)
         await self._request("DELETE", "/rest/v1/retreats", params={"id": f"eq.{retreat['id']}"})
+
+    async def list_prefix(self, prefix: str) -> list[str]:
+        """Every file under a folder, however deep."""
+        folder, out = prefix.rstrip("/"), []
+        offset = 0
+        while True:
+            response = await self._request("POST", f"/storage/v1/object/list/{self.bucket}",
+                                           json={"prefix": folder, "limit": 1000, "offset": offset})
+            items = response.json()
+            for item in items:
+                path = f"{folder}/{item['name']}"
+                out += await self.list_prefix(path) if item.get("id") is None else [path]
+            if len(items) < 1000:
+                return out
+            offset += len(items)
+
+    async def delete_files(self, paths: list[str]) -> None:
+        for i in range(0, len(paths), 500):
+            await self._request("DELETE", f"/storage/v1/object/{self.bucket}", json={"prefixes": paths[i:i + 500]})
+
+    async def delete_prefix(self, prefix: str) -> None:
+        paths = await self.list_prefix(prefix)
+        if paths:
+            await self.delete_files(paths)
+
+    async def redact_logs(self, retreat_id: str | None = None, user_id: str | None = None,
+                          purposes: tuple[str, ...] = ()) -> None:
+        """Erase the prompts and replies of matching log rows; their costs and times stay."""
+        params = {}
+        if retreat_id:
+            params["retreat_id"] = f"eq.{retreat_id}"
+        if user_id:
+            params["user_id"] = f"eq.{user_id}"
+        if purposes:
+            params["purpose"] = f"in.({','.join(purposes)})"
+        if not params:
+            return
+        await self._request("PATCH", "/rest/v1/llm_calls", params=params, json=REDACTED,
+                            headers={"Prefer": "return=minimal"})
 
     async def put_file(self, path: str, data: bytes, mime: str) -> None:
         await self._request(

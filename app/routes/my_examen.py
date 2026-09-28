@@ -4,7 +4,7 @@ recorded for them (full accounts; see app/my_examen.py)."""
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from .. import my_examen, tts
+from .. import my_examen, quotas, tts
 from ..auth import User, current_user
 
 router = APIRouter(prefix="/api/practice/examen")
@@ -31,4 +31,6 @@ async def make_examen(body: ExamenRequest, user: User = Depends(current_user)):
         raise HTTPException(400, "The deluxe voices aren't set up on this server.")
     if len(body.days) > my_examen.MAX_DAYS_TEXT:
         raise HTTPException(400, f"Please keep it under {my_examen.MAX_DAYS_TEXT:,} characters.")
+    if user.id not in my_examen._running:  # asking again while one is being made changes nothing
+        await quotas.admit(user)
     return await my_examen.start(user.id, user.log_email, body.days, body.voice)

@@ -2,6 +2,9 @@
 and sends its access token; the backend asks Supabase who the token belongs to.
 Without Supabase (tests, local development) every request is one local user."""
 
+import base64
+import hashlib
+import json
 import os
 import time
 from dataclasses import dataclass
@@ -12,8 +15,12 @@ from fastapi import Header, HTTPException
 from . import config
 
 LOCAL_USER_ID = "00000000-0000-0000-0000-000000000000"
-_cache: dict[str, tuple["User", float]] = {}  # token -> (user, checked_at)
+# Who a token belongs to, so every request needn't ask Supabase: keyed by a hash of the
+# token (never the token itself), kept for CACHE_SECONDS or until the token expires,
+# whichever comes first, and never more than CACHE_MAX entries.
+_cache: dict[str, tuple["User", float]] = {}  # sha256(token) -> (user, good until)
 CACHE_SECONDS = 300
+CACHE_MAX = 5_000
 
 
 @dataclass(frozen=True)
@@ -45,7 +52,30 @@ def check_setup() -> None:
 
 
 def email_allowed(email: str) -> bool:
-    return not config.ALLOWED_EMAILS or email.lower() in config.ALLOWED_EMAILS
+    """Full (paid) mode: the emails on ALLOWED_EMAILS. An empty list means no one, unless
+    EVERYONE_FULL=1 says, on purpose, that every signed-in account may spend."""
+    if not config.ALLOWED_EMAILS:
+        return os.environ.get("EVERYONE_FULL") == "1"
+    return email.lower() in config.ALLOWED_EMAILS
+
+
+def _expires(token: str) -> float:
+    """The token's own expiry (its exp claim), read without trusting it for anything but
+    shortening how long it's cached. Unknown: now plus CACHE_SECONDS."""
+    try:
+        payload = token.split(".")[1]
+        return float(json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))["exp"])
+    except (IndexError, ValueError, KeyError, TypeError):
+        return time.time() + CACHE_SECONDS
+
+
+def _remember(key: str, user: "User", token: str) -> None:
+    now = time.time()
+    for k in [k for k, (_, until) in _cache.items() if until <= now]:
+        _cache.pop(k, None)
+    while len(_cache) >= CACHE_MAX:
+        _cache.pop(next(iter(_cache)))  # the oldest
+    _cache[key] = (user, min(now + CACHE_SECONDS, _expires(token)))
 
 
 async def current_user(authorization: str = Header(default="")) -> User:
@@ -58,8 +88,9 @@ async def current_user(authorization: str = Header(default="")) -> User:
     token = authorization.removeprefix("Bearer ").strip()
     if not token:
         raise HTTPException(401, "Sign in to continue.")
-    cached = _cache.get(token)
-    if cached and time.time() - cached[1] < CACHE_SECONDS:
+    key = hashlib.sha256(token.encode()).hexdigest()
+    cached = _cache.get(key)
+    if cached and time.time() < cached[1]:
         return cached[0]
 
     try:
@@ -80,5 +111,5 @@ async def current_user(authorization: str = Header(default="")) -> User:
     if not full and not config.FREE_MODE:
         raise HTTPException(403, "This account isn't on the list of allowed users for this demo.")
     user = User(data["id"], email, full=full, anonymous=anonymous)
-    _cache[token] = (user, time.time())
+    _remember(key, user, token)
     return user

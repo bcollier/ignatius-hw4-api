@@ -32,19 +32,24 @@ def doc_id(link: str) -> str:
 async def fetch(link: str) -> tuple[str, bytes]:
     """(filename, .docx bytes) for a shared Google Doc."""
     url = EXPORT_URL.format(id=doc_id(link))
+    limit = config.MAX_UPLOAD_MB * 1024 * 1024
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as http:
-            response = await http.get(url)
+            async with http.stream("GET", url) as response:
+                if response.status_code in (401, 403, 404) or DOCX_TYPE not in response.headers.get("content-type", ""):
+                    # A private document redirects to a sign-in page instead of the file.
+                    raise GoogleDocError(NOT_SHARED)
+                if response.status_code >= 400:
+                    raise GoogleDocError(f"Google Docs returned an error ({response.status_code}).")
+                data = bytearray()
+                async for chunk in response.aiter_bytes():  # read no more than the limit
+                    data += chunk
+                    if len(data) > limit:
+                        raise GoogleDocError(f"That document is larger than {config.MAX_UPLOAD_MB} MB.")
+                disposition = response.headers.get("content-disposition", "")
     except httpx.HTTPError as exc:
         raise GoogleDocError("Google Docs didn't answer. Try again in a moment.") from exc
-    if response.status_code in (401, 403, 404) or DOCX_TYPE not in response.headers.get("content-type", ""):
-        # A private document redirects to a sign-in page instead of the file.
-        raise GoogleDocError(NOT_SHARED)
-    if response.status_code >= 400:
-        raise GoogleDocError(f"Google Docs returned an error ({response.status_code}).")
-    if len(response.content) > config.MAX_UPLOAD_MB * 1024 * 1024:
-        raise GoogleDocError(f"That document is larger than {config.MAX_UPLOAD_MB} MB.")
-    return _filename(response.headers.get("content-disposition", "")), response.content
+    return _filename(disposition), bytes(data)
 
 
 def _filename(disposition: str) -> str:

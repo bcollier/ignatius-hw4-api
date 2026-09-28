@@ -573,7 +573,7 @@ flowchart LR
 - **Keys live only in environment variables:** `.env` locally (gitignored, never committed) and Render's dashboard in production. `.env.example` lists the names with empty values. No key has ever been committed or typed into a prompt.
 - **Supabase:** the secret key stays on the server; the browser gets only the publishable key, which is designed to be public. RLS is on with no policies.
 - **Retreats are private:** another person's retreat is 404, the same as a missing one, except example retreats, which are read-only and keep each visitor's progress in their own folder.
-- **Files** are in a private bucket, reached through signed URLs that expire after 24 hours (cached 23 hours). Paths start with the owner's id.
+- **Files** are in a private bucket, reached through signed URLs that expire after 6 hours (reused for up to 5). Paths start with the owner's id.
 - **Live conversation keys** never reach the browser: OpenAI's SDP is relayed by the server, and xAI gets a token that expires in 5 minutes.
 - **Spending** is limited to `ALLOWED_EMAILS`; free mode costs nothing; uploads, pages, text, prompts, track lengths and conversation time are capped.
 - **CORS** allows only `ALLOWED_ORIGINS`. The local file route exists only without Supabase and refuses paths outside `DATA_DIR`.
@@ -586,7 +586,13 @@ flowchart LR
   - The server refuses to start with half-configured sign-in, without sign-in unless `LOCAL_MODE=1`, or with a public storage bucket.
   - The public options no longer show the ElevenLabs balance.
   - Unsaved journal drafts in the browser are kept per account and cleared at sign-out.
-  - Still to do: deletion of logs and source files with a retreat or conversation history (F08), ownership checked before a read can resume a job (F10), and a per-address sign-in throttle (F09). Limits on job admission and upload parsing (F03, F04) matter only at a larger scale.
+  - Deleting a retreat removes its whole storage folder (sources and scans too) and erases the prompts and replies in its log rows (costs are kept); forgetting conversations erases their log copies, and a memory update already running can't restore them; a new Examen removes the old recordings (F08).
+  - A retreat is looked up without side effects, and a stalled job is resumed only after ownership is checked; ids can't reach outside the store (F10).
+  - Phone sign-in codes: the caller's address is the one Render's edge saw; no global lockout that a flood of guesses could trigger; one code per account (F09).
+  - Each person may run a few jobs at once and start only so many a day (free: 1 and 5; full: 3 and 50), with a ceiling for the whole server; the anonymous error-report endpoint is rate limited (F03).
+  - Request bodies are capped before anything reads them; Word files are checked for decompression bombs, images for size before decoding, scanned pages drawn within a pixel budget, Google Docs downloads streamed with a ceiling, and parsing runs off the event loop (F04).
+  - The sign-in cache keeps hashes, not tokens, honours each token's expiry and is bounded; an empty `ALLOWED_EMAILS` gives no one full mode unless `EVERYONE_FULL=1`; search queries are written without the person's notes; signed file links last 6 hours.
+  - Dependencies install from `requirements.lock`, every package pinned by hash; Dependabot opens weekly update pull requests (refresh the lock after merging one).
 
 ---
 
@@ -603,7 +609,9 @@ Names only; values go in `.env` or Render's dashboard.
 | `WEB_SEARCH` | `1` | Web search for the deep dive |
 | `ELEVENLABS_API_KEY`, `ELEVENLABS_MODEL`, `ELEVENLABS_USD_PER_1K_CHARS` | / `eleven_multilingual_v2` / `0.30` | Premium voices |
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_BUCKET` | / / / `retreats` | Sign-in, database, storage |
-| `ALLOWED_EMAILS` | anyone | Who gets full mode |
+| `ALLOWED_EMAILS` | no one | Who gets full mode (the paid models and voices). Empty means no one, unless `EVERYONE_FULL=1` |
+| `EVERYONE_FULL` | off | `1` gives every signed-in account full mode when `ALLOWED_EMAILS` is empty (for a private deployment) |
+| `LOCAL_MODE` | off | `1` runs without Supabase: one local user, files on disk. Without it, the server won't start unless sign-in is fully set up |
 | `JETSTREAM_API_KEY`, `JETSTREAM_BASE_URL`, `JETSTREAM_MODELS` | / proxy URL / `muse-glimmer,llama-4-scout` | Free mode |
 | `FREE_MODE`, `LOCAL_USER_MODE` | `1` / | Free mode switch; preview free mode locally |
 | `TAVILY_API_KEY`, `TAVILY_SEARCH_DEPTH` | / `basic` | Tavily |

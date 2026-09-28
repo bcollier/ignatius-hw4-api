@@ -11,7 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import auth, config
+from . import auth, body_limit, config
+from .body_limit import BodyLimit
 from .routes import (about_me, agents, build_log, client_errors, conversation, handoff, cost_report, days, example_documents, local_files, meta,
                      my_examen, practice_journal, retreats)
 from .storage import LocalStore, StorageError, store
@@ -27,6 +28,9 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Ignatius at Home API", version="0.2.0", lifespan=lifespan)
+# Before routing, so an oversized body is refused before anything parses it (see body_limit.py);
+# inside CORS, so the browser can read the refusal.
+app.add_middleware(BodyLimit, max_bytes=config.MAX_UPLOAD_MB * 1024 * 1024 * body_limit.UPLOAD_FILES + body_limit.SLACK)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.ALLOWED_ORIGINS,
