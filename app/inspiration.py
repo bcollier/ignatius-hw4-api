@@ -58,7 +58,7 @@ async def compose(idea: str, photo: Image | None, days: int, model: str) -> tupl
     texts = await asyncio.gather(*(_passage(d) for d in outline["days"]))
     parts = [f"{outline['title']}\n\nA retreat of {len(texts)} days, from this idea: {outline['idea']}\n"
              "Scripture is from the World English Bible (public domain) unless it was copied from the person's photo."]
-    for n, (day, (ref, text)) in enumerate(zip(outline["days"], texts), start=1):
+    for n, (day, (ref, text)) in enumerate(zip(outline["days"], texts, strict=False), start=1):
         parts.append(f"Day {n}: {day['title']}\n{ref}\n\n{text}")
     await llm_log.step(f"Fetched the scripture for {len(texts)} days from the World English Bible.")
     source = Extracted(kind="idea", text="\n\n".join(parts), page_count=0,
@@ -74,9 +74,9 @@ async def _outline(idea: str, photo: Image | None, days: int, model: str, meter:
         images = [(photo.data, photo.mime)] if photo else []
         try:
             reply = await jetstream.complete(pricing.api_model(model), system, ask, meter, images=images, max_tokens=4000)
-        except jetstream.ImagesRejected:
+        except jetstream.ImagesRejected as exc:
             raise InspirationError("The free model can't look at photos. Describe the idea in words, "
-                                   "or upload the photo as the retreat's material instead.")
+                                   "or upload the photo as the retreat's material instead.") from exc
         except jetstream.JetstreamError as exc:
             raise InspirationError(str(exc)) from exc
         outline = llm._parse_json(reply)

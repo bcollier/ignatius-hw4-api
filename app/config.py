@@ -1,6 +1,7 @@
 """Settings read from environment variables (and a local .env file in development)."""
 
 import os
+import tempfile
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -84,7 +85,7 @@ ALLOWED_ORIGINS = _list(
 # Running without Supabase (one local user, files on disk) must be asked for by name,
 # so a missing setting on the server can never quietly turn sign-in off.
 LOCAL_MODE = os.environ.get("LOCAL_MODE") == "1"
-DATA_DIR = Path(os.environ.get("DATA_DIR", "/tmp/ignatius"))
+DATA_DIR = Path(os.environ.get("DATA_DIR") or Path(tempfile.gettempdir()) / "ignatius")  # local mode only
 
 MAX_UPLOAD_MB = _int("MAX_UPLOAD_MB", 15)
 MAX_PAGES = _int("MAX_PAGES", 40)

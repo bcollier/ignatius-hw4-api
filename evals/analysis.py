@@ -60,7 +60,7 @@ def weighted_kappa(a: list[int], b: list[int], k: int = 7) -> float | None:
     if len(a) < 3:
         return None
     observed = np.zeros((k, k))
-    for x, y in zip(a, b):
+    for x, y in zip(a, b, strict=False):
         observed[int(x) - 1, int(y) - 1] += 1
     observed /= observed.sum()
     expected = np.outer(observed.sum(1), observed.sum(0))
@@ -68,6 +68,27 @@ def weighted_kappa(a: list[int], b: list[int], k: int = 7) -> float | None:
     w = (i - j) ** 2 / (k - 1) ** 2
     denom = (w * expected).sum()
     return None if denom == 0 else 1 - (w * observed).sum() / denom
+
+
+def gwet_ac2(units: list[list[float]], k: int = 7) -> float | None:
+    """Gwet's AC2 with quadratic weights, for any number of judges (Gwet 2014). Unlike
+    kappa, its chance term doesn't swell when nearly every score sits in one category,
+    so it stays meaningful under a ceiling (the "kappa paradox")."""
+    units = [[int(round(v)) for v in u] for u in units if len(u) >= 2]
+    if len(units) < 3:
+        return None
+    i, j = np.indices((k, k))
+    w = 1 - (i - j) ** 2 / (k - 1) ** 2
+    counts = np.zeros((len(units), k))
+    for n, u in enumerate(units):
+        for v in u:
+            counts[n, min(k, max(1, v)) - 1] += 1
+    r = counts.sum(1)
+    weighted = counts @ w.T  # r*_ik: agreement-weighted counts
+    pa = float(np.mean((counts * (weighted - 1)).sum(1) / (r * (r - 1))))
+    pi = (counts / r[:, None]).mean(0)
+    pe = float(w.sum() / (k * (k - 1)) * (pi * (1 - pi)).sum())
+    return None if pe >= 1 else (pa - pe) / (1 - pe)
 
 
 def icc(matrix: np.ndarray) -> tuple[float | None, float | None]:
@@ -141,7 +162,7 @@ def eta_squared(item_means: dict) -> tuple[float | None, float | None, float | N
         if not sst:
             return 0.0
         groups = defaultdict(list)
-        for lab, v in zip(labs, values):
+        for lab, v in zip(labs, values, strict=False):
             groups[lab].append(v)
         return sum(len(g) * (statistics.fmean(g) - grand) ** 2 for g in groups.values()) / sst
     observed = eta(labels)
@@ -215,7 +236,7 @@ def analyse(run: RunDir, judges: list[str]) -> dict:
             for a, b in combinations(judges, 2):
                 pa = [(raw[(a, it)], raw[(b, it)]) for it in items if (a, it) in raw and (b, it) in raw]
                 if pa:
-                    xs, ys = zip(*pa)
+                    xs, ys = zip(*pa, strict=False)
                     k = weighted_kappa(xs, ys)
                     if k is not None:
                         kappas.append(k)
@@ -233,6 +254,7 @@ def analyse(run: RunDir, judges: list[str]) -> dict:
                 "alpha_std": r3(alpha(units(standardized(raw, judges), judges, items))),
                 "icc1": r3(one), "icck": r3(avg), "judges_for_08": r3(judges_for(0.8, one)),
                 "kappa": r3(statistics.fmean(kappas)) if kappas else None,
+                "ac2": r3(gwet_ac2(units(raw, judges, items))),
                 "exact": r3(statistics.fmean(exact)) if exact else None,
                 "within1": r3(statistics.fmean(within)) if within else None,
                 "eta2": r3(eta), "eta2_p": r3(p_eta), "eta2_null": r3(null_eta),
@@ -259,7 +281,7 @@ def analyse(run: RunDir, judges: list[str]) -> dict:
                 sa = [(data[(a, *it)][s], data[(b, *it)][s]) for it in items
                       if (a, *it) in data and (b, *it) in data and s in data[(a, *it)] and s in data[(b, *it)]]
                 if len(sa) >= 3:
-                    xs, ys = zip(*sa)
+                    xs, ys = zip(*sa, strict=False)
                     per.append((weighted_kappa(xs, ys), statistics.fmean(x == y for x, y in sa),
                                 statistics.fmean(abs(x - y) <= 1 for x, y in sa)))
             oa = [(overall[(a, it)], overall[(b, it)]) for it in items if (a, it) in overall and (b, it) in overall]
@@ -269,7 +291,7 @@ def analyse(run: RunDir, judges: list[str]) -> dict:
             pairs.append({"a": a, "b": b, "kappa": r3(statistics.fmean(kap)) if kap else None,
                           "exact": r3(statistics.fmean(e for _, e, _ in per)),
                           "within1": r3(statistics.fmean(w for _, _, w in per)),
-                          "spearman": r3(spearman(*zip(*oa))) if len(oa) > 3 else None,
+                          "spearman": r3(spearman(*zip(*oa, strict=False))) if len(oa) > 3 else None,
                           "bias": r3(statistics.fmean(y - x for x, y in oa)) if oa else None, "n": len(oa)})
 
         # redundancy between scales
@@ -326,8 +348,38 @@ def analyse(run: RunDir, judges: list[str]) -> dict:
                          "models": model_rows, "diffs": diffs, "self_preference": selfpref,
                          "within_model_sd": r3(sd), "power": power}
     out["tracks_data"] = tracks_out
+    out["scale_text"] = scale_text()
     out["pieces"] = pieces(run)
     out["text_agreement"] = text_agreement(rows, judges)
+    return out
+
+
+# ---------------------------------------------------------------- what each scale asked
+
+def scale_text() -> dict:
+    """For each track and scale, exactly what the judge was asked, from the judge prompts
+    (app/agent_prompts/eval_judge*.md), and the scale it answered on."""
+    import re
+
+    from app import prompts
+    out = {}
+    for tracks, name in ((("heart", "deep"), "eval_judge"), (("companion",), "eval_judge_companion")):
+        text = prompts._prompt(name)
+        found = {}
+        for line in text.splitlines():
+            m = re.match(r"- ([a-z_]+): (.+)", line)
+            if m:
+                found[m.group(1)] = m.group(2).strip()
+            elif line.startswith("- Each fruit of the Spirit") or line.startswith("- The three theological virtues"):
+                intro, _, names = line[2:].partition(": ")  # the first colon; a note can hold its own
+                for key, extra in re.findall(r"([a-z_]+)(?: \(([^)]*)\))?", names):
+                    found[key] = f"{intro}.{' ' + extra[0].upper() + extra[1:] + '.' if extra else ''}"
+        for t in tracks:
+            out[t] = {s: {"question": q, "scale": (
+                "1 to 7, lower is better (1 = none, 7 = pervasive or very likely). The judge was told to use the whole range: 4 is ordinary, 1 and 7 are rare."
+                if s in LOWER_IS_BETTER else
+                "1 to 7, higher is better. The judge was told to use the whole range: 4 is ordinary, 1 and 7 are rare.")}
+                for s, q in found.items()}
     return out
 
 

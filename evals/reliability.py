@@ -15,7 +15,6 @@ import argparse
 import json
 import statistics
 from collections import defaultdict
-from itertools import combinations
 
 from .common import COMPANION_SCALES, MODELS, SCALES, RunDir, goodness
 
@@ -120,7 +119,7 @@ def write(run: RunDir, judges: list[str]) -> str:
         for b in judges:
             pairs = [(v[a], v[b]) for v in per_item.values() if a in v and b in v]
             try:
-                cells.append("1" if a == b else fmt(statistics.correlation(*zip(*pairs), method="ranked")))
+                cells.append("1" if a == b else fmt(statistics.correlation(*zip(*pairs, strict=False), method="ranked")))
             except (statistics.StatisticsError, ValueError):
                 cells.append("–")
         lines.append(f"| {MODELS[a][2]} | " + " | ".join(cells) + " |")

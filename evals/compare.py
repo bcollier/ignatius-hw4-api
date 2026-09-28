@@ -75,7 +75,7 @@ def rubric_table(rows, method_filter, track, scales, models):
         lines.append(f"| {scale.replace('_', ' ')}{mark} | " + " | ".join(fmt(mean(cell[(scale, m)])) for m in models) + " |")
     overall = [mean([goodness(s, mean(cell[(s, m)]) or 0) for s in scales if cell[(s, m)]]) for m in models]
     lines.append("| **overall (higher is better)** | " + " | ".join(f"**{fmt(o)}**" for o in overall) + " |")
-    return "\n".join(lines), dict(zip(models, overall))
+    return "\n".join(lines), dict(zip(models, overall, strict=False))
 
 
 def per_item(rows, method_filter, scales):
@@ -94,7 +94,7 @@ def agreement(a, b, scales):
         pairs = [(a[k][scale], b[k][scale]) for k in a if k in b and scale in a[k] and scale in b[k]]
         if len(pairs) < 4:
             continue
-        xs, ys = zip(*pairs)
+        xs, ys = zip(*pairs, strict=False)
         try:
             rho = statistics.correlation(xs, ys, method="ranked")
         except statistics.StatisticsError:
@@ -132,7 +132,7 @@ def write(run: RunDir) -> str:
         out += [f"## {TRACK_NAMES[track]}", ""]
         for label, filt, key in (("System A: LLM as judge (both judges)", lambda r: r["system"] == "A", "A"),
                                  ("System A: no judge scoring its own model", lambda r: r["system"] == "A" and r["judge"] != r["model"], "A:no-self"),
-                                 *[(f"System A: judged by {MODELS[j][2]} alone", (lambda j: lambda r: r["judge"] == j)(j), f"A:{j}")
+                                 *[(f"System A: judged by {MODELS[j][2]} alone", (lambda r, j=j: r["judge"] == j), f"A:{j}")
                                    for j in judges if len(judges) > 1],
                                  ("System B: DeepEval G-Eval", lambda r: r["method"] == "geval", "B:geval"),
                                  ("System B: DeepEval JevEval (Jev)", lambda r: r["method"] == "jev", "B:jev")):
@@ -157,8 +157,8 @@ def write(run: RunDir) -> str:
             "The gap is B minus A on the 1-7 scale.", ""]
     for b_method in ("geval", "jev"):
         for track, scales in (("heart", SCALES), ("deep", SCALES), ("companion", COMPANION_SCALES)):
-            a = per_item(rows, lambda r: r["system"] == "A" and r["track"] == track, scales)
-            b = per_item(rows, lambda r: r["method"] == b_method and r["track"] == track, scales)
+            a = per_item(rows, lambda r, track=track: r["system"] == "A" and r["track"] == track, scales)
+            b = per_item(rows, lambda r, track=track, m=b_method: r["method"] == m and r["track"] == track, scales)
             agree = agreement(a, b, scales)
             if not agree:
                 continue

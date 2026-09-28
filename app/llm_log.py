@@ -14,7 +14,7 @@ import time
 log = logging.getLogger(__name__)
 
 # {"user_id", "email", "retreat_id", "day", "purpose"}
-context: contextvars.ContextVar[dict] = contextvars.ContextVar("llm_call_context", default={})
+context: contextvars.ContextVar[dict | None] = contextvars.ContextVar("llm_call_context", default=None)
 
 MAX_TEXT = 200_000  # characters kept per prompt or response
 
@@ -32,7 +32,7 @@ def activity(text: str) -> None:
 
 def tag(**fields) -> None:
     """Add to the current task's log context."""
-    context.set({**context.get(), **fields})
+    context.set({**(context.get() or {}), **fields})
 
 
 def _clip(text: str) -> str:
@@ -85,7 +85,7 @@ async def record(
 ) -> None:
     from .storage import store  # late import: storage imports config only
 
-    ctx = context.get()
+    ctx = context.get() or {}
     row = {
         "user_id": ctx.get("user_id"),
         "email": ctx.get("email"),

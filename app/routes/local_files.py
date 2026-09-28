@@ -13,8 +13,8 @@ router = APIRouter()
 def read_file(path: str):
     try:
         target = store.local_path(path)
-    except StorageError:
-        raise HTTPException(404, "File not found.")
+    except StorageError as exc:
+        raise HTTPException(404, "File not found.") from exc
     if not target.is_file():
         raise HTTPException(404, "File not found.")
     media = "audio/mpeg" if target.suffix == ".mp3" else "image/jpeg"

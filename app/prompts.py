@@ -18,7 +18,7 @@ def _sections(name: str) -> dict[str, str]:
     """A prompt file split at its "## key" headings, as {key: text}."""
     parts = re.split(r"^## +(\w+) *$", _prompt(name), flags=re.M)[1:]
     return {key: " ".join(text.split()) if name == "guide_lines" else text.strip()
-            for key, text in zip(parts[::2], parts[1::2])}
+            for key, text in zip(parts[::2], parts[1::2], strict=False)}
 
 
 def _tagged(tag: str, text: str) -> str:
@@ -37,12 +37,12 @@ PERSON: contextvars.ContextVar[str] = contextvars.ContextVar("person", default="
 # The person's own versions of agent prompts ({agent id: text}, from the Agents page),
 # set for the length of a job like PERSON (profile.use_agents). An agent without one
 # uses the default.
-CUSTOM: contextvars.ContextVar[dict] = contextvars.ContextVar("custom", default={})
+CUSTOM: contextvars.ContextVar[dict | None] = contextvars.ContextVar("custom", default=None)
 
 
 def custom(agent: str, default: str) -> str:
     """The person's version of an agent's prompt in the current job, or the default."""
-    return CUSTOM.get().get(agent) or default
+    return (CUSTOM.get() or {}).get(agent) or default
 
 
 def person_block(about: str) -> str:

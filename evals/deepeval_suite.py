@@ -91,7 +91,7 @@ def piece_metrics(judge, track: str, only: set[str]) -> dict:
             metrics[f"geval:{scale}"] = GEval(
                 name=scale, model=judge, evaluation_params=use, threshold=0.5,
                 criteria=f"The actual output is {PIECE}. Rate how far it is {WHAT[scale]}.",
-                evaluation_steps=[f"Read the day in the input and the actual output as spoken to a person at prayer.",
+                evaluation_steps=["Read the day in the input and the actual output as spoken to a person at prayer.",
                                   f"Judge only this: how far the actual output is {WHAT[scale]}.",
                                   "Use the whole range; an ordinary piece sits in the middle. Don't reward length."])
         if "jev" in only and HAS_JEV:
