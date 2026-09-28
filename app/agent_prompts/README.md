@@ -55,6 +55,15 @@ Placeholders in `{braces}` are filled in by the code; keep them. Files with `## 
 | [`retreat_so_far.md`](retreat_so_far.md) | The heart and deep dive writers from day 2 on, before what earlier days said |
 | [`series.md`](series.md) | Every call for a retreat in a series, before the earlier retreats |
 
+## Eval prompts (not used by the app)
+
+These are used only by the offline evals in `evals/`, never by the app itself.
+
+| File | Used by |
+| --- | --- |
+| [`eval_judge.md`](eval_judge.md), [`eval_judge_companion.md`](eval_judge_companion.md) | `evals/llm_judge.py`: the 1–7 rubric for pieces and for companion conversations |
+| `eval_scale_anchored.md`, `eval_scale_ten.md`, `eval_scale_exemplar.md`, `eval_scale_critique.md`, `eval_scale_checklist.md`, `eval_scale_pairwise.md`, `eval_scale_ranking.md` | `evals/scale_study.py`: seven other ways of asking the judges, compared in [docs/evals/SCALE_STUDY.md](../../docs/evals/SCALE_STUDY.md) |
+
 ## Changing behavior that isn't a prompt
 
 Some behavior is a setting rather than wording:

@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 247 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 248 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1582,6 +1582,12 @@ Tested with a real conversation.
 > merge it
 
 **What was done:** Squash-merged bcollier/ben.collier.phd#16. The new Ignatius at Home image is live on the projects page.
+
+### 248. 2026-09-28, 13:10 UTC
+
+> Still running?
+
+**What was done:** Yes, it had finished: 1,377 judgments, none invalid, about $1.64. My watcher had missed the finish because it matched its own command line. Ran the analysis and committed the study: evals/scale_study.py, seven eval_scale_*.md prompts and docs/evals/SCALE_STUDY.md. Added a "Would another way of asking work better?" section to the evals page, with each format's score histogram and cells shaded good, fair or poor on stated cut-offs. The finding: comparing pieces pairwise did far more than rewording a scale. The judges' agreement rose from α −0.26 to 0.49, and the models separated best. Critique-first cut the top-end pile-up most (79% to 45%). The checklist and the 0–10 scale didn't help.
 
 ---
 
