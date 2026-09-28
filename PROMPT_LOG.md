@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 231 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 232 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1443,6 +1443,27 @@ Production came back up on the new code.
 > on your lifts faith story when I push pause the background sound is still there
 
 **What was done:** Pause (on the page or the lock screen) now fades out and pauses the background music along with the voice, and Play brings back the same track where it stopped. This was true of every practice with music on, not only this one. Checked in a headless browser with the chant playing.
+
+### 232. 2026-09-28, 02:15 UTC
+
+> do this Evals: Opus, GPT-6 and Muse have finished writing. Gemma, on your Mac, needs about two more hours. The cheap judges (Gemini Flash, Muse, Llama Scout) are scoring the finished pieces now. When they're done I'll show you: * the ratings; * each judge's leniency; * the agreement numbers. / explain this Silence notice on live calls: yes or no? It's written up but not built. / go ahead with all security fixes of any size and scope / explain more details and step by step what you need for the only you can do these
+
+**What was done:** Every remaining audit finding and observation fixed and deployed:
+- **F10:** no side effects before an ownership check.
+- **F08:** deleting a retreat or forgetting conversations removes the files and erases the log copies; the costs are kept.
+- **F09:** sign-in codes use the caller's address as Render's edge saw it; no global lockout; one code per account.
+- **F03:** limits on jobs at once and per day.
+- **F04:** bodies capped before parsing; zip-bomb, image-size and page-size limits; Google Docs downloads streamed with a ceiling; parsing off the event loop.
+- **Observations:**
+  - sign-in cache hashed, expiring and bounded;
+  - an empty allowlist now means no one gets full mode;
+  - search queries are written without private notes;
+  - signed links last 6 hours;
+  - dependencies install from a hashed lock;
+  - Dependabot opens update pull requests;
+  - the web page has a Content Security Policy, refuses framing, and keeps tokens out of error reports.
+145 backend tests pass, 23 of them security tests. A walk through the whole app under the new policy found no violations. Production confirmed live (an oversized body now gets 413).
+Cheap-judge pass (Gemini Flash, Muse, Llama Scout) on 48 pieces and conversations: ratings, leniency and agreement (Krippendorff's alpha, also with each judge's leniency removed) in `evals/runs/full/reliability.md`. Agreement is weak. Explained the silence notice, and the owner's remaining steps one by one.
 
 ---
 
