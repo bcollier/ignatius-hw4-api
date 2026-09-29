@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 271 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 272 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1751,6 +1751,12 @@ Added it to the scale study as variant v2 and started it on the three cheap judg
 > This doesn’t have how long it will take to do the examination and does now have the animated line under the text *(with a screenshot of the Examen's first screen)*
 
 **What was done:** The time estimate existed but was drawn under the iPhone's status bar. The practice screen's title, step, time and progress bar are now a header pinned below the status bar (safe area): 'Presence · 1 of 31 · about 15 min', then '· 14 left' from the second step. The spoken text now follows the voice as on the prayer screen: what has been said stays bright, the word being spoken gets the animated gold underline, and the rest waits dimmed. It uses the recording's word timings when there are any, otherwise the playback position. Tested on a phone-sized screen with the Examen.
+
+### 272. 2026-09-29, 16:25 UTC
+
+> Where do the responses get stored and displayed *(with a screenshot of an Examen journaling question with a typed answer)*
+
+**What was done:** Explained: while you type, the answer is kept as a draft on that device. When you move on (Next, Back, the timer ending, or ending the exercise) it's saved to your account, privately, in your own folder (practice_journal.json, up to 2,000 entries), so it follows you to every device. They're shown on the Practice page under 'My practice journal' at the bottom: newest first, the last 60, each with its date and question. Nothing else reads them: not the companion, the calendar or anything shared. Offered to show them elsewhere.
 
 ---
 
