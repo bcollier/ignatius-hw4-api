@@ -255,3 +255,14 @@ def test_preview_gives_a_title_and_description(client):
 def test_preview_rejects_what_it_cannot_read(client):
     r = client.post("/api/retreats/preview", files={"file": ("notes.rtf", b"hello")})
     assert r.status_code == 400
+
+
+def test_boot_timing_is_recorded_and_summarized(client):
+    up = client.get("/api/health").json()["up_seconds"]
+    assert up >= 0
+    for ms, cold in ((42000, True), (38000, True), (300, False)):
+        assert client.post("/api/boot-timing", json={"wait_ms": ms, "cold": cold, "up_seconds": 1.0}).status_code == 204
+    body = client.get("/api/boot-timing?days=3").json()
+    today = body["days"][-1]
+    assert today["n"] >= 3 and today["cold_n"] >= 2 and body["typical_cold_ms"] >= 38000
+    assert client.post("/api/boot-timing", json={"wait_ms": -5}).status_code in (400, 422)

@@ -1,0 +1,28 @@
+# Once a day, time how long the live server takes to answer (usually from asleep: the
+# free tier sleeps after 15 quiet minutes) and record it with the app's own start-up
+# timings (POST /api/boot-timing, source "probe"). Shown in Settings → Server start-up.
+name: Daily start-up check
+on:
+  schedule:
+    - cron: "17 9 * * *" # 09:17 UTC, 5:17 a.m. Eastern: nobody has been praying for hours
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Time the first answer and record it
+        env:
+          API: https://ignatius-hw4-api.onrender.com
+        run: |
+          set -euo pipefail
+          start=$(date +%s%3N)
+          body=$(curl -sS --max-time 300 "$API/api/health")
+          wait_ms=$(( $(date +%s%3N) - start ))
+          up=$(echo "$body" | python3 -c "import json,sys; print(json.load(sys.stdin).get('up_seconds', 1e9))")
+          cold=$(python3 -c "print('true' if $up * 1000 < $wait_ms + 5000 else 'false')")
+          echo "waited ${wait_ms} ms; server up ${up} s; cold start: ${cold}"
+          curl -sS --max-time 60 -X POST "$API/api/boot-timing" -H "Content-Type: application/json" \
+            -d "{\"wait_ms\": ${wait_ms}, \"cold\": ${cold}, \"up_seconds\": ${up}, \"source\": \"probe\"}"

@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 257 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 258 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1665,6 +1665,12 @@ Offered to draft it as a v2 rubric and test it on the free judges.
 - critique before scoring;
 - weak, typical and strong reference pieces, and a quote required for any 6 or 7 (otherwise it counts as 5).
 Added it to the scale study as variant v2 and started it on the three cheap judges over the same 48 pieces (216 judgments). Grouped the 19 scales into craft, faults, fruits of the Spirit and theological virtues. Each scale shows its top-end share, agreement, how well it separates the models, and the scale it most duplicates. Proposed reducing to 5 scored scales plus two yes/no flags and a fruits checklist. None of the 12 fruit and virtue scales separated the models in either track, and several pairs correlate at 0.86–0.94.
+
+### 258. 2026-09-28, 22:00 UTC
+
+> How long is the typical wait at boot up? Start getting a measure of it every day and plot it on a graph in the admin settings along with the customized agents
+
+**What was done:** Every visit now times its wait for the server and reports it (POST /api/boot-timing). The server's new uptime figure in /api/health tells a cold start from an already-awake server. A GitHub Actions job (Daily start-up check, 09:17 UTC) adds one measure a day even when nobody visits. Settings shows a new Server start-up section under Agents, in debug mode: the typical cold start, and a 30-day chart of daily cold-start medians with the longest wait, awake visits, the daily check, and a dashed line for the typical wait. No history existed before this; the first real point is the user's screenshot of a 40-second wait. Also fixed doubled quotation marks in three waiting-screen quotes.
 
 ---
 

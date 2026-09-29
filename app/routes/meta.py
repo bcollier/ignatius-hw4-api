@@ -8,6 +8,7 @@ from .. import auth, config, pricing, prompts, search, talk, tts
 from ..auth import User, current_user
 
 router = APIRouter()
+STARTED = time.time()  # when this server process started: a wait longer than its uptime was a cold start
 
 
 @router.get("/")
@@ -24,6 +25,7 @@ def health():
         "tiers": list(tts.tiers()),
         "sign_in": auth.enabled(),
         "server_time": time.time(),
+        "up_seconds": round(time.time() - STARTED, 1),
     }
 
 
