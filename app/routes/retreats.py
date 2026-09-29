@@ -211,6 +211,8 @@ async def _source_bytes(file: UploadFile | None, example: str, google_doc: str =
 
 @router.get("/{retreat_id}")
 async def read_retreat(retreat: dict = Depends(readable_retreat)):
+    if not retreat.get("read_only") and await pipeline.with_introduction(retreat):
+        await save_retreat(retreat)  # older retreats: the handout's introduction, found once
     return await view_of(retreat)
 
 

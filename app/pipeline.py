@@ -21,7 +21,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import config, inspiration, llm, llm_log, pricing, profile, prompts, search, series, tts
+from . import config, front_matter, inspiration, llm, llm_log, pricing, profile, prompts, search, series, tts
 from .extract import Extracted, Image
 from .storage import StorageError, store
 
@@ -199,6 +199,20 @@ async def _save_source(retreat: dict, source: Extracted) -> None:
     await store.put_file(_source_path(retreat, "source.json"), json.dumps(meta).encode(), "application/json")
     for i, img in enumerate(source.scanned_pages):
         await store.put_file(_source_path(retreat, f"scan{i}.png"), img.data, img.mime)
+
+
+async def with_introduction(retreat: dict) -> bool:
+    """Retreats planned before front matter was kept: read it from the saved source once.
+    True if the plan changed (the caller saves it)."""
+    plan = retreat.get("plan")
+    if not plan or "introduction" in plan or plan.get("mode") != "follows_source":
+        return False
+    try:
+        text = json.loads(await store.get_file(_source_path(retreat, "source.json")))["text"]
+    except (StorageError, ValueError, KeyError):
+        text = ""
+    plan["introduction"] = front_matter.extract(text, plan)
+    return True
 
 
 async def _load_source(retreat: dict) -> Extracted | None:
@@ -387,6 +401,7 @@ async def _plan(retreat: dict, source: Extracted, plan_prompt: str) -> None:
             return await save(retreat)
         finally:
             llm.stream_watch.reset(watching)  # the days' writing isn't planning
+    plan["introduction"] = front_matter.extract(source.text, plan)  # the handout's own words before Day 1
     await _apply_plan(retreat, plan, meter)
     if retreat.get("build_options"):
         await llm_log.step("Next: making each day in order. For each: the reflection for the heart, then web research "
