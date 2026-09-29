@@ -27,6 +27,11 @@ SESSION_VOICES = {
 }
 # Sessions recorded only in the free voice (no ElevenLabs credits).
 FREE_ONLY = {"my-dossier", "birth"}
+# The sleep prayers: only a warm Irish voice (ElevenLabs), levelled to one loudness.
+SLEEP_VOICE = ("1OYA2kgM85gF2eGN8HEp", "Colleen, ElevenLabs (Irish)")
+for _sid in ("sleep-10", "sleep-30", "sleep-45"):
+    SESSION_VOICES[_sid] = {"deluxe": SLEEP_VOICE}
+DELUXE_ONLY = {"sleep-10", "sleep-30", "sleep-45"}
 
 
 async def _balance() -> dict:
@@ -47,6 +52,10 @@ async def main(folder: Path) -> None:
                 voices = {"standard": voices["standard"]}
                 if tier not in voices:
                     session["voices"] = {"standard": voices["standard"][1]}
+                    continue
+            if session["id"] in DELUXE_ONLY:
+                if tier != "deluxe":
+                    session["voices"] = {"deluxe": SLEEP_VOICE[1]}
                     continue
             voice = voices[tier][0]
             session["voices"] = {k: label for k, (_, label) in voices.items()}

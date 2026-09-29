@@ -31,6 +31,9 @@ PREMIUM_VOICES = {
     "EXAVITQu4vr4xnSDxMaL": "Sarah (reassuring, female)",
     "Xb7hH8MSUJpSbSDYk0k2": "Alice (clear educator, British female)",
     "pFZP5JQG7iQjIQuC4Bku": "Lily (velvety, British female)",
+    # From the ElevenLabs voice library (added to the account), chosen for the sleep prayers.
+    "1OYA2kgM85gF2eGN8HEp": "Colleen (warm, Irish female)",
+    "1cxc5c3E9K6F1wlqOJGV": "Emily (soft, meditative, Northern Irish female)",
 }
 
 ELEVENLABS_CHUNK = 2500
