@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 266 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 267 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1721,6 +1721,12 @@ Added it to the scale study as variant v2 and started it on the three cheap judg
 > actually instead of an all-day event it woudl be better to say when it was actually finished so if i do my examin at 11pm i can see what time it happened. same with my bridges program, i wasn to see if i did it at 11am or 11pm etc.
 
 **What was done:** Calendar events are now timed: each prayed day runs from when that sitting began (the player sends it) to when it was finished, or is a 15-minute block ending at the time it was marked prayed. The description says 'Finished at 11:02 pm'. Several finishes within 20 minutes count as one sitting. Finished practices (the Examen and the others) are now recorded (POST /api/practice/done) and appear the same way, linked to the practice. Settings copy updated. 'Bridges' isn't part of the app, so it can't record it; offered options. Feed cache cut to 60 seconds. Tests updated.
+
+### 267. 2026-09-29, 12:00 UTC
+
+> I don’t think I need the bridges button for now
+
+**What was done:** Nothing built; the "I just did…" button for things outside the app stays an idea, noted in the roadmap's spirit for later.
 
 ---
 
