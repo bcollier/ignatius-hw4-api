@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 264 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 265 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1707,6 +1707,14 @@ Added it to the scale study as variant v2 and started it on the three cheap judg
 > put an integration that adds an all day event on your calendar that says prayed week 3 day 1 consideration of all things and a link to this app and to this day if possible. integrate with google calendar if possible. also when you mark a date as prayed, at the top of the day it should say "Last prayed Monday, September 24, 2026" at the top and always stay in memory.
 
 **What was done:** Calendar: Settings → Your calendar turns on a private feed address (/api/calendar/<token>.ics), with buttons to subscribe in Google Calendar or Apple Calendar (webcal). Every day marked prayed then appears as an all-day event, e.g. 'Prayed · Week 3 · Day 1 · Consideration of the way things are', with links to the app and to that day, in the person's own time zone. The week comes from the retreat's series. A prayed day also shows an 'Add to Google Calendar' link that opens the event prefilled. Direct Google Calendar API access was not used because Google requires an app review for calendar permissions. Links to a single day now work (./?r=ID&day=N). The server keeps last_prayed_at and a log of prayed dates, which unmarking doesn't erase, and the top of each day shows 'Last prayed Monday, September 28, 2026' (and how many times, if more than once). 1 test added.
+
+### 265. 2026-09-29, 04:10 UTC
+
+> make a direct link on teh settings page https://calendar.google.com/calendar/u/0/r/settings/addbyurl
+>
+> Settings → Calendar → Accounts
+
+**What was done:** Settings → Your calendar now shows the address itself, and a two-step Google section: 1. Copy your calendar address; 2. a direct link to Google Calendar's add-by-URL page (calendar.google.com/calendar/u/0/r/settings/addbyurl), with 'paste it into URL of calendar'. The one-tap link stays as a fallback. The iPhone section spells out Settings → Calendar → Accounts → Fetch New Data (iOS 18: Settings → Apps → Calendar → Calendar Accounts); a web page can't link into the iPhone's Settings.
 
 ---
 
