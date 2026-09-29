@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 270 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 271 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1745,6 +1745,12 @@ Added it to the scale study as variant v2 and started it on the three cheap judg
 > This image seems blurry did we scale it up too much? Find a better image or fix it *(with a screenshot of Week 3 Day 2's rain photo on the home page)*
 
 **What was done:** Yes: the handout embeds its pictures tiny, so there was nothing better in the PDF to recover. Week 3's are 155–480 pixels wide, and the rain photo is 275 × 183. Fixed both ways. Day 2 (Come to the water, Isaiah 55) now opens with Hiroshige's 'Sudden Shower over Shin-Ōhashi Bridge and Atake' (1857), a public-domain print from The Metropolitan Museum of Art, stored at 1055 × 1568 and credited in its caption; the handout's pictures follow it. Everywhere in the app, a picture under 600 pixels wide is no longer stretched: it's shown at no more than about 1.6 times its size, framed over a blurred wash of its own colours, and on the prayer screen it's centred instead of filling the screen.
+
+### 271. 2026-09-29, 16:10 UTC
+
+> This doesn’t have how long it will take to do the examination and does now have the animated line under the text *(with a screenshot of the Examen's first screen)*
+
+**What was done:** The time estimate existed but was drawn under the iPhone's status bar. The practice screen's title, step, time and progress bar are now a header pinned below the status bar (safe area): 'Presence · 1 of 31 · about 15 min', then '· 14 left' from the second step. The spoken text now follows the voice as on the prayer screen: what has been said stays bright, the word being spoken gets the animated gold underline, and the rest waits dimmed. It uses the recording's word timings when there are any, otherwise the playback position. Tested on a phone-sized screen with the Examen.
 
 ---
 
