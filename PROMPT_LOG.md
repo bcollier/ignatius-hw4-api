@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 261 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 262 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1689,6 +1689,12 @@ Added it to the scale study as variant v2 and started it on the three cheap judg
 > If we use a Jev key for evaluations what is the data use agreement in Jev? Is it private and secure?
 
 **What was done:** Checked TypeSafe's own privacy policy (last updated Nov 19, 2025) and model docs. They don't train or fine-tune on inputs, and the service is hosted in the US. Retention is 'as long as reasonably necessary', with no set period. Zero data retention is for enterprise customers only. They may use anonymized or aggregated data, and the policy gives 'no guarantees' of security; no SOC 2 or subprocessor list is published. What the evals send is low-risk: pieces the models wrote on six World English Bible passages, the research results, and scripted companion conversations, with no real users' notes, journals or conversations. Advised keeping it that way, turning off DeepEval's own telemetry, and rotating the TypeSafe key that was partly visible in an earlier screenshot.
+
+### 262. 2026-09-29, 03:20 UTC
+
+> put how it all works below the header, just above Contents *(with a screenshot of the README's "How it all works" box)*
+
+**What was done:** Moved the "How it all works: ARCHITECTURE.md" box in the web README from under the title to just above Contents, below the video, the introduction and the hero image.
 
 ---
 
