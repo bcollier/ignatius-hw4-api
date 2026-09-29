@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 262 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 263 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1695,6 +1695,12 @@ Added it to the scale study as variant v2 and started it on the three cheap judg
 > put how it all works below the header, just above Contents *(with a screenshot of the README's "How it all works" box)*
 
 **What was done:** Moved the "How it all works: ARCHITECTURE.md" box in the web README from under the title to just above Contents, below the video, the introduction and the hero image.
+
+### 263. 2026-09-29, 03:35 UTC
+
+> I listened to 3 sections of week 3 day 1 so sections 1, 2, 3. then switched to my ipad, it did not save my place that i had started on another device. these should always save your place when you move out. when you come back there should be a simple continue, or restart from the beginning icon
+
+**What was done:** Your place was already saved on the server every 30 seconds and when the screen hid, but opening a day ignored it: the home page's Continue and Pray this day always started at part 1, and the day page's Continue went only to the start of the part. Now the place is also saved at every new part and every pause. Opening a day left partway, from any button or device, shows 'You were partway through this day', with Continue (the part and the time you'll pick up at) and Start from the beginning (a restart icon); the play button means Continue. Continue picks up a few seconds before where you stopped. The day page's buttons now say Continue praying and Start over with icons. Tested locally with a saved place.
 
 ---
 
