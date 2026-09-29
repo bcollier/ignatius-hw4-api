@@ -279,7 +279,19 @@ def test_prayed_days_are_remembered_and_in_the_calendar_feed(client):
     assert on["on"] and on["webcal"].startswith("webcal://") and on["https"].endswith(".ics")
     assert client.post("/api/calendar/feed", json={}).json()["https"] == on["https"]  # the same address
     ics = client.get("/api/calendar/" + on["https"].rsplit("/", 1)[1]).text.replace("\r\n ", "")
-    assert "BEGIN:VCALENDAR" in ics and "DTSTART;VALUE=DATE:" in ics
+    assert "BEGIN:VCALENDAR" in ics and "DTSTART:" in ics and "DTSTART;VALUE=DATE" not in ics and "Finished at " in ics
     assert "SUMMARY:Prayed · Week 2 · Day 1" in ics and f"?r={second}&day=1" in ics
+    # a practice finished tonight, and a day prayed from start to finish, at their real times
+    from datetime import datetime, timedelta, timezone
+    began = (datetime.now(timezone.utc) - timedelta(minutes=12)).isoformat()
+    assert client.post("/api/practice/done", json={"session": "examen", "title": "The Examen", "began_at": began}).json()["from"]
+    client.post(f"/api/retreats/{second}/days/2/progress", json={"step": 9, "finished": True, "began_at": began})
+    token = on["https"].rsplit("/", 1)[1]
+    from app.routes import calendar
+    calendar._cache.clear()
+    ics = client.get("/api/calendar/" + token).text.replace("\r\n ", "")
+    assert "SUMMARY:Prayed · The Examen" in ics and "?practice=examen" in ics
+    start = datetime.fromisoformat(began).astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    assert f"DTSTART:{start}" in ics  # from when it began
     assert client.delete("/api/calendar/feed").status_code == 204
     assert client.get("/api/calendar/" + on["https"].rsplit("/", 1)[1]).status_code == 404

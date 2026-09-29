@@ -1,10 +1,12 @@
 """Prayed days on your own calendar. Turning it on makes a private feed address (a
 long random token in the URL is the only key); subscribe to it once in Google Calendar,
-Apple Calendar or Outlook, and every day you mark prayed appears as an all-day event,
-"Prayed · Week 3 · Day 1 · Consideration of the Way Things Are", with links to the app
-and to that day. Calendar apps re-read the feed on their own schedule (Google every few
+Apple Calendar or Outlook, and every day you pray appears at the time you prayed it,
+from when you began to when you finished ("Prayed · Week 3 · Day 1 · Consideration of
+the Way Things Are"), with links to the app and to that day; finished practices, like
+the Examen, appear the same way. Calendar apps re-read the feed on their own schedule (Google every few
 hours, Apple as often as you set). Turning it off makes the old address stop working."""
 
+import json
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
@@ -21,7 +23,7 @@ from .highlights import _json, _save
 
 router = APIRouter(prefix="/api/calendar")
 TOKENS = "_calendar/tokens.json"  # token -> {"user_id", "tz"}
-CACHE_SECONDS = 600
+CACHE_SECONDS = 60  # calendar apps check every hour or more; this only absorbs bursts
 _cache: dict[str, tuple[float, bytes]] = {}
 
 
@@ -97,26 +99,63 @@ def day_title(retreat: dict, day: dict) -> str:
     return "Prayed · " + " · ".join(p for p in parts if p)
 
 
+UNKNOWN_LENGTH = timedelta(minutes=15)  # when only the finish is known: a short block ending then
+
+
+def _utc(dt: datetime) -> str:
+    return f"{dt.astimezone(timezone.utc):%Y%m%dT%H%M%SZ}"
+
+
+def _event(uid: str, title: str, entry: dict, zone: ZoneInfo, description: str, link: str) -> list[str]:
+    """A timed event: from when it began to when it was finished (calendar apps show it in
+    the viewer's own time zone)."""
+    end = datetime.fromisoformat(entry["at"])
+    begin = datetime.fromisoformat(entry["from"]) if entry.get("from") else end - UNKNOWN_LENGTH
+    if not timedelta(0) < end - begin < timedelta(hours=6):
+        begin = end - UNKNOWN_LENGTH
+    finished = end.astimezone(zone).strftime("%-I:%M %p").lower()
+    lines = ["BEGIN:VEVENT", f"UID:{uid}@ignatius-at-home", f"DTSTAMP:{_utc(datetime.now(timezone.utc))}",
+             f"DTSTART:{_utc(begin)}", f"DTEND:{_utc(end)}", f"SUMMARY:{_escape(title)}",
+             f"DESCRIPTION:{_escape(f'Finished at {finished}.{chr(10)}{description}')}", "TRANSP:TRANSPARENT"]
+    if link:
+        lines.append(f"URL:{link}")
+    return lines + ["END:VEVENT"]
+
+
 def events(retreat: dict, zone: ZoneInfo) -> list[str]:
     plan_days = {str(d["day"]): d for d in (retreat.get("plan") or {}).get("days", [])}
     app = config.APP_URL.rstrip("/") + "/"
     out = []
     for n, state in retreat.get("days", {}).items():
-        dates = state.get("prayed_log") or ([state["prayed_at"]] if state.get("prayed_at") else [])
         d = plan_days.get(n)
         if not d:
             continue
+        log = [e if isinstance(e, dict) else {"at": e} for e in state.get("prayed_log") or []]
+        if not log and state.get("prayed_at"):
+            log = [{"at": state["prayed_at"]}]
         link = f"{app}?r={retreat['id']}&day={n}"
-        title = day_title(retreat, d)
         about = (retreat.get("plan") or {}).get("title", "")
-        for when in dict.fromkeys(dates):
-            local = datetime.fromisoformat(when).astimezone(zone).date()
-            out += ["BEGIN:VEVENT", f"UID:{retreat['id']}-{n}-{local:%Y%m%d}@ignatius-at-home",
-                    f"DTSTAMP:{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}",
-                    f"DTSTART;VALUE=DATE:{local:%Y%m%d}", f"DTEND;VALUE=DATE:{local + timedelta(days=1):%Y%m%d}",
-                    f"SUMMARY:{_escape(title)}", f"URL:{link}",
-                    f"DESCRIPTION:{_escape(f'{about}{chr(10)}This day: {link}{chr(10)}Ignatius at Home: {app}')}",
-                    "TRANSP:TRANSPARENT", "END:VEVENT"]
+        for entry in log:
+            stamp = datetime.fromisoformat(entry["at"]).astimezone(timezone.utc)
+            out += _event(f"{retreat['id']}-{n}-{stamp:%Y%m%dT%H%M%S}", day_title(retreat, d), entry, zone,
+                          f"{about}{chr(10)}This day: {link}{chr(10)}Ignatius at Home: {app}", link)
+    return out
+
+
+async def practice_events(user_id: str, zone: ZoneInfo) -> list[str]:
+    from .practice_journal import done_path
+
+    try:
+        log = json.loads(await store.get_file(done_path(user_id)))
+    except (StorageError, ValueError):
+        return []
+    app = config.APP_URL.rstrip("/") + "/"
+    out = []
+    for entry in log:
+        stamp = datetime.fromisoformat(entry["at"]).astimezone(timezone.utc)
+        link = f"{app}?practice={entry['session']}"
+        out += _event(f"practice-{entry['session']}-{stamp:%Y%m%dT%H%M%S}", f"Prayed · {entry.get('title') or 'A practice'}",
+                      entry, zone, f"Ignatius at Home: {app}", link)
     return out
 
 
@@ -139,6 +178,7 @@ async def feed(token: str):
             continue
         if retreat:
             lines += events(retreat, zone)
+    lines += await practice_events(who["user_id"], zone)
     lines.append("END:VCALENDAR")
     body = ("\r\n".join(_fold(line) for line in lines) + "\r\n").encode()
     _cache[token] = (time.time(), body)

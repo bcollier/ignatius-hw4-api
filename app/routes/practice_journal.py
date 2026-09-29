@@ -52,3 +52,35 @@ async def write_entry(body: Entry, user: User = Depends(current_user)):
     entries = (entries + [entry])[-MAX_ENTRIES:]
     await store.put_file(_path(user.id), json.dumps(entries).encode(), "application/json")
     return entry
+
+
+# ---------------------------------------------------------------- when each practice was done
+# A finished practice (the Examen, a weekly review…), with when it began and ended: kept
+# for the calendar feed, so an Examen at 11 p.m. shows at 11 p.m.
+MAX_DONE = 2_000
+
+
+def done_path(user_id: str) -> str:
+    return f"{user_id}/practice_log.json"
+
+
+class Done(BaseModel):
+    session: str
+    title: str = ""
+    began_at: str | None = None
+
+
+@router.post("/done")
+async def practice_done(body: Done, user: User = Depends(current_user)):
+    from .days import _when  # the same check of a time sent by the browser
+
+    try:
+        log = json.loads(await store.get_file(done_path(user.id)))
+    except (StorageError, ValueError):
+        log = []
+    now = datetime.now(timezone.utc).isoformat()
+    began = _when(body.began_at)
+    entry = {"session": body.session[:40], "title": body.title[:120], "at": now, **({"from": began} if began and began < now else {})}
+    log = (log + [entry])[-MAX_DONE:]
+    await store.put_file(done_path(user.id), json.dumps(log).encode(), "application/json")
+    return entry
