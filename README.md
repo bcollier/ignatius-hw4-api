@@ -506,6 +506,8 @@ Every error has the shape `{"error": {"status": 400, "message": "..."}}`, with a
 | `GET /api/retreats` | 🔒 | | `{retreats: [...], examples: [...]}`: summaries with status, days, progress, day states, prayed counts, series; examples add `demo`, `read_only`, `cover` |
 | `POST /api/retreats` | 🔒 | multipart: `file` (.pdf/.docx, ≤15 MB, ≤40 pages), `model`, `plan_prompt`, `series`, `start_date`, `options` (JSON: voices, write model, research service, prompts, guidance, tailoring) | **202**, retreat `planning`; then `building` with `progress`; then `ready` |
 | `POST /api/retreats/preview` | 🔒 | multipart: `file`, `model` (the planning model; the preview uses the fast one of its family: Llama 4 Scout or Claude Haiku 4.5) | `{title, description, pages}`: a first look at the file, so the person can check it's the right one. Nothing is stored; 20 per account per 10 minutes |
+| `GET/POST/DELETE /api/calendar/feed` | 🔒 | `timezone` (POST) | The person's private calendar feed: its `https` and `webcal` addresses, turned on or off |
+| `GET /api/calendar/{token}.ics` | the token | – | An iCalendar feed: an all-day event for each date a day was prayed |
 | `GET /api/highlights` | 🔒 | – | The person's highlights (newest first), their weekly choice, and which ways of sending are set up |
 | `POST /api/highlights` | 🔒 | `text` (≤1,200), `retreat_id`, `retreat_title`, `day`, `part`, `ref` | The saved highlight (the same text in the same retreat is kept once) |
 | `DELETE /api/highlights/{id}` | 🔒 | – | **204** |

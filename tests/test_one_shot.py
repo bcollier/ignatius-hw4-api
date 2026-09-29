@@ -266,3 +266,20 @@ def test_an_exercise_day_has_nothing_to_record(client, monkeypatch):
     assert r.json()["days"]["2"]["prayed_at"]
     pdf = client.get(f"/api/retreats/{body['id']}/script.pdf")
     assert pdf.status_code == 200 and pdf.content[:4] == b"%PDF"
+
+
+def test_prayed_days_are_remembered_and_in_the_calendar_feed(client):
+    first = until(client, make(client).json()["id"], finished)["id"]
+    second = until(client, make(client, series=first).json()["id"], finished)["id"]
+    url = f"/api/retreats/{second}/days/1/prayed"
+    client.post(url, json={})
+    day = client.post(url, json={"prayed": False}).json()["days"]["1"]
+    assert day["prayed_at"] is None and day["last_prayed_at"] and len(day["prayed_log"]) == 1  # unmarking keeps the memory
+    on = client.post("/api/calendar/feed", json={"timezone": "America/New_York"}).json()
+    assert on["on"] and on["webcal"].startswith("webcal://") and on["https"].endswith(".ics")
+    assert client.post("/api/calendar/feed", json={}).json()["https"] == on["https"]  # the same address
+    ics = client.get("/api/calendar/" + on["https"].rsplit("/", 1)[1]).text.replace("\r\n ", "")
+    assert "BEGIN:VCALENDAR" in ics and "DTSTART;VALUE=DATE:" in ics
+    assert "SUMMARY:Prayed · Week 2 · Day 1" in ics and f"?r={second}&day=1" in ics
+    assert client.delete("/api/calendar/feed").status_code == 204
+    assert client.get("/api/calendar/" + on["https"].rsplit("/", 1)[1]).status_code == 404

@@ -32,6 +32,20 @@ class ProgressRequest(BaseModel):
     finished: bool = False
 
 
+MAX_PRAYED_LOG = 60
+
+
+def remember_prayed(state: dict) -> None:
+    """Keep when a day was prayed even if it's later unmarked: "Last prayed …" on the day,
+    and the calendar feed's events. One entry per date."""
+    now = now_iso()
+    state["last_prayed_at"] = now
+    log = state.get("prayed_log") or []
+    if not log or log[-1][:10] != now[:10]:
+        log.append(now)
+    state["prayed_log"] = log[-MAX_PRAYED_LOG:]
+
+
 @router.post("/prayed")
 async def mark_prayed(day: int, body: PrayedRequest, retreat: dict = Depends(readable_retreat)):
     """Mark a day prayed (or not), and keep the word that stayed and a short note."""
@@ -42,6 +56,8 @@ async def mark_prayed(day: int, body: PrayedRequest, retreat: dict = Depends(rea
     if len(note) > MAX_NOTE_CHARS:
         raise HTTPException(400, f"The note can be up to {MAX_NOTE_CHARS:,} characters.")
     state["prayed_at"] = (state.get("prayed_at") or now_iso()) if body.prayed else None
+    if body.prayed:
+        remember_prayed(state)
     if word or note:
         state["journal"] = {"word": word, "note": note, "at": now_iso()}
     elif body.word is not None or body.note is not None:
@@ -64,6 +80,7 @@ async def listening_progress(day: int, body: ProgressRequest, retreat: dict = De
     if body.finished:
         listening["finished_at"] = now
         state["prayed_at"] = state.get("prayed_at") or now
+        remember_prayed(state)
     state["listening"] = listening
     await save_retreat(retreat)
     return {"listening": listening, "prayed_at": state.get("prayed_at")}
