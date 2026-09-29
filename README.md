@@ -506,6 +506,13 @@ Every error has the shape `{"error": {"status": 400, "message": "..."}}`, with a
 | `GET /api/retreats` | 🔒 | | `{retreats: [...], examples: [...]}`: summaries with status, days, progress, day states, prayed counts, series; examples add `demo`, `read_only`, `cover` |
 | `POST /api/retreats` | 🔒 | multipart: `file` (.pdf/.docx, ≤15 MB, ≤40 pages), `model`, `plan_prompt`, `series`, `start_date`, `options` (JSON: voices, write model, research service, prompts, guidance, tailoring) | **202**, retreat `planning`; then `building` with `progress`; then `ready` |
 | `POST /api/retreats/preview` | 🔒 | multipart: `file`, `model` (the planning model; the preview uses the fast one of its family: Llama 4 Scout or Claude Haiku 4.5) | `{title, description, pages}`: a first look at the file, so the person can check it's the right one. Nothing is stored; 20 per account per 10 minutes |
+| `GET /api/highlights` | 🔒 | – | The person's highlights (newest first), their weekly choice, and which ways of sending are set up |
+| `POST /api/highlights` | 🔒 | `text` (≤1,200), `retreat_id`, `retreat_title`, `day`, `part`, `ref` | The saved highlight (the same text in the same retreat is kept once) |
+| `DELETE /api/highlights/{id}` | 🔒 | – | **204** |
+| `PUT /api/highlights/weekly` | 🔒 | `email`, `sms`, `phone` (E.164) | The weekly choice; refused for a way of sending that isn't set up |
+| `POST /api/highlights/send-weekly` | `X-Cron-Secret` | – | `{sent, skipped, failed}`: one highlight each, the one sent longest ago |
+| `POST /api/boot-timing` | – | `wait_ms`, `cold`, `up_seconds`, `source` | **204**; a start-up wait, limited per address |
+| `GET /api/boot-timing` | 🔒 | `days` (≤120) | Daily start-up waits and the typical cold start |
 | `GET /api/retreats/{id}` | 🔒 readable | | The retreat with signed URLs: plan, days, tracks and guidance clips with scripts, sources, lengths; listening and journal; costs (owners only) |
 | `GET /api/retreats/{id}/script.pdf` | 🔒 readable | `day`, `order` (`lectio`/`simple`), `grace_silence`, `pause` | Printable script in prayer order, with images, guidance, silences, sources, journal; the whole retreat adds a cover and series titles |
 | `GET /api/retreats/{id}/research` | 🔒 readable | | Each day's passage, notes, searches, every result with its service, citations |
@@ -618,6 +625,10 @@ Names only; values go in `.env` or Render's dashboard.
 | `ALLOWED_EMAILS` | no one | Who gets full mode (the paid models and voices). Empty means no one, unless `EVERYONE_FULL=1` |
 | `EVERYONE_FULL` | off | `1` gives every signed-in account full mode when `ALLOWED_EMAILS` is empty (for a private deployment) |
 | `LOCAL_MODE` | off | `1` runs without Supabase: one local user, files on disk. Without it, the server won't start unless sign-in is fully set up |
+| `RESEND_API_KEY`, `MAIL_FROM` | – | Email for the weekly highlight, through [Resend](https://resend.com/docs/api-reference/emails/send-email). `MAIL_FROM` must be on a domain verified in Resend, e.g. `Ignatius at Home <highlights@collier.phd>`. Off until both are set |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` | – | Text messages for the weekly highlight, through [Twilio](https://www.twilio.com/docs/messaging/api/message-resource). US numbers need A2P 10DLC registration first. Off until all three are set |
+| `CRON_SECRET` | – | Shared with the GitHub Actions "Weekly highlight" job (repository secret of the same name); without it `POST /api/highlights/send-weekly` refuses |
+| `APP_URL` | the GitHub Pages address | The link at the foot of the weekly highlight |
 | `JETSTREAM_API_KEY`, `JETSTREAM_BASE_URL`, `JETSTREAM_MODELS` | / proxy URL / `muse-glimmer,llama-4-scout` | Free mode |
 | `FREE_MODE`, `LOCAL_USER_MODE` | `1` / | Free mode switch; preview free mode locally |
 | `TAVILY_API_KEY`, `TAVILY_SEARCH_DEPTH` | / `basic` | Tavily |

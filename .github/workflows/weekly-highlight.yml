@@ -1,0 +1,23 @@
+# Sunday mornings: one saved highlight to each person who asked for it (email or text).
+# Needs the CRON_SECRET repository secret, the same value as CRON_SECRET on Render.
+name: Weekly highlight
+on:
+  schedule:
+    - cron: "0 13 * * 0" # Sundays 13:00 UTC, 9 a.m. Eastern
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Send this week's highlights
+        env:
+          API: https://ignatius-hw4-api.onrender.com
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CRON_SECRET" ]; then echo "CRON_SECRET isn't set; nothing sent."; exit 0; fi
+          curl -sS --max-time 300 "$API/api/health" > /dev/null   # wake the server first
+          curl -sS --fail --max-time 300 -X POST "$API/api/highlights/send-weekly" -H "X-Cron-Secret: $CRON_SECRET"

@@ -117,3 +117,13 @@ PROFILE_MAX_CHARS = _int("PROFILE_MAX_CHARS", 6000)
 # How much of an earlier series goes to the model, in characters (about 4 per token).
 SERIES_MAX_CHARS = _int("SERIES_MAX_CHARS", 600_000)  # Claude: about 150k tokens of a 1M window
 SERIES_MAX_CHARS_FREE = _int("SERIES_MAX_CHARS_FREE", 80_000)  # Jetstream models: about 20k tokens
+
+# The weekly highlight: email through Resend, text messages through Twilio (each off
+# until its keys are set), sent by a scheduled job that presents CRON_SECRET.
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+MAIL_FROM = os.environ.get("MAIL_FROM", "").strip()  # e.g. "Ignatius at Home <highlights@collier.phd>"
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "").strip()
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "").strip()
+TWILIO_FROM = os.environ.get("TWILIO_FROM", "").strip()  # the sending number, +1…
+CRON_SECRET = os.environ.get("CRON_SECRET", "").strip()
+APP_URL = os.environ.get("APP_URL", "https://bcollier.github.io/ignatius-hw4-web/").strip()
