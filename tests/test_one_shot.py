@@ -295,3 +295,25 @@ def test_prayed_days_are_remembered_and_in_the_calendar_feed(client):
     assert f"DTSTART:{start}" in ics  # from when it began
     assert client.delete("/api/calendar/feed").status_code == 204
     assert client.get("/api/calendar/" + on["https"].rsplit("/", 1)[1]).status_code == 404
+
+
+def test_a_photo_of_the_page_is_kept_as_a_pdf_with_the_day(client):
+    rid = until(client, make(client).json()["id"], finished)["id"]
+    doc = pymupdf.open()
+    page = doc.new_page(width=400, height=520)
+    page.insert_text((40, 60), "Come to the water")
+    photo = page.get_pixmap(dpi=144).tobytes("jpeg")
+    r = client.post(f"/api/retreats/{rid}/days/1/page-notes", files={"photo": ("page.jpg", photo, "image/jpeg")},
+                    data={"local_date": "Monday, September 29, 2026"})
+    assert r.status_code == 200, r.text
+    note = r.json()["days"]["1"]["page_notes"][0]
+    assert note["url"] and note["local_date"] == "Monday, September 29, 2026" and note["size"] < 1_000_000
+    assert client.delete(f"/api/retreats/{rid}/days/1/page-notes/{note['id']}").json()["days"]["1"]["page_notes"] == []
+    assert client.post(f"/api/retreats/{rid}/days/1/page-notes", files={"photo": ("x.jpg", b"not a photo", "image/jpeg")}).status_code == 400
+
+
+def test_marked_words_are_matched_to_the_passage():
+    from app import page_notes
+    passage = "Let every one who thirsts, come to the waters; and you who have no money come, buy and eat."
+    assert page_notes.in_passage("come to the waiers", passage) == "come to the waters;"
+    assert page_notes.in_passage("the mountains will sing", passage) is None

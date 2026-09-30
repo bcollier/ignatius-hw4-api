@@ -235,6 +235,7 @@ async def public_view(retreat: dict) -> dict:
     for d in retreat["days"].values():
         for group in ("tracks", "guide"):
             paths += [t["path"] for t in d.get(group, {}).values() if t.get("status") == "ready"]
+    paths += [n["path"] for d in retreat["days"].values() for n in d.get("page_notes") or []]
     urls = await store.urls(paths) if paths else {}
     view["images"] = [{**img, "url": urls.get(img["path"])} for img in retreat["images"]]
 
@@ -242,7 +243,8 @@ async def public_view(retreat: dict) -> dict:
         return {k: {**t, "url": urls.get(t.get("path"))} for k, t in clips.items()}
 
     view["days"] = {
-        n: {**d, "tracks": with_urls(d["tracks"]), "guide": with_urls(d.get("guide", {}))}
+        n: {**d, "tracks": with_urls(d["tracks"]), "guide": with_urls(d.get("guide", {})),
+            **({"page_notes": [{**p, "url": urls.get(p["path"])} for p in d["page_notes"]]} if d.get("page_notes") else {})}
         for n, d in retreat["days"].items()
     }
     if view.get("plan"):  # retreats planned before image_indexes existed

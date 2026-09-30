@@ -1,11 +1,18 @@
 """One day of a retreat: marking it prayed, listening progress, and rebuilding it."""
 
+import asyncio
+import time
+import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from .. import llm_log, pipeline, quotas, tts
+from .. import config, llm_log, page_notes, pipeline, pricing, quotas, tts
+from ..extract import ExtractError
+from ..storage import StorageError, store
+from . import highlights
+from .uploads import read_upload
 from ..access import day_state, my_retreat, now_iso, readable_retreat, save_retreat, view_of
 from ..auth import User, current_user
 from ..checks import BuildRequest, resolve_build
@@ -150,3 +157,75 @@ async def retry_day(day: int, retreat: dict = Depends(my_retreat), user: User = 
     llm_log.tag(email=user.log_email)
     await pipeline.retry_failed(retreat, day)
     return await pipeline.public_view(retreat)
+
+
+# ---------------------------------------------------------------- a photo of the page you prayed with
+# Handwriting copied off it, the printed words you marked highlighted in the app, and
+# the photo with a page of notes kept as a small PDF with this day (app/page_notes.py).
+PAGE_PHOTOS_PER_HOUR = 20
+_page_reads: dict[str, list[float]] = {}
+
+
+def _page_read_allowed(user_id: str) -> bool:
+    now = time.time()
+    recent = [t for t in _page_reads.get(user_id, []) if now - t < 3600]
+    _page_reads[user_id] = recent
+    if len(recent) >= PAGE_PHOTOS_PER_HOUR:
+        return False
+    recent.append(now)
+    return True
+
+
+@router.post("/page-notes")
+async def add_page_notes(day: int, photo: UploadFile = File(...), local_date: str = Form("", max_length=60),
+                         retreat: dict = Depends(my_retreat), user: User = Depends(current_user)):
+    state = day_state(retreat, day)
+    plan_day = next((d for d in retreat["plan"]["days"] if d["day"] == day), None)
+    if not plan_day:
+        raise HTTPException(404, f"This retreat has no day {day}.")
+    if not _page_read_allowed(user.id):
+        raise HTTPException(429, "That's a lot of photos in an hour. Try again a little later.")
+    data = await read_upload(photo)
+    model = config.LLM_MODEL if user.full else (pricing.jetstream_models()[0][0] if pricing.jetstream_models() else config.LLM_MODEL)
+    meter = pricing.Meter(model, await pricing.prices())
+    llm_log.tag(email=user.log_email, retreat_id=retreat["id"], day=day, purpose="page_notes")
+    try:
+        found = await page_notes.read(data, model, meter)
+        when = local_date.strip() or datetime.now(timezone.utc).strftime("%A, %B %-d, %Y")
+        pdf = await asyncio.to_thread(page_notes.make_pdf, data, page_notes.summary_heading(retreat, plan_day), when, found)
+    except ExtractError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, "The photo couldn't be read just now. Please try again.") from exc
+    note_id = uuid.uuid4().hex[:10]
+    path = f"{retreat['user_id']}/{retreat['id']}/day{day}_page_{note_id}.pdf"
+    await store.put_file(path, pdf, "application/pdf")
+    # Marked words that are in the passage become highlights, so they're marked in the app too.
+    passage = plan_day.get("passage_text") or ""
+    for m in found["marked"]:
+        m["matched"] = page_notes.in_passage(m["text"], passage) if passage else None
+    await highlights.add_many(user.id, [{"text": m["matched"], "retreat_id": retreat["id"],
+                                         "retreat_title": (retreat.get("plan") or {}).get("title", ""), "day": day,
+                                         "part": "page", "ref": plan_day.get("source_ref", "")[:120]}
+                                        for m in found["marked"] if m.get("matched")])
+    state.setdefault("page_notes", []).append({"id": note_id, "at": now_iso(), "local_date": when, "path": path,
+                                               "size": len(pdf), "title": found["title"], "handwritten": found["handwritten"],
+                                               "marked": found["marked"], "usd": round(meter.usd, 4)})
+    await save_retreat(retreat)
+    return await view_of(retreat)
+
+
+@router.delete("/page-notes/{note_id}")
+async def remove_page_notes(day: int, note_id: str, retreat: dict = Depends(my_retreat)):
+    state = day_state(retreat, day)
+    notes = state.get("page_notes") or []
+    gone = [n for n in notes if n["id"] == note_id]
+    if not gone:
+        raise HTTPException(404, "No such page.")
+    state["page_notes"] = [n for n in notes if n["id"] != note_id]
+    try:
+        await store.delete_files([gone[0]["path"]])
+    except StorageError:
+        pass
+    await save_retreat(retreat)
+    return await view_of(retreat)

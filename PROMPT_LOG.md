@@ -1798,7 +1798,7 @@ Added it to the scale study as variant v2 and started it on the three cheap judg
 
 > I should be able to take a picture of my notes and have it take any hand written notes off of the page, highlight anything that was underlined or highlighted in the pdf and then converted to a reasonable size pdf and stored with that meditation and journal entry for that days prayer *(with a photo of the Week 3 Day 2 handout: underlines, a circled verse, and handwritten notes "hymn John Foley" and "wow unbelievable")*
 
-**What was done:** Queued, to be built right after the sounds; see the next entries.
+**What was done:** Built. On any day of your own retreat, 'Add a photo of your page' opens the camera. A vision model (Claude for full accounts, Llama 4 Scout on the free tier) copies the handwriting word for word, each note with the printed line it sits beside, and lists the printed words underlined, circled, bracketed or highlighted, with printed verse numbers removed. Each marked phrase is matched letter by letter to the day's passage and saved as a highlight, so it's marked in the app. The photo, turned upright from the phone's rotation tag and resized to 1600 px, and a notes page (heading, local date, 'Your handwritten notes', 'What you marked') are kept as a PDF of about 250–360 KB in the retreat's private folder. It's shown under the day's journal with a link to the PDF, and can be removed; up to 20 photos an hour. Tried on the Week 3 Day 2 photo: 'hymn John Foley' and 'wow unbelievable!' were read and all eight marks matched the passage, in about 17 seconds for about $0.06. 3 tests added.
 
 ### 280. 2026-09-29, 18:55 UTC
 

@@ -70,6 +70,27 @@ async def list_highlights(user: User = Depends(current_user)):
             "channels": _channels(), "email": user.email}
 
 
+async def add_many(user_id: str, new: list[dict]) -> int:
+    """Highlights made for the person (the words they marked on a photo of their page); any
+    already saved are kept once. Returns how many were added."""
+    if not new:
+        return 0
+    items = await _json(_path(user_id), [])
+    have = {(h["text"], h.get("retreat_id")) for h in items}
+    added = 0
+    for h in new:
+        text = " ".join(str(h.get("text") or "").split())[:MAX_TEXT]
+        if len(text) < 2 or (text, h.get("retreat_id")) in have:
+            continue
+        items.append({"id": uuid.uuid4().hex[:12], "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                      "text": text, "retreat_id": h.get("retreat_id", ""), "retreat_title": h.get("retreat_title", ""),
+                      "day": h.get("day"), "part": h.get("part", ""), "ref": h.get("ref", ""), "sent_at": None})
+        have.add((text, h.get("retreat_id")))
+        added += 1
+    await _save(_path(user_id), items[-MAX_HIGHLIGHTS:])
+    return added
+
+
 @router.post("")
 async def add(body: NewHighlight, user: User = Depends(current_user)):
     text = " ".join(body.text.split())

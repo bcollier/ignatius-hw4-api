@@ -509,6 +509,8 @@ Every error has the shape `{"error": {"status": 400, "message": "..."}}`, with a
 | `GET/POST/DELETE /api/calendar/feed` | 🔒 | `timezone` (POST) | The person's private calendar feed: its `https` and `webcal` addresses, turned on or off |
 | `GET /api/calendar/{token}.ics` | the token | – | An iCalendar feed: a timed event for each prayer (from when it began to when it finished) and each finished practice |
 | `POST /api/practice/done` | 🔒 | `session`, `title`, `began_at` | A finished practice, kept for the calendar |
+| `POST /api/retreats/{id}/days/{n}/page-notes` | 🔒 own | multipart: `photo`, `local_date` | The retreat; the day's `page_notes` gains one: the handwriting and marks read from the photo, and a PDF (`url`). Marked words that match the passage become highlights |
+| `DELETE /api/retreats/{id}/days/{n}/page-notes/{note}` | 🔒 own | – | The retreat, without that page |
 | `GET /api/highlights` | 🔒 | – | The person's highlights (newest first), their weekly choice, and which ways of sending are set up |
 | `POST /api/highlights` | 🔒 | `text` (≤1,200), `retreat_id`, `retreat_title`, `day`, `part`, `ref` | The saved highlight (the same text in the same retreat is kept once) |
 | `DELETE /api/highlights/{id}` | 🔒 | – | **204** |
