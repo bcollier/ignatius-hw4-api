@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 274 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 276 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1769,6 +1769,18 @@ Added it to the scale study as variant v2 and started it on the three cheap judg
 > for the retreats that a user uploads, never replace an image for a day with our own image. the images included on the PDF are meaningful prayer icons chosen to go with the text, do not sub in something higher resolution. like this *(with a screenshot of Week 3 Day 2 showing the Hiroshige print)*
 
 **What was done:** Removed the Hiroshige print from Week 3, Day 2: its pictures are the handout's own two again, and the print was deleted from storage. The display change stays: a small handout picture is framed at a size it can hold instead of being stretched, never replaced. Nothing in the app substitutes pictures in uploaded retreats; that was a one-time manual change. Saved as a standing rule.
+
+### 275. 2026-09-29, 17:35 UTC
+
+> The clear and yellow text over this picture does not work well fix it make it pretty and elegant *(with a screenshot of the prayer screen: words over a small picture, a saved highlight drawn as separate boxes)*
+
+**What was done:** Two causes. The small-picture framing added earlier centred the picture on the whole screen, so in 'image and text' view it sat under the words. It's now kept in the picture's band above the text, clear of the close button. The tan boxes were a saved highlight, wrapped word by word because each spoken word is its own element. On the prayer screen a highlight is now one continuous soft gold stroke under the lower half of the letters, with slightly warmer text, and the spaces are marked too so it doesn't break between words.
+
+### 276. 2026-09-29, 17:40 UTC
+
+> More details on how it looks see text problems *(with a screenshot of the Day 2 still life with text running across it)*
+
+**What was done:** The same cause as prompt 275, fixed there: in 'image and text' view the small picture now stays above the words instead of under them. Checked at phone size with the handout's 275-pixel picture.
 
 ---
 
