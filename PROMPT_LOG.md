@@ -1,6 +1,6 @@
 # Prompt log
 
-HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 280 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
+HW4 asks for a log of the AI tools and models used and the prompts given. This project was built with **Claude Code** (Claude Opus 5.5, with Claude Fable 5.1 for the redesign review and the rewritten prompts) from Thursday evening, September 25, to Sunday, September 27, 2026, from an original design written September 24–25 ([docs/original-spec](docs/original-spec/)). Below is **every prompt** the author typed, 281 in all, in order and word for word (typos kept), each with a line on what was done in response. Attached screenshots are marked in italics or `[screenshot]`. No secret keys were ever typed into a prompt; a signed Storage token inside one pasted URL is redacted, and one long, personal "About me" the author pasted (prompt 184) is described rather than reproduced.
 
 **How it was built, in phases** (details in the [frontend README](https://github.com/bcollier/ignatius-hw4-web#the-method-spec-driven-in-phases)): spec first; building to the spec; a large spec-driven revision from [IMPROVEMENTS.md](docs/IMPROVEMENTS.md); a Clean Code cleanup ([CODE_CLEANUP.md](docs/CODE_CLEANUP.md)); the prompts rewritten from a brief; a visual redesign from approved mockups ([VISUAL_REDESIGN.md](docs/VISUAL_REDESIGN.md)); then new features (guided practices, the Examen, retreats from an idea or a photo) and testing on a real iPhone, where each problem seen on the phone came back as a prompt here. The last prompts are documentation, a security review ([CODE_REVIEW.md](docs/CODE_REVIEW.md) holds the review checklist), the sign-in email, and the portfolio entry.
 
@@ -1805,6 +1805,12 @@ Added it to the scale study as variant v2 and started it on the three cheap judg
 > Log all my prompts
 
 **What was done:** Every prompt is logged in both PROMPT_LOG.md files as the work goes (this is prompt 280). Checked both logs have the same entries and count.
+
+### 281. 2026-09-30, 12:00 UTC
+
+> give me the design for the next five major features in the app, and I'll choose one to implement. after you build on feature design create designs for what we should consider for the next feature. I should always have 5 recommended design features ready and one building right now
+
+**What was done:** Wrote five full feature designs in a shared doc, 'Ignatius at Home: Next Feature Designs' (https://claude.ai/code/artifact/e2c511d8-ce5a-4ff2-bebc-83616f693b5a). Each covers why, the experience, data and API, AI, privacy, effort, cost, risks and success: 1. My prayer journal and the movements of the heart (recommended first); 2. The weekly review and repetition day; 3. Share with the person who accompanies you; 4. Classic retreats library; 5. Praying with the saints (Julian of Norwich first). An at-a-glance table compares them, and a queue section tracks 'building now', 'shipped' and five more ideas waiting (liturgical seasons, the iPhone app, group mode, Spanish, retreat houses). Saved the five-ready, one-building rule to memory.
 
 ---
 
