@@ -7,4 +7,4 @@ anthropic==1.8.0
 edge-tts==7.2.8
 httpx==0.28.1
 python-dotenv==1.2.3
-openai==3.19.2
+openai==3.23.0
